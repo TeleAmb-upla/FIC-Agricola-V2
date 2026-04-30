@@ -1,0 +1,24 @@
+{
+  "generated_at": "2026-04-27T00:00:00+00:00",
+  "aoi_id_column": "wetland_id",
+  "source": {
+    "id": "sentinel2",
+    "label": "Sentinel-2",
+    "description": "Series estacionales de referencia (opcional).",
+    "color": "#38bdf8",
+    "has_data": false
+  },
+  "indices": {},
+  "wetlands": {},
+  "rasters": {},
+  "periods": [],
+  "summary": {
+    "n_wetlands": 0,
+    "n_periods": 0,
+    "data_points": 0,
+    "raster_count": 0,
+    "total_area_ha": 0,
+    "latest_period": null,
+    "available_years": []
+  }
+}

@@ -1,0 +1,154 @@
+{
+  "meta": {
+    "version": 1,
+    "descripcion": "Predios temporales de campaña dron: códigos G+número (g1…) o nog para NOG. wetland_id minúsculas en config/API.",
+    "patron_nomenclatura_dron": "{codigo_temporal}_{YYYYMMDD}_{indices|rgb}.{tif}, codigo_temporal ∈ G+N o NOG",
+    "ejemplo": "G1_20240715_ndvi.tif (también NOG_20240715_ndvi.tif con wetland_id \"nog\")"
+  },
+  "organizacion": {
+    "regionales": [
+      {
+        "id": "reg_valparaiso",
+        "nombre": "Regional Valparaíso"
+      }
+    ],
+    "jefes_area": [
+      {
+        "id": "ja_colchagua",
+        "nombre": "Jefe de área — Colchagua costera",
+        "regional_id": "reg_valparaiso"
+      }
+    ],
+    "sats": [
+      {
+        "id": "sat_central",
+        "nombre": "SAT asesoría técnica — zona central",
+        "jefe_area_id": "ja_colchagua"
+      }
+    ],
+    "asesores": [
+      {
+        "id": "as_munoz",
+        "nombre": "María Muñoz",
+        "sat_id": "sat_central"
+      },
+      {
+        "id": "as_reyes",
+        "nombre": "Diego Reyes",
+        "sat_id": "sat_central"
+      }
+    ],
+    "agricultores": [
+      {
+        "id": "agr_vinedos",
+        "nombre": "Viñedos del Valle SPA",
+        "asesor_id": "as_munoz"
+      },
+      {
+        "id": "agr_agricola",
+        "nombre": "Agrícola Los Lomos Ltda.",
+        "asesor_id": "as_reyes"
+      }
+    ]
+  },
+  "predios": [
+    {
+      "codigo_temporal": "G1",
+      "wetland_id": "g1",
+      "nombre": "Campo temporal G1",
+      "agricultor_id": "agr_vinedos",
+      "cadena_superior": {
+        "asesor_id": "as_munoz",
+        "sat_id": "sat_central",
+        "jefe_area_id": "ja_colchagua",
+        "regional_id": "reg_valparaiso"
+      },
+      "ruta_drone_rel": "data/drone/g1/",
+      "notas": "Asignado a María Muñoz (asesor) bajo el mismo SAT que el jefe de área indicado."
+    },
+    {
+      "codigo_temporal": "G2",
+      "wetland_id": "g2",
+      "nombre": "Parcela demostración G2",
+      "agricultor_id": "agr_agricola",
+      "cadena_superior": {
+        "asesor_id": "as_reyes",
+        "sat_id": "sat_central",
+        "jefe_area_id": "ja_colchagua",
+        "regional_id": "reg_valparaiso"
+      },
+      "ruta_drone_rel": "data/drone/g2/",
+      "notas": "Otro productor y asesor distinto; misma jerarquía superior de ejemplo."
+    },
+    {
+      "codigo_temporal": "G3",
+      "wetland_id": "g3",
+      "nombre": "Lote pendiente alta resolución G3",
+      "agricultor_id": "agr_vinedos",
+      "cadena_superior": {
+        "asesor_id": "as_munoz",
+        "sat_id": "sat_central",
+        "jefe_area_id": "ja_colchagua",
+        "regional_id": "reg_valparaiso"
+      },
+      "ruta_drone_rel": "data/drone/g3/",
+      "notas": "Mismo agricultor que G1 para pruebas de dos predios bajo el mismo asesor."
+    },
+    {
+      "codigo_temporal": "G4",
+      "wetland_id": "g4",
+      "nombre": "Predio temporal G4",
+      "agricultor_id": "agr_vinedos",
+      "cadena_superior": {
+        "asesor_id": "as_munoz",
+        "sat_id": "sat_central",
+        "jefe_area_id": "ja_colchagua",
+        "regional_id": "reg_valparaiso"
+      },
+      "ruta_drone_rel": "data/drone/g4/",
+      "notas": "Ejemplo nomenclatura G4_* raster plano."
+    },
+    {
+      "codigo_temporal": "G5",
+      "wetland_id": "g5",
+      "nombre": "Predio temporal G5",
+      "agricultor_id": "agr_agricola",
+      "cadena_superior": {
+        "asesor_id": "as_reyes",
+        "sat_id": "sat_central",
+        "jefe_area_id": "ja_colchagua",
+        "regional_id": "reg_valparaiso"
+      },
+      "ruta_drone_rel": "data/drone/g5/",
+      "notas": ""
+    },
+    {
+      "codigo_temporal": "G6",
+      "wetland_id": "g6",
+      "nombre": "Predio temporal G6",
+      "agricultor_id": "agr_vinedos",
+      "cadena_superior": {
+        "asesor_id": "as_reyes",
+        "sat_id": "sat_central",
+        "jefe_area_id": "ja_colchagua",
+        "regional_id": "reg_valparaiso"
+      },
+      "ruta_drone_rel": "data/drone/g6/",
+      "notas": ""
+    },
+    {
+      "codigo_temporal": "NOG",
+      "wetland_id": "nog",
+      "nombre": "Predio NOG (nombre sin G numérico)",
+      "agricultor_id": "agr_agricola",
+      "cadena_superior": {
+        "asesor_id": "as_munoz",
+        "sat_id": "sat_central",
+        "jefe_area_id": "ja_colchagua",
+        "regional_id": "reg_valparaiso"
+      },
+      "ruta_drone_rel": "data/drone/nog/",
+      "notas": "Archivos planos tipo NOG_YYYYMMDD_ndvi.tif; wetland_id en config: nog."
+    }
+  ]
+}

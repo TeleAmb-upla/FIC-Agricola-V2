@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoreo Agricola · Elige tu nivel de visualización</title>
+    <link rel="icon" href="assets/img/favicon.png" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root{
+            --fic-bg:#eef4ed;--fic-surface:#ffffff;--fic-border:#c5d4c0;--fic-text:#1a2e1f;--fic-muted:#4a5c4e;
+            --fic-accent:#1d6b4a;--fic-accent-soft:rgba(29,107,74,.1);--fic-shadow:0 4px 20px rgba(26,46,31,.08);--fic-radius:16px;
+            --fic-gate-col:min(34rem,100%)
+        }
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{
+            font-family:'Source Sans 3',system-ui,sans-serif;
+            background:var(--fic-bg);
+            background-image:radial-gradient(ellipse 80% 50% at 50% -20%,var(--fic-accent-soft),transparent 55%);
+            color:var(--fic-text);line-height:1.55;min-height:100svh;min-height:100vh;
+            font-size:clamp(15px, calc(0.25vw + 14px), 16px);
+        }
+        .fic-gate{min-height:100svh;min-height:100vh;padding:clamp(1rem,3.5vh,1.75rem) clamp(1rem,4vw,2rem) clamp(1.5rem,4vh,2.5rem);display:flex;align-items:flex-start;justify-content:center}
+        .fic-gate-inner{max-width:min(42rem,94vw);width:100%}
+        .fic-gate-brand{
+            display:grid;
+            grid-template-columns:auto minmax(0,1fr);
+            gap:1rem 1.35rem;
+            align-items:center;
+            width:100%;
+            /* Misma anchura y centrado que .fic-hier (tarjetas de nivel) */
+            max-width:var(--fic-gate-col);
+            margin-left:auto;margin-right:auto;
+            margin-bottom:1.35rem;
+            padding:1.15rem 1.2rem;
+            border-radius:var(--fic-radius);
+            border:2px solid var(--fic-border);
+            background:var(--fic-surface);
+            box-shadow:var(--fic-shadow);
+        }
+        @media(max-width:540px){
+            .fic-gate-brand{
+                grid-template-columns:1fr;
+                justify-items:center;
+                text-align:center;
+                padding:1.2rem 1rem;
+            }
+            .fic-gate-brand__text{text-align:center}
+        }
+        .fic-gate-brand__logo-wrap{
+            flex-shrink:0;
+            padding:6px;
+            border-radius:var(--fic-radius);
+            background:rgba(238,244,237,.85);
+            border:1px solid rgba(197,212,192,.65);
+            filter:drop-shadow(0 4px 16px rgba(29,107,74,.14));
+        }
+        .fic-gate-brand__logo{width:clamp(88px,22vw,138px);height:auto;flex-shrink:0;object-fit:contain;display:block}
+        .fic-gate-brand__text{min-width:0;flex:1}
+        .fic-gate-brand__line{font-family:'Outfit',sans-serif;margin:0;line-height:1.34}
+        .fic-gate-brand__line--lead{
+            font-size:clamp(1.02rem,calc(0.35vw + 0.9rem),1.22rem);font-weight:500;letter-spacing:-0.025em;color:var(--fic-text);
+        }
+        .fic-gate-brand__line--lead strong{
+            font-weight:800;
+            background:linear-gradient(102deg,var(--fic-accent) 0%,#0d4d35 92%);
+            -webkit-background-clip:text;background-clip:text;color:transparent;
+        }
+        @supports not (background-clip: text) {
+            .fic-gate-brand__line--lead strong { color: var(--fic-accent); background: none; }
+        }
+        .fic-gate-brand__line--sub{
+            margin-top:.35rem;font-size:clamp(0.9rem,calc(0.2vw + 0.84rem),1rem);font-weight:500;
+            color:rgba(26,46,31,.82);letter-spacing:-0.015em;
+        }
+        .fic-gate-brand__line--sub strong{font-weight:700;color:var(--fic-accent)}
+        .fic-gate-eyebrow{
+            font-family:'Outfit',sans-serif;
+            font-size:.74rem;
+            letter-spacing:.14em;
+            text-transform:uppercase;
+            color:var(--fic-accent);
+            font-weight:700;
+            margin-bottom:8px;
+            padding:0.35rem 0.55rem;
+            display:inline-block;
+            border-radius:999px;
+            background:var(--fic-accent-soft);
+        }
+        .fic-gate-title{
+            font-family:'Outfit',sans-serif;
+            font-size:clamp(1.48rem,calc(0.55rem + 2vw),2.05rem);
+            font-weight:800;letter-spacing:-0.038em;line-height:1.12;color:#132516;
+            margin-top:2px;
+        }
+        .fic-gate-lead{margin-top:12px;font-size:clamp(0.95rem, calc(0.88rem + 0.2vw), 1.05rem);color:var(--fic-muted);max-width:40rem;line-height:1.55;padding:0.85rem 1rem;border-radius:14px;background:rgba(255,255,255,.72);border:1px solid rgba(197,212,192,.6);box-shadow:0 2px 14px rgba(26,46,31,.05)}
+        .fic-gate-lead em{font-style:normal;color:var(--fic-text);opacity:.88}
+        .fic-hier{margin-top:1.5rem;width:100%;max-width:var(--fic-gate-col);margin-left:auto;margin-right:auto;display:flex;flex-direction:column;align-items:stretch;gap:0}
+        .fic-hier__chain{display:flex;flex-direction:column;align-items:stretch;width:100%}
+        .fic-hier__stem{width:2px;flex:0 0 10px;min-height:10px;align-self:center;margin:0 auto;background:linear-gradient(180deg,var(--fic-border),var(--fic-accent));opacity:.6;border-radius:1px}
+        .fic-hier__merge-note{
+            font-size:.75rem;font-weight:600;color:var(--fic-muted);text-align:center;max-width:100%;margin:.45rem 0 .15rem
+        }
+        .fic-hier__merge-note--tight{margin-top:.2rem}
+        .fic-hier__stem--tall{flex-basis:12px;min-height:12px}
+        .fic-hier__row--pair{
+            display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;align-items:stretch
+        }
+        @media(max-width:520px){
+            .fic-hier__row--pair{grid-template-columns:1fr}
+        }
+        .fic-hier-pick,
+        .fic-hier-pick--link{
+            display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;text-align:left;padding:14px 16px;border-radius:var(--fic-radius);
+            border:2px solid var(--fic-border);background:var(--fic-surface);color:var(--fic-text);cursor:pointer;transition:.16s;box-shadow:var(--fic-shadow);
+            font-family:'Source Sans 3',sans-serif;min-height:0
+        }
+        .fic-hier-pick--link{text-decoration:none;color:inherit}
+        .fic-hier-pick:hover,.fic-hier-pick--link:hover{border-color:var(--fic-accent);box-shadow:0 6px 24px rgba(29,107,74,.1)}
+        .fic-hier-pick:focus,.fic-hier-pick--link:focus{outline:none;border-color:var(--fic-accent);box-shadow:0 0 0 3px var(--fic-accent-soft)}
+        .fic-hier-pick--disabled,.fic-hier-pick--disabled:hover,.fic-hier-pick--disabled:focus{
+            cursor:not-allowed;opacity:.58;border-color:rgba(197,212,192,.72);background:rgba(255,255,255,.72);
+            box-shadow:0 2px 12px rgba(26,46,31,.04);pointer-events:none
+        }
+        .fic-hier-pick__soon{font-style:normal;font-size:.82em;font-weight:600;color:var(--fic-muted);opacity:.95}
+        .fic-hier-pick__name{font-family:'Outfit',sans-serif;font-size:1rem;font-weight:700}
+        .fic-hier-pick__hint{font-size:.86rem;color:var(--fic-muted);line-height:1.38}
+    </style>
+</head>
+<body>
+<div class="fic-gate" id="ficHierarchyGate" role="region" aria-labelledby="ficGateTitle">
+    <div class="fic-gate-inner">
+        <header class="fic-gate-brand" aria-label="Plataforma Monitoreo Agricola">
+            <span class="fic-gate-brand__logo-wrap">
+                <img class="fic-gate-brand__logo" src="assets/img/Logo_FIC_Teleamb.png" width="138" height="138" alt="Logo FIC TeleAmb — Laboratorio TeleAmb, UPLA" decoding="async">
+            </span>
+            <div class="fic-gate-brand__text">
+                <p class="fic-gate-brand__line fic-gate-brand__line--lead">Plataforma de <strong>Monitoreo Satelital Agrícola</strong></p>
+                <p class="fic-gate-brand__line fic-gate-brand__line--sub">para la Adaptación al <strong>Cambio Climático</strong></p>
+            </div>
+        </header>
+        <p class="fic-gate-eyebrow">Acceso al mapa</p>
+        <h1 class="fic-gate-title" id="ficGateTitle">Elige tu nivel de visualización</h1>
+        <p class="fic-gate-lead">Indica <strong>tu rol en la cadena</strong> (regional, jefe, SAT o asesor; el <strong>agricultor</strong> es el nivel más bajo y no elige entre tipos de dato: lo que ve dependerá de la disponibilidad de satélite y dron). <em>Al elegir, abrirás el mapa e índices en otra pantalla.</em></p>
+        <div class="fic-hier" id="ficHierarchyTree">
+            <div class="fic-hier__chain" aria-label="Región y jefe de área (opciones superiores no disponibles aún)">
+                <div class="fic-hier-pick fic-hier-pick--disabled" aria-disabled="true" title="Próximamente">
+                    <span class="fic-hier-pick__name">Regional</span>
+                    <span class="fic-hier-pick__hint">Vista de conjunto y seguimiento por región. <em class="fic-hier-pick__soon">Próximamente.</em></span>
+                </div>
+                <div class="fic-hier__stem" aria-hidden="true"></div>
+                <div class="fic-hier-pick fic-hier-pick--disabled" aria-disabled="true" title="Próximamente">
+                    <span class="fic-hier-pick__name">Jefe de área</span>
+                    <span class="fic-hier-pick__hint">Coordina oficinas o equipos bajo un área. <em class="fic-hier-pick__soon">Próximamente.</em></span>
+                </div>
+            </div>
+            <div class="fic-hier__stem fic-hier__stem--tall" aria-hidden="true"></div>
+            <p class="fic-hier__merge-note" id="ficHierPairExpl">Mismo escalón: servicio de asesoría (SAT) y asesor individual</p>
+            <div class="fic-hier__row--pair" role="group" aria-labelledby="ficHierPairExpl">
+                <a class="fic-hier-pick fic-hier-pick--link" href="explorador.html?nivel=sat">
+                    <span class="fic-hier-pick__name">SAT</span>
+                    <span class="fic-hier-pick__hint">Servicio de asesoría técnica de una zona.</span>
+                </a>
+                <a class="fic-hier-pick fic-hier-pick--link" href="explorador.html?nivel=asesor">
+                    <span class="fic-hier-pick__name">Asesor (individual)</span>
+                    <span class="fic-hier-pick__hint">Cartera de productores y visitas a terreno.</span>
+                </a>
+            </div>
+            <div class="fic-hier__stem fic-hier__stem--tall" aria-hidden="true"></div>
+            <p class="fic-hier__merge-note fic-hier__merge-note--tight" id="ficHierAgricultor">Nivel más bajo: un solo acceso al predio</p>
+            <div class="fic-hier__chain" aria-labelledby="ficHierAgricultor">
+                <a class="fic-hier-pick fic-hier-pick--link" href="explorador.html?nivel=agricultor">
+                    <span class="fic-hier-pick__name">Agricultor</span>
+                    <span class="fic-hier-pick__hint">Verás datos de satélite siempre que existan series; los vuelos de dron aparecen cuando hay campañas cargadas para tu zona. Una sola vista con lo disponible.</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

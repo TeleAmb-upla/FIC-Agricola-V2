@@ -1,0 +1,9 @@
+{
+  "source": {
+    "id": "sentinel2",
+    "label": "Sentinel-2",
+    "description": "Series estacionales de referencia (opcional).",
+    "has_data": false
+  },
+  "wetlands": {}
+}

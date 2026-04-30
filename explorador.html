@@ -1,0 +1,1609 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoreo Agricola · Visualización</title>
+    <link rel="icon" href="assets/img/favicon-explorador.png" type="image/png" sizes="512x512">
+    <link rel="apple-touch-icon" href="assets/img/favicon-explorador.png" sizes="180x180">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <style>
+        :root {
+            --fic-ag-dark: #0f2418;
+            --fic-ag-mid: #1d6b4a;
+            --fic-ag-accent: #2d9d6e;
+            --fic-ag-ink: #122018;
+            --fic-ag-muted: #4a5c4e;
+            --fic-ag-border-soft: rgba(29, 107, 74, 0.09);
+            --fic-ag-glass: rgba(255, 255, 255, 0.93);
+            --fic-ag-glass-edge: rgba(255, 255, 255, 0.55);
+            --fic-panel-w: clamp(316px, 30vw, 380px);
+            --fic-ndvi: #2d8a4e;
+            --fic-ndwi: #2b6cb0;
+            --fic-warn: #c4a035;
+            --fic-radius-soft: 20px;
+            --fic-radius-inner: 18px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body.fic-explorer {
+            height: 100%;
+            max-height: 100dvh;
+            overflow: hidden;
+        }
+        body.fic-explorer {
+            font-family: 'Source Sans 3', system-ui, sans-serif;
+            background: #0f1512;
+            color: var(--fic-ag-ink);
+            font-size: clamp(15.5px, calc(0.38vw + 14px), 17px);
+            line-height: 1.5;
+        }
+        /* App: panel izquierdo de borde a borde + etapa de mapa */
+        .fic-app {
+            display: flex;
+            width: 100%;
+            height: 100dvh;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .fic-map-stage {
+            position: relative;
+            flex: 1;
+            min-width: 0;
+            min-height: 0;
+            background: #0d120f;
+        }
+        #mapa {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            width: 100%;
+            height: 100%;
+            background: #0d120f;
+        }
+        .fic-explorer .leaflet-container { background: #0d120f; font-family: inherit; border-radius: 0; }
+        /* Zoom y controles: esquina del mapa (no del panel) */
+        .fic-explorer .leaflet-control-zoom { border: none !important; box-shadow: 0 6px 24px rgba(0,0,0,.14) !important; border-radius: 14px !important; overflow: hidden; }
+        .fic-explorer .leaflet-control-zoom a { width: 34px; height: 34px; line-height: 34px; font-size: 18px; color: var(--fic-ag-ink) !important; background: rgba(255,255,255,.96) !important; border-bottom-color: rgba(0,0,0,.06) !important; }
+        .fic-explorer .leaflet-control-layers { border: none !important; border-radius: 14px !important; box-shadow: 0 6px 24px rgba(0,0,0,.14) !important; background: rgba(255,255,255,.96) !important; padding: 6px 10px !important; }
+        .fic-explorer .leaflet-bar { border: none !important; }
+        @media (max-width: 720px) {
+            .fic-app { flex-direction: column; }
+            :root { --fic-panel-w: 100%; }
+            .fic-side-panel { max-height: 42dvh; width: 100% !important; border-right: none !important; border-bottom: 1px solid var(--fic-ag-border-soft); }
+            .fic-map-stage { flex: 1; min-height: 48dvh; }
+            .fic-panel-brand__pill {
+                flex-wrap: wrap;
+                justify-content: center;
+                row-gap: 0.35rem;
+            }
+            .fic-topbar-headings { text-align: center; }
+        }
+
+        /* Marca FIC (dentro del panel lateral, centrada) */
+        .fic-panel-brand {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            justify-content: flex-start;
+            width: 100%;
+            padding: 0 0 0.5rem;
+        }
+        .fic-panel-brand__pill {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 0.45rem;
+            padding: 0.38rem 0.7rem 0.38rem 0.38rem;
+            max-width: 100%;
+            border-radius: 18px;
+            background: linear-gradient(165deg, rgba(255,255,255,0.72) 0%, rgba(251,253,250,0.52) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.72);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow:
+                0 4px 24px rgba(18, 42, 28, 0.07),
+                inset 0 1px 0 rgba(255, 255, 255, 0.88);
+        }
+        .fic-brand {
+            flex-shrink: 0;
+            width: clamp(72px, 15vw, 108px);
+            height: clamp(72px, 15vw, 108px);
+            border-radius: 14px;
+            overflow: visible;
+            background: transparent;
+            box-shadow: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2px;
+            filter: drop-shadow(0 4px 14px rgba(29, 107, 74, 0.24));
+        }
+        .fic-brand img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .fic-topbar-headings {
+            min-width: 0;
+            flex: 1;
+            text-align: left;
+        }
+        .fic-topbar-kicker {
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: rgba(45, 157, 110, 0.72);
+            line-height: 1.2;
+        }
+        .fic-topbar-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: clamp(1.08rem, calc(0.48rem + 1.25vw), 1.32rem);
+            font-weight: 800;
+            letter-spacing: -0.038em;
+            line-height: 1.12;
+            margin-top: 2px;
+            background: linear-gradient(100deg, var(--fic-ag-dark) 0%, var(--fic-ag-mid) 52%, #145a3a 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            filter: drop-shadow(0 2px 14px rgba(29, 107, 74, 0.12));
+        }
+        @supports not (background-clip: text) {
+            .fic-topbar-title { color: var(--fic-ag-dark); background: none; filter: none; }
+        }
+
+        /* Panel lateral: columna normal, alto completo, bordes suaves */
+        .fic-side-panel {
+            width: var(--fic-panel-w);
+            flex-shrink: 0;
+            height: 100%;
+            min-height: 0;
+            padding: max(10px, env(safe-area-inset-top)) 18px max(12px, env(safe-area-inset-bottom)) 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            overflow: hidden;
+            background: linear-gradient(175deg, #fbfdf9 0%, #f3f8f3 38%, #ebf3ec 100%);
+            border-right: 1px solid var(--fic-ag-border-soft);
+            box-shadow: 12px 0 40px rgba(18, 42, 28, 0.07);
+            z-index: 5;
+        }
+        .fic-side-panel__scroll {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 2px 4px 10px 2px;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            -webkit-overflow-scrolling: touch;
+        }
+        .fic-side-panel__scroll::-webkit-scrollbar { width: 6px; }
+        .fic-side-panel__scroll::-webkit-scrollbar-thumb {
+            background: rgba(29, 107, 74, 0.18);
+            border-radius: 99px;
+        }
+        .fic-panel-block {
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid rgba(255, 255, 255, 0.85);
+            border-radius: var(--fic-radius-inner);
+            padding: 1.05rem 1.05rem 1.1rem;
+            box-shadow:
+                0 2px 20px rgba(18, 42, 28, 0.05),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        }
+        .fic-panel-block--tight { padding: 0.95rem 0.95rem 1rem; }
+        .fic-dock-nav {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 10px;
+            margin-bottom: 0.65rem;
+            padding-bottom: 0.7rem;
+            border-bottom: 1px solid rgba(29, 107, 74, 0.08);
+        }
+        .fic-hier-badge-wrap { font-size: 0.88rem; color: var(--fic-ag-muted); }
+        .fic-hier-badge-wrap strong { color: var(--fic-ag-ink); font-weight: 700; }
+        .btn-ghost {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 999px;
+            border: none;
+            background: rgba(255, 255, 255, 0.75);
+            color: var(--fic-ag-mid);
+            font-size: 0.86rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            text-decoration: none;
+            transition: 0.18s ease;
+            box-shadow: 0 2px 12px rgba(18, 42, 28, 0.06);
+        }
+        .btn-ghost:hover { background: #fff; box-shadow: 0 4px 16px rgba(29, 107, 74, 0.12); color: var(--fic-ag-dark); }
+        .fic-ctx-hint {
+            font-size: 0.86rem;
+            color: var(--fic-ag-ink);
+            line-height: 1.4;
+            padding: 0.5rem 0.65rem;
+            border-radius: 12px;
+            background: rgba(232, 244, 233, 0.75);
+            border: 1px solid rgba(29, 107, 74, 0.1);
+            margin: 0.35rem 0 0.15rem;
+        }
+        .fic-ctx-hint[hidden] { display: none !important; }
+        .fic-welcome {
+            font-weight: 600;
+            color: var(--fic-ag-dark);
+        }
+
+        .fic-panel-block--tight .fic-sidebar-title { margin-top: 0.5rem; }
+        .fic-sidebar-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--fic-ag-dark);
+            margin: 0.35rem 0 0.5rem;
+        }
+        .helper { font-size: 0.9rem; color: var(--fic-ag-muted); line-height: 1.45; margin-bottom: 0.65rem; }
+        .fic-sidebar-block { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.7rem; }
+        .fic-sidebar-block:first-of-type { margin-top: 0; }
+        .selector-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--fic-ag-muted);
+        }
+        .fic-sidebar-block select {
+            padding: 0.55rem 0.7rem;
+            border-radius: 12px;
+            border: none;
+            background: rgba(255, 255, 255, 0.9);
+            color: var(--fic-ag-ink);
+            font-size: 0.94rem;
+            width: 100%;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            line-height: 1.35;
+            box-shadow: 0 2px 12px rgba(18, 42, 28, 0.06);
+        }
+        .fic-sidebar-block select:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(45, 157, 110, 0.28), 0 2px 12px rgba(18, 42, 28, 0.08);
+        }
+        .fic-layer-hint {
+            font-size: 0.82rem;
+            color: var(--fic-ag-muted);
+            margin-top: 0.45rem;
+            line-height: 1.4;
+        }
+        .fic-panel-error { font-size: 0.86rem; color: #7a1e1e; line-height: 1.4; }
+
+        .fic-map-hud {
+            position: absolute;
+            z-index: 850;
+            pointer-events: none;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+        .map-note {
+            position: absolute;
+            top: max(10px, env(safe-area-inset-top));
+            left: 50%;
+            right: auto;
+            transform: translateX(-50%);
+            max-width: min(420px, calc(100% - 100px));
+            width: max-content;
+            padding: 0.5rem 0.85rem;
+            background: rgba(255, 255, 255, 0.94);
+            border: 1px solid rgba(29, 107, 74, 0.1);
+            border-radius: 12px;
+            color: var(--fic-ag-muted);
+            font-size: 0.86rem;
+            line-height: 1.4;
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        .colorbar-box {
+            position: absolute;
+            left: max(14px, env(safe-area-inset-left));
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.94);
+            border: 1px solid rgba(29, 107, 74, 0.1);
+            border-radius: 18px;
+            padding: 12px 11px;
+            display: none;
+            align-items: center;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 86px;
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
+        }
+        .colorbar-title { font-size: 0.72rem; font-weight: 700; color: var(--fic-ag-muted); text-align: center; }
+        .colorbar-scale { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+        .colorbar-gradient { height: 168px; width: 14px; border-radius: 999px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06); }
+        .colorbar-scale span { font-size: 0.74rem; color: var(--fic-ag-ink); font-weight: 700; }
+        .preview-raster { image-rendering: pixelated; image-rendering: crisp-edges; }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 0.55rem 0.9rem;
+            min-height: 0;
+            border-radius: 12px;
+            border: none;
+            background: linear-gradient(165deg, var(--fic-ag-accent) 0%, var(--fic-ag-mid) 100%);
+            color: #fff;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            box-shadow: 0 3px 14px rgba(29, 107, 74, 0.28);
+            transition: 0.18s ease;
+        }
+        .btn:hover { filter: brightness(1.05); box-shadow: 0 5px 18px rgba(29, 107, 74, 0.34); }
+
+        /* Cartera asesor: panel flotante inferior — gráfico columnas NDVI + NDWI (Chart.js) */
+        .fic-asesor-chart-dock {
+            position: absolute;
+            z-index: 1100;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            padding: 0 14px 14px;
+            pointer-events: none;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+        }
+        .fic-asesor-chart-dock[hidden] { display: none !important; }
+        .fic-asesor-chart-card {
+            pointer-events: auto;
+            width: 100%;
+            max-width: min(720px, 92vw);
+            max-height: min(52vh, 460px);
+            display: flex;
+            flex-direction: column;
+            gap: 0.55rem;
+            padding: 0.75rem 1rem 0.85rem;
+            border-radius: var(--fic-radius-soft);
+            background: linear-gradient(165deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 252, 249, 0.94) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.75);
+            box-shadow:
+                0 -8px 40px rgba(18, 42, 28, 0.12),
+                0 18px 48px rgba(0, 0, 0, 0.14);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            animation: ficAsesorDockIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+            transition: padding 0.3s ease, gap 0.3s ease;
+        }
+        .fic-asesor-chart-card--collapsed {
+            max-height: none;
+            padding-bottom: 0.62rem;
+            gap: 0.35rem;
+        }
+        .fic-asesor-chart-card--collapsed .fic-asesor-chart-sub {
+            display: none;
+        }
+        .fic-asesor-chart-card--collapsed .fic-asesor-chart-canvas-wrap {
+            height: 0 !important;
+            min-height: 0 !important;
+            max-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            opacity: 0;
+            overflow: hidden !important;
+            pointer-events: none;
+            border: none !important;
+        }
+        @keyframes ficAsesorDockIn {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fic-asesor-chart-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        .fic-asesor-chart-head-main {
+            min-width: 0;
+            flex: 1;
+        }
+        .fic-asesor-chart-toggle {
+            flex-shrink: 0;
+            align-self: flex-start;
+            margin-top: 2px;
+            padding: 5px 11px;
+            font-size: 0.72rem;
+            white-space: nowrap;
+        }
+        .fic-asesor-chart-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.92rem;
+            font-weight: 800;
+            color: var(--fic-ag-dark);
+            letter-spacing: -0.02em;
+            line-height: 1.2;
+            margin: 0;
+        }
+        .fic-asesor-chart-sub {
+            font-size: 0.74rem;
+            color: var(--fic-ag-muted);
+            line-height: 1.42;
+            margin: 0.22rem 0 0;
+            max-width: 52ch;
+        }
+        /* Altura fija del área del chart: evita que flex/transiciones dejen el canvas en altura residual tras plegar/desplegar. */
+        .fic-asesor-chart-canvas-wrap {
+            position: relative;
+            flex: 0 0 auto;
+            width: 100%;
+            height: min(40vh, 360px);
+            min-height: min(40vh, 360px);
+            max-height: min(40vh, 360px);
+            opacity: 1;
+            transition: opacity 0.25s ease;
+        }
+        .fic-asesor-chart-canvas-wrap canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+        }
+        @media (max-width: 720px) {
+            .fic-asesor-chart-card { max-height: min(48vh, 420px); padding: 0.65rem 0.75rem 0.75rem; }
+            .fic-asesor-chart-canvas-wrap {
+                height: min(44vh, 320px);
+                min-height: min(44vh, 320px);
+                max-height: min(44vh, 320px);
+            }
+        }
+    </style>
+</head>
+<body class="fic-explorer">
+<div class="fic-app">
+<aside class="fic-side-panel" aria-label="Controles y resumen">
+    <header class="fic-panel-brand" id="ficTopbar" role="banner">
+        <div class="fic-panel-brand__pill">
+            <div class="fic-brand" title="Monitoreo Agricola — TeleAmb UPLA">
+                <img src="assets/img/Logo_FIC_Teleamb.png" alt="Logo FIC TeleAmb UPLA" width="108" height="108" decoding="async">
+            </div>
+            <div class="fic-topbar-headings">
+                <span class="fic-topbar-kicker">FIC — TeleAmb · UPLA</span>
+                <h1 class="fic-topbar-title">Monitoreo satelital agrícola</h1>
+            </div>
+        </div>
+    </header>
+    <div class="fic-side-panel__scroll">
+        <div class="fic-panel-block fic-panel-block--tight">
+            <div class="fic-dock-nav">
+                <div class="fic-hier-badge-wrap">Nivel: <strong id="ficHierarchyBadge">—</strong></div>
+                <a class="btn-ghost" id="ficBackToGate" href="index.html">Cambiar nivel</a>
+            </div>
+            <p class="fic-ctx-hint fic-welcome" id="ficWelcomeBanner" role="status" hidden></p>
+            <p class="fic-ctx-hint" id="ficHierarchyContextHint" role="status" hidden></p>
+            <p class="fic-panel-error" id="ficLoadHint" role="alert" hidden></p>
+            <h2 class="fic-sidebar-title">Mapa</h2>
+            <p class="helper" id="ficPredioHelper">Elige predio y capa. La fecha mostrada es la <strong>última imagen disponible</strong> para esa combinación.</p>
+            <div class="fic-sidebar-block">
+                <label class="selector-label" for="globalWetland">Predio</label>
+                <select id="globalWetland"></select>
+            </div>
+            <div class="fic-sidebar-block">
+                <label class="selector-label" for="mapIndex">Capa (índice o vista)</label>
+                <select id="mapIndex" title="Elegir capa: RGB, NDVI, NDWI…"></select>
+            </div>
+            <p class="fic-layer-hint" id="ficLayerPillHint"></p>
+        </div>
+    </div>
+</aside>
+
+<div class="fic-map-stage">
+    <div id="mapa" role="application" aria-label="Mapa interactivo"></div>
+    <div class="fic-map-hud" aria-hidden="true">
+        <div class="map-note" id="mapNote">Cargando mapa…</div>
+        <div class="colorbar-box" id="colorbarBox">
+            <div class="colorbar-title" id="cbTitle">NDVI</div>
+            <div class="colorbar-scale">
+                <span id="cbMax"></span>
+                <div class="colorbar-gradient" id="cbGradient"></div>
+                <span id="cbMin"></span>
+            </div>
+        </div>
+    </div>
+    <div class="fic-asesor-chart-dock" id="ficAsesorChartDock" hidden role="region" aria-label="Resumen de tu cartera: NDVI y NDWI">
+        <div class="fic-asesor-chart-card fic-asesor-chart-card--collapsed" id="ficAsesorChartCard">
+            <div class="fic-asesor-chart-head">
+                <div class="fic-asesor-chart-head-main">
+                    <h3 class="fic-asesor-chart-title">Tu cartera, último vuelo</h3>
+                    <p class="fic-asesor-chart-sub" id="ficAsesorChartSubtitle"></p>
+                </div>
+                <button type="button" class="btn-ghost fic-asesor-chart-toggle" id="ficAsesorChartToggle" aria-expanded="false" aria-controls="ficAsesorChartCanvasWrap">Mostrar gráfico</button>
+            </div>
+            <div class="fic-asesor-chart-canvas-wrap" id="ficAsesorChartCanvasWrap">
+                <canvas id="ficAsesorChartCanvas" aria-label="Barras NDVI y NDWI por agricultor; tocá una para abrir el predio"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/** Carpeta URL de esta página (p. ej. ``/`` o ``/fic_agro/``) para resolver ``data_static/`` bien con Live Server o http.server desde distintas rutas. */
+function ficPageDirPrefix() {
+    var p = window.location.pathname || '/';
+    var i = p.lastIndexOf('/');
+    return i <= 0 ? '/' : p.slice(0, i + 1);
+}
+const BASE = ficPageDirPrefix() + 'data_static';
+/** Datos de origen: AOI maestro (= ``shapefile_path`` → ``data/shapefiles/aoi.geojson``). */
+const SOURCE_DATA_ROOT = ficPageDirPrefix() + 'data';
+const LS_HIER = 'fic-hierarchy-level';
+/** ``1`` = panel del gráfico cartera desplegado (SAT / asesor); sin clave = plegado al entrar. */
+const LS_PORTFOLIO_CHART_EXPANDED = 'fic_portfolio_chart_expanded';
+const HIERARCHY_LEVELS = {
+    regional: { badge: 'Regional', appHint: 'Vista de alcance regional. Próximamente verás resúmenes agregados según el territorio bajo tu cargo.' },
+    jefe_area: { badge: 'Jefe de área', appHint: 'Vista de coordinación: más adelante filtrarás oficinas o equipos bajo tu gestión.' },
+    sat: { badge: 'SAT (asesoría técnica)', appHint: 'Vista alineada a un servicio de asesoría de zona.' },
+    asesor: { badge: 'Asesor', appHint: 'Vista de asesor en terreno; podrás acotar a tu cartera de productores.' },
+    agricultor: { badge: 'Agricultor', appHint: 'Vista centrada en tu predio: ortofoto e índices cuando hay campañas de dron cargadas.' }
+};
+const NIVEL_LEGACY = { agricultor_satelital: 'agricultor', sensor: 'agricultor' };
+
+const CBAR = {
+    ndvi: { gradient: 'linear-gradient(to top,#a50026,#d73027,#f46d43,#fdae61,#fee08b,#ffffbf,#d9ef8b,#a6d96a,#66bd63,#1a9850,#006837)', label: 'Follaje (NDVI)' },
+    ndwi: { gradient: 'linear-gradient(to top,#a50026,#d73027,#f46d43,#fdae61,#fee090,#ffffbf,#e0f3f8,#abd9e9,#74add1,#4575b4,#313695)', label: 'Agua (NDWI)' }
+};
+
+let mapa, aoiLayer, rasterOverlay;
+/** Gráfico cartera NDVI/NDWI (SAT y asesor); se destruye al ocultar o actualizar. */
+window.ficAsesorBarChart = null;
+
+function ficDestroyAsesorBarChart() {
+    var canvas = document.getElementById('ficAsesorChartCanvas');
+    if (canvas && typeof Chart !== 'undefined' && Chart.getChart) {
+        var ch = Chart.getChart(canvas);
+        if (ch) ch.destroy();
+    }
+    window.ficAsesorBarChart = null;
+}
+
+function ficUsesPortfolioCarteraChart() {
+    var h = state.hierarchyLevel;
+    return h === 'sat' || h === 'asesor';
+}
+
+function ficIsPortfolioChartExpanded() {
+    try {
+        return localStorage.getItem(LS_PORTFOLIO_CHART_EXPANDED) === '1';
+    } catch (e) {
+        return false;
+    }
+}
+
+function ficSetPortfolioChartExpanded(expanded) {
+    try {
+        if (expanded) localStorage.setItem(LS_PORTFOLIO_CHART_EXPANDED, '1');
+        else localStorage.removeItem(LS_PORTFOLIO_CHART_EXPANDED);
+    } catch (e) {}
+}
+
+function ficApplyPortfolioChartPanelDom() {
+    var card = document.getElementById('ficAsesorChartCard');
+    var btn = document.getElementById('ficAsesorChartToggle');
+    var expanded = ficIsPortfolioChartExpanded();
+    if (card) card.classList.toggle('fic-asesor-chart-card--collapsed', !expanded);
+    if (btn) {
+        btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        btn.textContent = expanded ? 'Ocultar gráfico' : 'Mostrar gráfico';
+    }
+    return expanded;
+}
+
+/** Tras desplegar, Chart.js a veces mide el canvas con altura 0; re-rendea cuando el layout ya aplicó la altura real. */
+function ficResizePortfolioChartDeferred() {
+    function run() {
+        var ch = window.ficAsesorBarChart;
+        if (ch && typeof ch.resize === 'function') ch.resize();
+    }
+    run();
+    requestAnimationFrame(function () {
+        run();
+        requestAnimationFrame(function () {
+            run();
+            setTimeout(run, 48);
+            setTimeout(run, 160);
+        });
+    });
+}
+
+function ficTogglePortfolioChartPanel() {
+    var expanded = !ficIsPortfolioChartExpanded();
+    ficSetPortfolioChartExpanded(expanded);
+    ficApplyPortfolioChartPanelDom();
+    if (!expanded) {
+        ficDestroyAsesorBarChart();
+    } else {
+        updateAsesorPortfolioChart();
+    }
+    requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+            if (mapa) mapa.invalidateSize({ animate: false });
+        });
+    });
+}
+
+const state = {
+    manifest: null,
+    aoi: null,
+    datasets: {},
+    metadata: {},
+    selectedSource: null,
+    selectedWetland: null,
+    hierarchyLevel: null,
+    mapLayerKind: 'rgb',
+    mapPeriodKey: null,
+    ficDbByPredio: {}
+};
+
+window.addEventListener('resize', function () {
+    if (mapa) mapa.invalidateSize({ animate: false });
+    if (window.ficAsesorBarChart && typeof window.ficAsesorBarChart.resize === 'function') {
+        window.ficAsesorBarChart.resize();
+    }
+});
+
+function ficTrim(v) {
+    return String(v === undefined || v === null ? '' : v).trim();
+}
+
+function usesAgricultorNamesInPredioSelect() {
+    var h = state.hierarchyLevel;
+    return h === 'sat' || h === 'asesor' || h === 'agricultor';
+}
+
+function updatePredioSidebarCopy() {
+    var helper = document.getElementById('ficPredioHelper');
+    var lab = document.querySelector('label[for="globalWetland"]');
+    var sel = document.getElementById('globalWetland');
+    if (usesAgricultorNamesInPredioSelect()) {
+        if (helper) {
+            helper.textContent =
+                'Elige agricultor y capa. Al pasar el cursor sobre cada nombre verás el código de predio. La fecha mostrada es la última imagen disponible para esa combinación.';
+        }
+        if (lab) lab.textContent = 'Agricultor / predio';
+        if (sel) {
+            sel.title =
+                'Lista por nombre de agricultor (el valor sigue siendo el código de predio).';
+        }
+    } else {
+        if (helper) {
+            helper.innerHTML =
+                'Elige predio y capa. La fecha mostrada es la <strong>última imagen disponible</strong> para esa combinación.';
+        }
+        if (lab) lab.textContent = 'Predio';
+        if (sel) sel.title = 'Código de predio (G1, G2, NOG…)';
+    }
+}
+
+function ficEscapeHtml(s) {
+    return String(s === undefined || s === null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function ficDbCodigoPredioLookup(wid) {
+    var lbl = String(predioCodeLabel(wid) || '').replace(/\s+/g, '').toUpperCase();
+    return lbl || String(wid || '').trim().toUpperCase();
+}
+
+function getFicDbRow(wid) {
+    var k = ficDbCodigoPredioLookup(wid);
+    return (state.ficDbByPredio || {})[k] || null;
+}
+
+function firstAsesorNameFromDb() {
+    var mp = state.ficDbByPredio || {};
+    var ks = Object.keys(mp);
+    for (var i = 0; i < ks.length; i++) {
+        var nm = ficTrim(mp[ks[i]].nombre_sat_asesor || '');
+        if (nm) return nm;
+    }
+    return '';
+}
+
+/** Nombre SAT/asesor para filtrar la cartera (predio seleccionado o primer nombre en CSV). */
+function advisorNameForPortfolioFilter() {
+    var rowSel = getFicDbRow(state.selectedWetland);
+    var fromSel = rowSel && ficTrim(rowSel.nombre_sat_asesor);
+    if (fromSel) return fromSel;
+    return firstAsesorNameFromDb();
+}
+
+function wetlandMatchesAdvisorFilter(wid, advisorName) {
+    if (!ficTrim(advisorName)) return true;
+    var row = getFicDbRow(wid);
+    var a = row && ficTrim(row.nombre_sat_asesor);
+    if (!a) return false;
+    return a.localeCompare(advisorName, 'es', { sensitivity: 'base' }) === 0;
+}
+
+function wetlandsInAdvisorPortfolio() {
+    var adv = advisorNameForPortfolioFilter();
+    return wetlandsListedForSelect().filter(function (wid) {
+        return wetlandMatchesAdvisorFilter(wid, adv);
+    });
+}
+
+function applyWetlandSelection(wid) {
+    state.selectedWetland = wid || null;
+    var wetlandSel = document.getElementById('globalWetland');
+    if (wetlandSel) wetlandSel.value = state.selectedWetland || '';
+    renderAOI();
+    refreshMapLayerState();
+    updateWelcomeBanner();
+    renderAll();
+}
+
+function updateAsesorPortfolioChart() {
+    var dock = document.getElementById('ficAsesorChartDock');
+    var canvas = document.getElementById('ficAsesorChartCanvas');
+    var subEl = document.getElementById('ficAsesorChartSubtitle');
+    if (!dock || !canvas) return;
+
+    if (!ficUsesPortfolioCarteraChart() || !state.datasets.drone || typeof Chart === 'undefined') {
+        dock.hidden = true;
+        dock.setAttribute('aria-hidden', 'true');
+        ficDestroyAsesorBarChart();
+        return;
+    }
+
+    var list = wetlandsInAdvisorPortfolio().slice();
+    list.sort(function (a, b) {
+        return wetlandPredioSelectLabel(a).localeCompare(wetlandPredioSelectLabel(b), 'es', { sensitivity: 'base' });
+    });
+
+    var adv = advisorNameForPortfolioFilter();
+
+    if (!list.length) {
+        ficDestroyAsesorBarChart();
+        dock.hidden = true;
+        dock.setAttribute('aria-hidden', 'true');
+        return;
+    }
+
+    dock.hidden = false;
+    dock.setAttribute('aria-hidden', 'false');
+    if (subEl) {
+        subEl.textContent = adv
+            ? 'Compará vegetación (verde) y humedad (azul) entre tus agricultores. Tocá una barra para ir a ese predio.'
+            : 'Compará vegetación (verde) y humedad (azul) entre los predios listados. Tocá una barra para centrar el mapa.';
+    }
+
+    ficApplyPortfolioChartPanelDom();
+    if (!ficIsPortfolioChartExpanded()) {
+        ficDestroyAsesorBarChart();
+        return;
+    }
+
+    var labels = list.map(function (wid) {
+        return wetlandPredioSelectLabel(wid);
+    });
+    var ndviData = list.map(function (wid) {
+        var v = latestSpatialMeanFromTimeseries(wid, 'ndvi');
+        return v != null && isFinite(v) ? v : null;
+    });
+    var ndwiData = list.map(function (wid) {
+        var v = latestSpatialMeanFromTimeseries(wid, 'ndwi');
+        return v != null && isFinite(v) ? v : null;
+    });
+
+    var vals = [];
+    ndviData.forEach(function (v) {
+        if (v != null && isFinite(v)) vals.push(v);
+    });
+    ndwiData.forEach(function (v) {
+        if (v != null && isFinite(v)) vals.push(v);
+    });
+
+    var yMin = -1;
+    var yMax = 1;
+    if (vals.length) {
+        yMin = Math.min.apply(null, vals);
+        yMax = Math.max.apply(null, vals);
+        if (yMin === yMax) {
+            yMin -= 0.028;
+            yMax += 0.028;
+        } else {
+            var span = yMax - yMin;
+            var pad = Math.max(span * 0.035, 0.012);
+            yMin -= pad;
+            yMax += pad;
+        }
+    }
+
+    ficDestroyAsesorBarChart();
+
+    var wrap = document.getElementById('ficAsesorChartCanvasWrap');
+    if (wrap) void wrap.offsetHeight;
+
+    canvas.removeAttribute('width');
+    canvas.removeAttribute('height');
+
+    var ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    window.ficAsesorBarChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'NDVI',
+                    data: ndviData,
+                    backgroundColor: 'rgba(29, 107, 74, 0.85)',
+                    borderColor: 'rgba(29, 107, 74, 0.35)',
+                    borderWidth: 1,
+                    borderRadius: 0,
+                    borderSkipped: false,
+                    maxBarThickness: 13,
+                    order: 1,
+                },
+                {
+                    label: 'NDWI',
+                    data: ndwiData,
+                    backgroundColor: 'rgba(43, 108, 176, 0.85)',
+                    borderColor: 'rgba(43, 108, 176, 0.35)',
+                    borderWidth: 1,
+                    borderRadius: 0,
+                    borderSkipped: false,
+                    maxBarThickness: 13,
+                    order: 2,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 520, easing: 'easeOutQuart' },
+            layout: {
+                padding: { left: 0, right: 2, top: 2, bottom: 0 },
+            },
+            interaction: { mode: 'nearest', intersect: true },
+            datasets: {
+                bar: {
+                    categoryPercentage: 0.28,
+                    barPercentage: 1,
+                },
+            },
+            onClick: function (_evt, elements) {
+                if (!elements.length) return;
+                var idx = elements[0].index;
+                if (list[idx] !== undefined) applyWetlandSelection(list[idx]);
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    align: 'end',
+                    labels: {
+                        boxWidth: 14,
+                        boxHeight: 10,
+                        usePointStyle: true,
+                        pointStyle: 'rectRounded',
+                        font: { family: "'Source Sans 3', system-ui, sans-serif", size: 11 },
+                    },
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (c) {
+                            var raw = c.raw;
+                            var t =
+                                raw == null || !isFinite(raw)
+                                    ? 'Sin dato'
+                                    : Number(raw).toFixed(4);
+                            return c.dataset.label + ': ' + t;
+                        },
+                    },
+                },
+            },
+            scales: {
+                x: {
+                    offset: true,
+                    stacked: false,
+                    grid: { display: false, drawBorder: false },
+                    ticks: {
+                        font: { family: "'Source Sans 3', system-ui, sans-serif", size: 8.5 },
+                        maxRotation: 40,
+                        minRotation: 22,
+                        autoSkip: true,
+                        padding: 4,
+                    },
+                },
+                y: {
+                    min: yMin,
+                    max: yMax,
+                    grid: { color: 'rgba(18, 42, 28, 0.07)', drawBorder: false },
+                    ticks: {
+                        maxTicksLimit: 9,
+                        font: { family: "'Source Sans 3', system-ui, sans-serif", size: 10 },
+                    },
+                },
+            },
+        },
+    });
+    ficResizePortfolioChartDeferred();
+}
+
+async function ensureDroneDatasetLoaded() {
+    if (!state.manifest || !state.manifest.sources.drone) return false;
+    if (state.datasets.drone && state.metadata.drone) return true;
+    var sd = state.manifest.sources.drone;
+    try {
+        state.datasets.drone = await fetchJson(BASE + '/' + sd.timeseries_path);
+        state.metadata.drone = await fetchJson(BASE + '/' + sd.metadata_path);
+        return true;
+    } catch (e) {
+        console.warn('No se cargó timeseries/metadata dron:', e.message || e);
+        return false;
+    }
+}
+
+/** Excluye predios solo demostración de la UI (p. ej. ``lote_demo`` / capa Demo). */
+function isUiSelectableWetland(wid) {
+    return String(wid || '').toLowerCase() !== 'lote_demo';
+}
+
+/** Claves de predio del desplegable (misma metadata, sin demostración). */
+function wetlandsListedForSelect() {
+    return currentWetlands().filter(isUiSelectableWetland);
+}
+
+/** Promedio espacial del último vuelo en series dron para un índice numérico (NDVI, NDWI…). */
+function latestSpatialMeanFromTimeseries(wid, indexKey) {
+    var ik = String(indexKey || 'ndvi').toLowerCase();
+    var wl = wid == null ? null : state.datasets.drone.wetlands[String(wid).toLowerCase()];
+    if (!wl || !wl.indices || !wl.indices[ik]) return null;
+    var ix = wl.indices[ik];
+    if (ix.metrics && ix.metrics.latest != null && ix.metrics.latest.value != null) {
+        return Number(ix.metrics.latest.value);
+    }
+    var pts = ix.points || [];
+    if (!pts.length) return null;
+    var best = pts[0];
+    var rank = '';
+    pts.forEach(function (p1) {
+        var cand = /\d{8}/.test(String(p1.period_key || ''))
+            ? String(p1.period_key)
+            : String(p1.date || p1.period_key || '');
+        if (cand > rank) {
+            rank = cand;
+            best = p1;
+        }
+    });
+    return best && best.value != null ? Number(best.value) : null;
+}
+
+function latestDroneNdviMean(wid) {
+    return latestSpatialMeanFromTimeseries(wid, 'ndvi');
+}
+
+function buildPolygonTooltipHtml(widLower, nomeMeta, metaWetlandInfo) {
+    var row = getFicDbRow(widLower);
+    var agr = row && ficTrim(row.nombre_agricultor) !== '' ? ficEscapeHtml(row.nombre_agricultor) : '—';
+    var ases = row && ficTrim(row.nombre_sat_asesor) !== '' ? ficEscapeHtml(row.nombre_sat_asesor) : '—';
+    var nome = ficEscapeHtml(nomeMeta);
+    var ndvi = latestDroneNdviMean(widLower);
+    var meanStr =
+        ndvi != null && isFinite(ndvi)
+            ? '<br><b>Promedio espacial NDVI</b> (último vuelo dron): <b>' + ndvi.toFixed(4) + '</b>'
+            : '';
+    return (
+        '<div style="font-family:Source Sans 3,sans-serif;line-height:1.65"><b>' +
+        nome +
+        '</b><br>' +
+        'Agricultor: <b>' +
+        agr +
+        '</b><br>Asesor: <b>' +
+        ases +
+        '</b><br>Superficie: <b>' +
+        fmtHa(metaWetlandInfo.area_ha) +
+        '</b><br>Última capa disponible: <b>' +
+        ficEscapeHtml(metaWetlandInfo.last_period || '—') +
+        '</b>' +
+        meanStr +
+        '</div>'
+    );
+}
+
+function parseAndStoreFicDatabaseCsv(text) {
+    var mp = {};
+    var lines = text.split(/\r?\n/);
+    var i = 1;
+    for (; i < lines.length; i++) {
+        var ln = lines[i];
+        if (!ficTrim(ln)) continue;
+        var parts = ln.split(',');
+        var code = ficTrim(parts[0]).toUpperCase();
+        if (!code) continue;
+        mp[code] = {
+            codigo_predio: code,
+            nombre_agricultor: ficTrim(parts[1] || ''),
+            nombre_sat_asesor: ficTrim(parts[2] || ''),
+            nombre_jefe_area: ficTrim(parts[3] || ''),
+            nombre_jefe_regional: ficTrim(parts[4] || ''),
+        };
+    }
+    state.ficDbByPredio = mp;
+}
+
+async function loadFicDatabaseCsv() {
+    state.ficDbByPredio = {};
+    var url = SOURCE_DATA_ROOT + '/fic_database.csv';
+    try {
+        var r = await fetch(url);
+        if (!r.ok) {
+            console.warn('fic_database.csv no disponible:', url);
+            return;
+        }
+        parseAndStoreFicDatabaseCsv(await r.text());
+    } catch (e) {
+        console.warn('Error leyendo fic_database.csv:', e.message || e);
+    }
+}
+
+function updateWelcomeBanner() {
+    var el = document.getElementById('ficWelcomeBanner');
+    if (!el) return;
+    var k = state.hierarchyLevel;
+    var needsWelcome = k === 'agricultor' || k === 'asesor' || k === 'sat';
+    if (!needsWelcome) {
+        el.hidden = true;
+        el.textContent = '';
+        return;
+    }
+    el.hidden = false;
+    var row = getFicDbRow(state.selectedWetland);
+    if (k === 'agricultor') {
+        var na = row && ficTrim(row.nombre_agricultor) !== '' ? ficTrim(row.nombre_agricultor) : '';
+        el.textContent = na ? 'Bienvenida, ' + na + '.' : 'Bienvenida.';
+    } else {
+        var asz = row && ficTrim(row.nombre_sat_asesor) !== '' ? ficTrim(row.nombre_sat_asesor) : firstAsesorNameFromDb();
+        el.textContent = asz ? 'Bienvenida, ' + asz + '.' : 'Bienvenida.';
+    }
+}
+
+function setHierarchyContextHint(key) {
+    const hi = document.getElementById('ficHierarchyContextHint');
+    if (!hi) return;
+    if (key === 'agricultor' || key === 'asesor' || key === 'sat') {
+        hi.hidden = true;
+        hi.textContent = '';
+        updateWelcomeBanner();
+        return;
+    }
+    const meta = HIERARCHY_LEVELS[key];
+    const t = meta && meta.appHint ? String(meta.appHint).trim() : '';
+    if (!t) {
+        hi.hidden = true;
+        hi.textContent = '';
+    } else {
+        hi.textContent = t;
+        hi.hidden = false;
+    }
+    var wel = document.getElementById('ficWelcomeBanner');
+    if (wel) {
+        wel.hidden = true;
+        wel.textContent = '';
+    }
+}
+
+function initFromQuery() {
+    const raw = new URLSearchParams(window.location.search).get('nivel');
+    const key = raw ? (NIVEL_LEGACY[raw] || raw) : null;
+    if (!key || !HIERARCHY_LEVELS[key]) {
+        window.location.replace('index.html');
+        return;
+    }
+    if (key !== raw) try { history.replaceState(null, '', '?nivel=' + encodeURIComponent(key)); } catch (e) {}
+    state.hierarchyLevel = key;
+    try { localStorage.setItem(LS_HIER, key); } catch (e) {}
+    const meta = HIERARCHY_LEVELS[key];
+    const badgeEl = document.getElementById('ficHierarchyBadge');
+    if (badgeEl) badgeEl.textContent = meta.badge;
+    setHierarchyContextHint(key);
+    document.body.setAttribute('data-hierarchy', key);
+    document.title = 'Monitoreo Agricola · ' + meta.badge;
+    initMap();
+    var actgl = document.getElementById('ficAsesorChartToggle');
+    if (actgl && !actgl.dataset.ficBound) {
+        actgl.dataset.ficBound = '1';
+        actgl.addEventListener('click', ficTogglePortfolioChartPanel);
+    }
+    loadManifest();
+    setTimeout(function () { if (mapa) mapa.invalidateSize({ animate: false }); }, 400);
+}
+
+window.addEventListener('load', initFromQuery);
+
+function initMap() {
+    if (mapa) return;
+    mapa = L.map('mapa', { center: [-33.45, -70.74], zoom: 11, zoomControl: false, maxZoom: 24 });
+    L.control.zoom({ position: 'topright' }).addTo(mapa);
+    L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(mapa);
+    const dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© <a href="https://carto.com/">Carto</a>',
+        maxZoom: 24,
+        maxNativeZoom: 20,
+    });
+    const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '© Esri',
+        maxZoom: 24,
+        maxNativeZoom: 19,
+    });
+    const topo = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '© Esri',
+        maxZoom: 24,
+        maxNativeZoom: 19,
+    });
+    /** OSM: buen detalle hasta ~z19 sin “map data not yet available”; no es imagen satélite. */
+    const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 24,
+        maxNativeZoom: 19,
+    });
+    topo.addTo(mapa);
+    L.control.layers(
+        {
+            'Mapa de relieve': topo,
+            'Imagen satélite (Esri)': sat,
+            'Mapa callejero (OSM)': osm,
+            'Mapa oscuro (Carto)': dark,
+        },
+        {},
+        { position: 'bottomright', collapsed: true }
+    ).addTo(mapa);
+}
+
+async function loadWetlandsAoiGeojson() {
+    const primary = SOURCE_DATA_ROOT + '/shapefiles/aoi.geojson';
+    const fallback = state.manifest && state.manifest.aoi_path
+        ? BASE + '/' + state.manifest.aoi_path
+        : null;
+    try {
+        state.aoi = await fetchJson(primary);
+        return;
+    } catch (e1) {
+        console.warn('AOI desde datos fuente no disponible (' + primary + '):', e1.message || e1);
+    }
+    if (fallback) {
+        try {
+            state.aoi = await fetchJson(fallback);
+            return;
+        } catch (e2) {
+            console.warn('AOI fallback desde static no disponible (' + fallback + '):', e2.message || e2);
+        }
+    }
+    state.aoi = null;
+}
+
+async function fetchJson(url) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('No se pudo cargar ' + url);
+    return response.json();
+}
+
+async function loadManifest() {
+    if (state.manifest) return;
+    const errEl = document.getElementById('ficLoadHint');
+    if (errEl) { errEl.hidden = true; errEl.textContent = ''; }
+    try {
+        state.manifest = await fetchJson(BASE + '/sources_manifest.json');
+    } catch (error) {
+        console.error(error);
+        var msgNoExport = 'No pudimos cargar los datos del mapa. Abre esta aplicación desde la carpeta del proyecto (explorador.html y la carpeta data_static con la información publicada). Si acabas de actualizar datos, espera unos instantes y vuelve a intentar.';
+        if (errEl) { errEl.textContent = msgNoExport; errEl.hidden = false; }
+        return;
+    }
+
+    await loadWetlandsAoiGeojson();
+    await loadFicDatabaseCsv();
+    await ensureDroneDatasetLoaded();
+
+    try {
+        const keys = Object.keys(state.manifest.sources || {});
+        if (!keys.length) throw new Error('No hay fuentes configuradas');
+        const withData = keys.find(function (k) {
+            return state.manifest.sources[k] && state.manifest.sources[k].has_data;
+        });
+        const defaultKey =
+            state.manifest.sources.drone && state.manifest.sources.drone.has_data ? 'drone' : withData || keys[0];
+        await setSource(defaultKey);
+    } catch (error) {
+        console.error(error);
+        if (errEl) {
+            errEl.textContent = 'Los datos del mapa no cargaron bien. Actualiza la página; si sigue igual, revisa la conexión o avisa al equipo técnico. Detalle técnico: ' + String(error.message || error);
+            errEl.hidden = false;
+        }
+    }
+}
+
+async function setSource(sourceKey) {
+    state.selectedSource = sourceKey;
+    if (!state.datasets[sourceKey]) {
+        const source = state.manifest.sources[sourceKey];
+        state.datasets[sourceKey] = await fetchJson(BASE + '/' + source.timeseries_path);
+        state.metadata[sourceKey] = await fetchJson(BASE + '/' + source.metadata_path);
+    }
+    buildSelectors();
+    renderAOI();
+    renderAll();
+}
+
+function currentSource() { return state.manifest.sources[state.selectedSource] || {}; }
+function currentData() { return state.datasets[state.selectedSource] || { wetlands: {} }; }
+function currentMeta() { return state.metadata[state.selectedSource] || { wetlands: {}, indices: {}, periods: [], rasters: {}, summary: {} }; }
+function currentWetlands() { return Object.keys(currentMeta().wetlands || {}); }
+
+function findLatestPeriodKey(wid, indexKey) {
+    const rasters = currentMeta().rasters || {};
+    const keys = [];
+    Object.keys(rasters).forEach(function (rk) {
+        const r = rasters[rk];
+        if (!r) return;
+        if (String(r.wetland_id).toLowerCase() !== String(wid).toLowerCase()) return;
+        if (String(r.index).toLowerCase() !== String(indexKey).toLowerCase()) return;
+        if (r.period_key) keys.push(r.period_key);
+    });
+    if (!keys.length) return null;
+    const order = (currentMeta().periods || []).map(function (p) { return p.key; });
+    function score(pk) {
+        var s = String(pk).trim();
+        if (/^\d{8}$/.test(s)) return parseInt(s, 10);
+        var m = s.match(/^(\d{4})_/);
+        var y = m ? parseInt(m[1], 10) : 0;
+        var si = order.indexOf(pk);
+        return y * 1000 + (si >= 0 ? si : 0);
+    }
+    keys.sort(function (a, b) { return score(b) - score(a); });
+    return keys[0];
+}
+
+function selectedPeriod() {
+    return state.mapPeriodKey || '';
+}
+function selectedIndex() {
+    var el = document.getElementById('mapIndex');
+    if (el && el.value) return el.value;
+    return state.mapLayerKind || 'ndvi';
+}
+
+var mapIndexSelectBound = false;
+function updateMapLayerHint() {
+    var hint = document.getElementById('ficLayerPillHint');
+    if (!hint) return;
+    var wid = state.selectedWetland;
+    if (!wid) {
+        hint.textContent = usesAgricultorNamesInPredioSelect() ? 'Elige un agricultor.' : 'Elige un predio.';
+        return;
+    }
+    if (state.mapPeriodKey) {
+        var meta = (currentMeta().periods || []).filter(function (p) { return p.key === state.mapPeriodKey; })[0];
+        var lab = (currentMeta().indices[state.mapLayerKind] && currentMeta().indices[state.mapLayerKind].label) || String(state.mapLayerKind).toUpperCase();
+        hint.textContent = meta
+            ? ('Último disponible: ' + meta.label + ' · ' + lab + '.')
+            : 'Último período para esta capa.';
+    } else {
+        hint.textContent = 'No hay imagen de esta capa para este predio. Prueba otra capa o otro predio en los desplegables.';
+    }
+}
+
+function refreshMapLayerState() {
+    var mapIndexSel = document.getElementById('mapIndex');
+    if (!mapIndexSel) return;
+    var indices = currentMeta().indices || {};
+    var idxKeys = Object.keys(indices);
+    mapIndexSel.innerHTML = '';
+    idxKeys.forEach(function (key) {
+        var opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = indices[key].label || key.toUpperCase();
+        mapIndexSel.appendChild(opt);
+    });
+    if (!idxKeys.length) {
+        state.mapLayerKind = 'ndvi';
+        state.mapPeriodKey = null;
+        updateMapLayerHint();
+        updateAsesorPortfolioChart();
+        return;
+    }
+    if (idxKeys.indexOf(state.mapLayerKind) < 0) {
+        if (idxKeys.indexOf('rgb') >= 0 && state.selectedSource === 'drone') state.mapLayerKind = 'rgb';
+        else if (idxKeys.indexOf('ndvi') >= 0) state.mapLayerKind = 'ndvi';
+        else state.mapLayerKind = idxKeys[0];
+    }
+    mapIndexSel.value = state.mapLayerKind;
+
+    if (!mapIndexSelectBound) {
+        mapIndexSelectBound = true;
+        mapIndexSel.addEventListener('change', function () {
+            state.mapLayerKind = mapIndexSel.value;
+            if (state.selectedWetland) {
+                state.mapPeriodKey = findLatestPeriodKey(state.selectedWetland, state.mapLayerKind);
+            } else {
+                state.mapPeriodKey = null;
+            }
+            updateMapLayerHint();
+            updateMapOverlay();
+            updateAsesorPortfolioChart();
+        });
+    }
+
+    var wid = state.selectedWetland;
+    if (!wid) {
+        state.mapPeriodKey = null;
+    } else {
+        state.mapPeriodKey = findLatestPeriodKey(wid, state.mapLayerKind);
+    }
+    updateMapLayerHint();
+    updateAsesorPortfolioChart();
+}
+
+function pickDefaultWetland() {
+    const wetlands = wetlandsListedForSelect();
+    if (!wetlands.length) return null;
+    const withData = wetlands.filter(function (wid) {
+        const info = currentMeta().wetlands[wid] || {};
+        return (info.n_periods || 0) > 0 || info.status === 'ready';
+    });
+    const candidates = withData.length ? withData : wetlands;
+    return state.selectedWetland && candidates.indexOf(state.selectedWetland) >= 0 ? state.selectedWetland : candidates[0];
+}
+
+function buildSelectors() {
+    const wetlandSel = document.getElementById('globalWetland');
+    const wetlands = wetlandsListedForSelect();
+    wetlandSel.innerHTML = '';
+    updatePredioSidebarCopy();
+    var pairs = wetlands.map(function (wid) {
+        return { wid: wid, lab: wetlandPredioSelectLabel(wid) };
+    });
+    if (usesAgricultorNamesInPredioSelect()) {
+        pairs.sort(function (a, b) {
+            return a.lab.localeCompare(b.lab, 'es', { sensitivity: 'base' });
+        });
+    }
+    pairs.forEach(function (p) {
+        const opt = document.createElement('option');
+        opt.value = p.wid;
+        opt.textContent = p.lab;
+        opt.title = wetlandPredioSelectOptionTitle(p.wid);
+        wetlandSel.appendChild(opt);
+    });
+    state.selectedWetland = pickDefaultWetland();
+    wetlandSel.value = state.selectedWetland || '';
+    wetlandSel.onchange = function () {
+        applyWetlandSelection(wetlandSel.value || null);
+    };
+
+    refreshMapLayerState();
+    updateWelcomeBanner();
+}
+
+function renderAll() {
+    updateMapOverlay();
+    updateWelcomeBanner();
+    updateAsesorPortfolioChart();
+    if (mapa) {
+        mapa.invalidateSize({ animate: false });
+        setTimeout(function () { if (mapa) mapa.invalidateSize({ animate: false }); }, 200);
+    }
+}
+
+function renderAOI() {
+    if (aoiLayer) { mapa.removeLayer(aoiLayer); aoiLayer = null; }
+    if (!state.aoi || !mapa) return;
+    const idCol = currentMeta().aoi_id_column || 'wetland_id';
+    aoiLayer = L.geoJSON(state.aoi, {
+        style: function (feature) {
+            const wid = String(feature.properties[idCol] || '').toLowerCase();
+            const active = wid === state.selectedWetland;
+            const color = active ? (currentSource().color || '#1d6b4a') : '#6b7f72';
+            return { color: color, weight: active ? 3 : 2, fillColor: color, fillOpacity: 0, dashArray: active ? '' : '6 4' };
+        },
+        onEachFeature: function (feature, layer) {
+            const wid = String(feature.properties[idCol] || '').toLowerCase();
+            const info = currentMeta().wetlands[wid] || {};
+            const name = info.name || feature.properties.nombre || wid;
+            const html = buildPolygonTooltipHtml(wid, name, info);
+            layer.bindTooltip(html, { sticky: true, opacity: 0.95 });
+        }
+    }).addTo(mapa);
+    /* El zoom lo define updateMapOverlay (extent del WebP) o fitMapToPredioAOI si no hay ráster. */
+}
+
+function updateMapOverlay() {
+    if (!mapa) return;
+    if (rasterOverlay) { mapa.removeLayer(rasterOverlay); rasterOverlay = null; }
+    const note = document.getElementById('mapNote');
+    const colorbar = document.getElementById('colorbarBox');
+    colorbar.style.display = 'none';
+    if (!state.selectedWetland) {
+        note.textContent = usesAgricultorNamesInPredioSelect()
+            ? 'No hay agricultor seleccionado.'
+            : 'No hay predio seleccionado.';
+        return;
+    }
+    if (!currentSource().has_data) {
+        note.textContent = 'Esta fuente aún no tiene mapas listos.';
+        fitMapToPredioAOI();
+        return;
+    }
+    if (!state.mapPeriodKey) {
+        note.textContent = 'No hay imagen disponible para la capa ' + String(selectedIndex()).toUpperCase() + ' en este predio en las fechas que tenemos cargadas.';
+        fitMapToPredioAOI();
+        return;
+    }
+    const rasterKey = state.selectedWetland + '_' + selectedPeriod() + '_' + selectedIndex();
+    const raster = currentMeta().rasters && currentMeta().rasters[rasterKey];
+    if (!raster) {
+        note.textContent = 'No hay capa ' + String(selectedIndex()).toUpperCase() + ' para este predio. Prueba otra opción en el desplegable.';
+        fitMapToPredioAOI();
+        return;
+    }
+    note.textContent = raster.index.toUpperCase() + ' · ' + raster.season + ' ' + raster.year + ' · ' + raster.visual.display_size[0] + '×' + raster.visual.display_size[1];
+    var cornerBounds = raster.visual.bounds;
+    if (!leafletBoundsCornersValid(cornerBounds)) {
+        var u = unionRasterBoundsForWetland(currentMeta(), state.selectedWetland);
+        if (u && u.isValid()) {
+            cornerBounds = [[u.getSouth(), u.getWest()], [u.getNorth(), u.getEast()]];
+        }
+    }
+    if (!leafletBoundsCornersValid(cornerBounds)) {
+        note.textContent = 'Esta vista no puede alinearse bien en el mapa. Prueba otra capa o avisa al equipo de soporte.';
+        fitMapToPredioAOI();
+        return;
+    }
+    const imgClass = raster.visual.render_mode === 'smooth' ? '' : 'preview-raster';
+    const overlayOpacity = raster.index === 'rgb'
+        ? 1
+        : (raster.visual.opacity != null ? raster.visual.opacity : 0.9);
+    rasterOverlay = L.imageOverlay(BASE + '/' + raster.visual.path, cornerBounds, { opacity: overlayOpacity, className: imgClass, interactive: false }).addTo(mapa);
+    mapa.fitBounds(cornerBounds, { padding: [36, 36] });
+
+    const idx = selectedIndex();
+    const idxMeta = currentMeta().indices && currentMeta().indices[idx];
+    const isVisualOnly = idxMeta && idxMeta.visual_only;
+    if (!isVisualOnly && CBAR[idx]) {
+        const cbar = CBAR[idx];
+        document.getElementById('cbGradient').style.background = cbar.gradient;
+        document.getElementById('cbTitle').textContent = cbar.label;
+        document.getElementById('cbMin').textContent = idxMeta.vmin != null ? idxMeta.vmin : '';
+        document.getElementById('cbMax').textContent = idxMeta.vmax != null ? idxMeta.vmax : '';
+        colorbar.style.display = 'flex';
+    } else {
+        colorbar.style.display = 'none';
+    }
+}
+
+function fmtHa(value) { return value === null || value === undefined ? '—' : Number(value).toFixed(1) + ' ha'; }
+
+/** Texto del desplegable de predio: nombre del agricultor si existe en ``fic_database.csv`` (SAT, asesor o agricultor). */
+function wetlandPredioSelectLabel(wetlandId) {
+    if (usesAgricultorNamesInPredioSelect()) {
+        var row = getFicDbRow(wetlandId);
+        var agr = row && ficTrim(row.nombre_agricultor);
+        if (agr) return agr;
+    }
+    return predioCodeLabel(wetlandId);
+}
+
+function wetlandPredioSelectOptionTitle(wetlandId) {
+    var code = predioCodeLabel(wetlandId);
+    var row = getFicDbRow(wetlandId);
+    var agr = row && ficTrim(row.nombre_agricultor);
+    if (usesAgricultorNamesInPredioSelect()) {
+        if (agr) return 'Predio ' + code + ' · ' + agr;
+        var wm = (currentMeta().wetlands || {})[wetlandId] || {};
+        var metaName = ficTrim(wm.name || '');
+        return metaName ? 'Predio ' + code + ' · ' + metaName : 'Predio ' + code;
+    }
+    var wm = (currentMeta().wetlands || {})[wetlandId] || {};
+    var nm = ficTrim(wm.name || '');
+    return nm ? 'Predio ' + code + ' · ' + nm : 'Predio ' + code;
+}
+
+/** Código de predio para la UI (nomenclatura imágenes: G1, G6, NOG; sin nombre largo). */
+function predioCodeLabel(wetlandId) {
+    const w = String(wetlandId || '').toLowerCase();
+    if (w === 'nog') return 'NOG';
+    const gm = /^g(\d+)$/.exec(w);
+    if (gm) return 'G' + gm[1];
+    if (w === 'lote_demo') return 'Demo';
+    return String(wetlandId);
+}
+
+/** Leaflet espera ``[[south, west], [north, east]]`` en grados. Rechaza bounds antiguos en metros (CRS proyectado). */
+function leafletBoundsCornersValid(cornerPairs) {
+    if (!cornerPairs || cornerPairs.length !== 2) return false;
+    var sw = cornerPairs[0], ne = cornerPairs[1];
+    if (!sw || !ne || sw.length < 2 || ne.length < 2) return false;
+    if (Math.abs(sw[0]) > 90 || Math.abs(ne[0]) > 90) return false;
+    if (Math.abs(sw[1]) > 185 || Math.abs(ne[1]) > 185) return false;
+    return true;
+}
+
+function boundsLatLngBoundsFromCorners(cornerPairs) {
+    if (!leafletBoundsCornersValid(cornerPairs)) return null;
+    try {
+        return L.latLngBounds(cornerPairs[0], cornerPairs[1]);
+    } catch (e) {
+        return null;
+    }
+}
+
+/** Envuelve extents de ráster en metadata por predio (zoom al vuelo real, no repetir AOI demo). */
+function unionRasterBoundsForWetland(meta, wetlandId) {
+    var rz = meta.rasters || {};
+    var want = String(wetlandId || '').toLowerCase();
+    var acc = null;
+    Object.keys(rz).forEach(function (rk) {
+        var r = rz[rk];
+        if (!r || String(r.wetland_id || '').toLowerCase() !== want) return;
+        var lb = boundsLatLngBoundsFromCorners(r.visual && r.visual.bounds);
+        if (!lb || !lb.isValid()) return;
+        acc = acc ? acc.extend(lb) : lb;
+    });
+    return acc;
+}
+
+/** Si no hay WebP o bounds corruptos: zoom a la huella agregada de los GeoTIFF; si no, al AOI del GeoJSON maestro. */
+function fitMapToPredioAOI() {
+    if (!mapa || !state.selectedWetland) return;
+    var fromRasters = unionRasterBoundsForWetland(currentMeta(), state.selectedWetland);
+    if (fromRasters && fromRasters.isValid()) {
+        mapa.fitBounds(fromRasters.pad(0.06), { padding: [36, 36] });
+        return;
+    }
+    if (!state.aoi) return;
+    const idCol = currentMeta().aoi_id_column || 'wetland_id';
+    const want = String(state.selectedWetland).toLowerCase();
+    const features = (state.aoi.features || []);
+    var fitBounds = null;
+    for (var i = 0; i < features.length; i++) {
+        var f = features[i];
+        var wid = String((f.properties || {})[idCol] || '').toLowerCase();
+        if (wid !== want) continue;
+        var layer = L.geoJSON(f);
+        var b = layer.getBounds();
+        if (b.isValid()) {
+            fitBounds = b;
+            break;
+        }
+    }
+    if (fitBounds && fitBounds.isValid()) mapa.fitBounds(fitBounds.pad(0.18));
+}
+</script>
+</body>
+</html>
