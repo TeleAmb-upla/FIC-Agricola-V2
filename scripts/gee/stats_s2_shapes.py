@@ -58,6 +58,11 @@ DEFAULT_COLLECTION = "projects/ee-javiermedinam/assets/S2_weekly_walpo"
 DEFAULT_SHAPES = "data/shapefiles/aoi.geojson"
 DEFAULT_BAND = "NDVI"
 
+MONTH_NAMES_ES = [
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+]
+
 
 def resolve_cloud_project(cli_project: str | None) -> str:
     if cli_project is not None and cli_project.strip() != "":
@@ -152,6 +157,12 @@ def _spatial_mean_scalar_from_props(prop: dict, band: str) -> float:
         return float("nan")
 
 
+def _distinct_year_lookup(ic: ee.ImageCollection) -> dict[int, object]:
+    """Mapea año entero → valor de metadato en la colección (por si no es ee.Number puro)."""
+    raw = ic.limit(50000).aggregate_array("year").distinct().sort().getInfo() or []
+    return {int(y): y for y in raw}
+
+
 def fc_zonal_weekly_genius_like(img: ee.Image, fc_ee: ee.FeatureCollection, band: str, scale_m: float) -> ee.FeatureCollection:
     """
     Misma mecánica que NDVI zonal yearly en ``products/ndvi/linear/geojson.py``:
@@ -204,9 +215,7 @@ def collect_weekly_table(
     """
     ic_full = ee.ImageCollection(collection_id)
     rows: list[dict] = []
-
-    year_lookup_raw = ic_full.limit(50000).aggregate_array("year").distinct().sort().getInfo() or []
-    year_lookup: dict[int, object] = {int(y): y for y in year_lookup_raw}
+    year_lookup = _distinct_year_lookup(ic_full)
 
     for yr in years:
         orig_y = year_lookup.get(int(yr), yr)
@@ -267,8 +276,7 @@ def enqueue_drive_weekly_zonal_csv_tasks(
     """Un ``Export.table.toDrive`` (CSV) por año, mismo FeatureCollection que la tabla local."""
     ic_full = ee.ImageCollection(collection_id)
     tasks: list[ee.batch.Task] = []
-    year_lookup_raw = ic_full.limit(50000).aggregate_array("year").distinct().sort().getInfo() or []
-    year_lookup: dict[int, object] = {int(y): y for y in year_lookup_raw}
+    year_lookup = _distinct_year_lookup(ic_full)
 
     selectors = ["predio_id", "year", "week", "month", "iso_week_start", "spatial_mean_week"]
 
@@ -313,9 +321,7 @@ def enqueue_yearly_median_raster_tasks_drive(
     """Patrón ``yearly_median_raster_exports_from_yearmonth`` (genius NDVI yearly raster): median anual → int16_scaled → Drive."""
     ic_full = ee.ImageCollection(collection_id)
     tasks: list[ee.batch.Task] = []
-
-    raw_years = ic_full.limit(50000).aggregate_array("year").distinct().sort().getInfo() or []
-    year_lookup: dict[int, object] = {int(y): y for y in raw_years}
+    year_lookup = _distinct_year_lookup(ic_full)
 
     for yr in sorted(years):
         orig_y = year_lookup.get(int(yr), yr)
@@ -371,15 +377,19 @@ def monthly_summary(df_weekly: pd.DataFrame, current_calendar_year: int) -> tupl
     Histórico: mediana pooled (predio×año×mes), años <= año completo anterior (curr-1).
 
     Actual: por mes del año calendar actual, media entre predios.
-    Devuelve (df_wide_mensual, df_detalle_opcional?)
+    Devuelve (tabla ancha mensual, detalle predio×año×mes con ``monthly_agg``).
     """
     if df_weekly.empty:
         empty = pd.DataFrame(
-            {
-                "month": range(1, 13),
-                "historic_monthly_median": np.nan,
-                "current_year_monthly_mean": np.nan,
-            }
+            [
+                {
+                    "month": m,
+                    "month_label": MONTH_NAMES_ES[m - 1],
+                    "historic_monthly_median": float("nan"),
+                    "current_year_monthly_mean": float("nan"),
+                }
+                for m in range(1, 13)
+            ]
         )
         return empty, empty
 
@@ -393,25 +403,21 @@ def monthly_summary(df_weekly: pd.DataFrame, current_calendar_year: int) -> tupl
     hist_pool = dm[dm["year"] <= last_complete_year].copy()
     curr = dm[dm["year"] == current_calendar_year].copy()
 
-    month_names_es = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
     hm = []
     cm = []
     for m in range(1, 13):
         hvals = hist_pool.loc[hist_pool["month"] == m, "monthly_agg"].dropna().values
-        hm.append({"month": m, "month_label": month_names_es[m - 1], "historic_monthly_median": float(np.median(hvals)) if hvals.size else float("nan")})
+        hm.append({"month": m, "month_label": MONTH_NAMES_ES[m - 1], "historic_monthly_median": float(np.median(hvals)) if hvals.size else float("nan")})
 
         cv = curr.loc[curr["month"] == m, "monthly_agg"].dropna().values
         cm_mean = float(np.mean(cv)) if cv.size else float("nan")
         cm.append(
-            {"month": m, "month_label": month_names_es[m - 1], "current_year_monthly_mean": cm_mean}
+            {"month": m, "month_label": MONTH_NAMES_ES[m - 1], "current_year_monthly_mean": cm_mean}
         )
 
     df_h = pd.DataFrame(hm)
     df_c = pd.DataFrame(cm)
     merged = df_h.merge(df_c[["month", "current_year_monthly_mean"]], on="month")
-    merged.attrs["baseline_note"] = (
-        f"Histórico: mediana pooled (≤{current_calendar_year - 1}); actual: año civil {current_calendar_year}."
-    )
     return merged, dm
 
 
@@ -438,14 +444,10 @@ def build_explorer_json_payload(
     collection_id: str,
 ) -> dict:
     """JSON para explorador HTML: Sentinel-2 por predio (`wetland_id` en minúsculas) + cartera."""
-    month_names_es = [
-        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
-    ]
     gen = datetime.now(timezone.utc).isoformat()
 
     portfolio_annual_rows = []
-    if portfolio_annual is not None and not portfolio_annual.empty:
+    if not portfolio_annual.empty:
         for _, r in portfolio_annual.iterrows():
             yv = int(r["year"])
             if yv > last_complete_year:
@@ -460,7 +462,7 @@ def build_explorer_json_payload(
             )
 
     portfolio_monthly_rows = []
-    if portfolio_monthly is not None and not portfolio_monthly.empty:
+    if not portfolio_monthly.empty:
         dfm = portfolio_monthly
         for m in range(1, 13):
             rows = dfm[dfm["month"] == m]
@@ -468,7 +470,7 @@ def build_explorer_json_payload(
                 portfolio_monthly_rows.append(
                     {
                         "month": m,
-                        "month_label": month_names_es[m - 1],
+                        "month_label": MONTH_NAMES_ES[m - 1],
                         "historic_median_between_predios": None,
                         "current_year_mean_between_predios": None,
                     }
@@ -478,7 +480,7 @@ def build_explorer_json_payload(
             portfolio_monthly_rows.append(
                 {
                     "month": m,
-                    "month_label": month_names_es[m - 1],
+                    "month_label": MONTH_NAMES_ES[m - 1],
                     "historic_median_between_predios": _json_safe(r0.get("historic_monthly_median")),
                     "current_year_mean_between_predios": _json_safe(r0.get("current_year_monthly_mean")),
                 }
@@ -489,7 +491,7 @@ def build_explorer_json_payload(
         apr = df_week.groupby(["predio_id", "year"], as_index=False)["spatial_mean_week"].median()
 
         predios = apr["predio_id"].astype(str).str.strip().unique()
-        dm = dm_detail.copy() if dm_detail is not None and not dm_detail.empty else pd.DataFrame()
+        dm = dm_detail.copy() if not dm_detail.empty else pd.DataFrame()
 
         for raw_pid in predios:
             key = raw_pid.strip().lower()
@@ -512,7 +514,7 @@ def build_explorer_json_payload(
                     months_out.append(
                         {
                             "month": m,
-                            "month_label": month_names_es[m - 1],
+                            "month_label": MONTH_NAMES_ES[m - 1],
                             "historic_median_within_predio_months": None,
                             "current_year_value": None,
                         }
@@ -528,7 +530,7 @@ def build_explorer_json_payload(
                 months_out.append(
                     {
                         "month": m,
-                        "month_label": month_names_es[m - 1],
+                        "month_label": MONTH_NAMES_ES[m - 1],
                         "historic_median_within_predio_months": _json_safe(hist_m),
                         "current_year_value": _json_safe(cur_v),
                     }

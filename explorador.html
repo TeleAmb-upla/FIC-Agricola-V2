@@ -248,6 +248,55 @@
         }
 
         .fic-panel-block--tight .fic-sidebar-title { margin-top: 0.5rem; }
+        .fic-source-pills-wrap {
+            margin: 0.4rem 0 0.85rem;
+        }
+        .fic-source-pills-wrap[hidden] { display: none !important; }
+        .fic-source-pills-label {
+            display: block;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: rgba(26, 32, 24, 0.55);
+            margin-bottom: 0.45rem;
+        }
+        .fic-source-pills {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 0;
+            padding: 3px;
+            border-radius: 999px;
+            background: rgba(232, 244, 233, 0.65);
+            border: 1px solid rgba(29, 107, 74, 0.12);
+        }
+        .fic-source-pill {
+            flex: 1;
+            min-width: 0;
+            border: none;
+            background: transparent;
+            color: var(--fic-ag-muted);
+            font-family: inherit;
+            font-size: 0.84rem;
+            font-weight: 600;
+            padding: 0.42rem 0.65rem;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+        }
+        .fic-source-pill:hover {
+            color: var(--fic-ag-dark);
+        }
+        .fic-source-pill:focus-visible {
+            outline: 2px solid var(--fic-ag-accent);
+            outline-offset: 2px;
+        }
+        .fic-source-pill--active {
+            background: #fff;
+            color: var(--fic-ag-dark);
+            box-shadow: 0 2px 12px rgba(18, 42, 28, 0.1);
+        }
         .fic-sidebar-title {
             font-family: 'Outfit', sans-serif;
             font-size: 1.05rem;
@@ -502,6 +551,13 @@
             <p class="fic-ctx-hint" id="ficHierarchyContextHint" role="status" hidden></p>
             <p class="fic-panel-error" id="ficLoadHint" role="alert" hidden></p>
             <h2 class="fic-sidebar-title">Mapa</h2>
+            <div class="fic-source-pills-wrap" id="ficSourcePillsWrap" hidden role="group" aria-label="Origen de las imágenes del mapa">
+                <span class="fic-source-pills-label" id="ficSourcePillsLabel">Fuente del mapa</span>
+                <div class="fic-source-pills">
+                    <button type="button" class="fic-source-pill fic-source-pill--active" id="ficPillSatellite" aria-pressed="true">Satélite</button>
+                    <button type="button" class="fic-source-pill" id="ficPillDrone" aria-pressed="false">Dron</button>
+                </div>
+            </div>
             <p class="helper" id="ficPredioHelper">Elige predio y capa. La fecha mostrada es la <strong>última imagen disponible</strong> para esa combinación.</p>
             <div class="fic-sidebar-block">
                 <label class="selector-label" for="globalWetland">Predio</label>
@@ -566,9 +622,21 @@ const HIERARCHY_LEVELS = {
     jefe_area: { badge: 'Jefe de área', appHint: 'Vista de coordinación: más adelante filtrarás oficinas o equipos bajo tu gestión.' },
     sat: { badge: 'SAT (asesoría técnica)', appHint: 'Vista alineada a un servicio de asesoría de zona.' },
     asesor: { badge: 'Asesor', appHint: 'Vista de asesor en terreno; podrás acotar a tu cartera de productores.' },
-    agricultor: { badge: 'Agricultor', appHint: 'Vista centrada en tu predio: ortofoto e índices cuando hay campañas de dron cargadas.' }
+    agricultor: { badge: 'Agricultor', appHint: 'Vista centrada en tu predio: el mapa principal usa satélite; el dron aparece como opción cuando hay vuelos cargados para tu caso.' }
 };
 const NIVEL_LEGACY = { agricultor_satelital: 'agricultor', sensor: 'agricultor' };
+
+/** Clave de fuente no-dron del manifiesto (p. ej. ``sentinel2``). */
+function getSatelliteSourceKey() {
+    var srcs = state.manifest && state.manifest.sources;
+    if (!srcs) return null;
+    if (srcs.sentinel2) return 'sentinel2';
+    var keys = Object.keys(srcs);
+    for (var i = 0; i < keys.length; i++) {
+        if (keys[i] !== 'drone') return keys[i];
+    }
+    return null;
+}
 
 const CBAR = {
     ndvi: { gradient: 'linear-gradient(to top,#a50026,#d73027,#f46d43,#fdae61,#fee08b,#ffffbf,#d9ef8b,#a6d96a,#66bd63,#1a9850,#006837)', label: 'Follaje (NDVI)' },
@@ -661,7 +729,7 @@ const state = {
     selectedSource: null,
     selectedWetland: null,
     hierarchyLevel: null,
-    mapLayerKind: 'rgb',
+    mapLayerKind: 'ndvi',
     mapPeriodKey: null,
     ficDbByPredio: {}
 };
@@ -757,13 +825,15 @@ function wetlandsInAdvisorPortfolio() {
     });
 }
 
-function applyWetlandSelection(wid) {
+async function applyWetlandSelection(wid) {
     state.selectedWetland = wid || null;
     var wetlandSel = document.getElementById('globalWetland');
     if (wetlandSel) wetlandSel.value = state.selectedWetland || '';
+    if (await ensureMapSourceMatchesPillsPolicy()) return;
     renderAOI();
     refreshMapLayerState();
     updateWelcomeBanner();
+    syncSourcePillsDom();
     renderAll();
 }
 
@@ -975,9 +1045,117 @@ function isUiSelectableWetland(wid) {
     return String(wid || '').toLowerCase() !== 'lote_demo';
 }
 
+function wetlandsListedForMeta(meta) {
+    if (!meta || !meta.wetlands) return [];
+    return Object.keys(meta.wetlands).filter(isUiSelectableWetland);
+}
+
 /** Claves de predio del desplegable (misma metadata, sin demostración). */
 function wetlandsListedForSelect() {
     return currentWetlands().filter(isUiSelectableWetland);
+}
+
+function manifestDroneAvailable() {
+    var d = state.manifest && state.manifest.sources && state.manifest.sources.drone;
+    return !!(d && d.has_data && state.metadata && state.metadata.drone);
+}
+
+function wetlandHasDroneData(wid) {
+    var dm = state.metadata.drone;
+    if (!dm || !dm.wetlands) return false;
+    var info = dm.wetlands[String(wid || '').toLowerCase()];
+    if (!info) return false;
+    if ((info.n_periods || 0) > 0) return true;
+    if (info.status === 'ready') return true;
+    return false;
+}
+
+/** Predios usados para saber si el pill Dron aplica (satélite si hay; si no, respaldo dron). */
+function contextScopeWetlandsForDronePill() {
+    var satKey = getSatelliteSourceKey();
+    var sm = satKey && state.metadata[satKey];
+    var list = wetlandsListedForMeta(sm || {});
+    if (!list.length && state.metadata.drone) {
+        list = wetlandsListedForMeta(state.metadata.drone);
+    }
+    return list;
+}
+
+/**
+ * ¿Mostrar el selector Satélite / Dron? Solo si hay serie satélite en el manifiesto y,
+ * según el nivel: el agricultor (mismo nombre en CSV), la cartera del asesor/SAT o cualquier predio (regional/jefe),
+ * algún predio tiene vuelos dron cargados.
+ */
+function contextShowsDronePill() {
+    if (!manifestDroneAvailable()) return false;
+    var satKey = getSatelliteSourceKey();
+    if (!satKey || !state.metadata[satKey]) return false;
+    var h = state.hierarchyLevel;
+    var list = contextScopeWetlandsForDronePill();
+    var scopeWids = [];
+    if (h === 'asesor' || h === 'sat') {
+        var adv = advisorNameForPortfolioFilter();
+        list.forEach(function (w) {
+            if (wetlandMatchesAdvisorFilter(w, adv)) scopeWids.push(w);
+        });
+    } else if (h === 'agricultor') {
+        var anchor = state.selectedWetland;
+        var rowA = anchor && getFicDbRow(anchor);
+        var nm = rowA && ficTrim(rowA.nombre_agricultor);
+        if (nm) {
+            list.forEach(function (w) {
+                var r = getFicDbRow(w);
+                if (
+                    r &&
+                    ficTrim(r.nombre_agricultor).localeCompare(nm, 'es', { sensitivity: 'base' }) === 0
+                ) {
+                    scopeWids.push(w);
+                }
+            });
+        } else {
+            scopeWids = list.slice();
+        }
+    } else {
+        scopeWids = list.slice();
+    }
+    for (var i = 0; i < scopeWids.length; i++) {
+        if (wetlandHasDroneData(scopeWids[i])) return true;
+    }
+    return false;
+}
+
+function syncSourcePillsDom() {
+    var wrap = document.getElementById('ficSourcePillsWrap');
+    var satKey = getSatelliteSourceKey();
+    if (!wrap) return;
+    if (!satKey) {
+        wrap.hidden = true;
+        return;
+    }
+    wrap.hidden = !contextShowsDronePill();
+    var bSat = document.getElementById('ficPillSatellite');
+    var bDrone = document.getElementById('ficPillDrone');
+    if (!bSat || !bDrone) return;
+    var onSat = state.selectedSource !== 'drone';
+    bSat.setAttribute('aria-pressed', onSat ? 'true' : 'false');
+    bDrone.setAttribute('aria-pressed', onSat ? 'false' : 'true');
+    bSat.classList.toggle('fic-source-pill--active', onSat);
+    bDrone.classList.toggle('fic-source-pill--active', !onSat);
+}
+
+function ficBindSourcePills() {
+    var bSat = document.getElementById('ficPillSatellite');
+    var bDrone = document.getElementById('ficPillDrone');
+    if (!bSat || bSat.dataset.ficBound) return;
+    bSat.dataset.ficBound = '1';
+    bDrone.dataset.ficBound = '1';
+    bSat.addEventListener('click', function () {
+        var sk = getSatelliteSourceKey();
+        if (sk) void setSource(sk);
+    });
+    bDrone.addEventListener('click', function () {
+        if (contextShowsDronePill()) void setSource('drone');
+    });
 }
 
 /** Promedio espacial del último vuelo en series dron para un índice numérico (NDVI, NDWI…). */
@@ -1141,6 +1319,7 @@ function initFromQuery() {
         actgl.dataset.ficBound = '1';
         actgl.addEventListener('click', ficTogglePortfolioChartPanel);
     }
+    ficBindSourcePills();
     loadManifest();
     setTimeout(function () { if (mapa) mapa.invalidateSize({ animate: false }); }, 400);
 }
@@ -1237,9 +1416,9 @@ async function loadManifest() {
         const withData = keys.find(function (k) {
             return state.manifest.sources[k] && state.manifest.sources[k].has_data;
         });
-        const defaultKey =
-            state.manifest.sources.drone && state.manifest.sources.drone.has_data ? 'drone' : withData || keys[0];
-        await setSource(defaultKey);
+        const satKey = getSatelliteSourceKey();
+        const initialKey = satKey || withData || keys[0];
+        await setSource(initialKey);
     } catch (error) {
         console.error(error);
         if (errEl) {
@@ -1259,6 +1438,17 @@ async function setSource(sourceKey) {
     buildSelectors();
     renderAOI();
     renderAll();
+    syncSourcePillsDom();
+}
+
+/** Si el dron ya no aplica al contexto, vuelve a satélite (evita quedar en dron sin pill). */
+async function ensureMapSourceMatchesPillsPolicy() {
+    var satKey = getSatelliteSourceKey();
+    if (satKey && !contextShowsDronePill() && state.selectedSource === 'drone') {
+        await setSource(satKey);
+        return true;
+    }
+    return false;
 }
 
 function currentSource() { return state.manifest.sources[state.selectedSource] || {}; }
@@ -1404,7 +1594,7 @@ function buildSelectors() {
     state.selectedWetland = pickDefaultWetland();
     wetlandSel.value = state.selectedWetland || '';
     wetlandSel.onchange = function () {
-        applyWetlandSelection(wetlandSel.value || null);
+        void applyWetlandSelection(wetlandSel.value || null);
     };
 
     refreshMapLayerState();
