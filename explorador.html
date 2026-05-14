@@ -26,6 +26,10 @@
             --fic-warn: #c4a035;
             --fic-radius-soft: 20px;
             --fic-radius-inner: 18px;
+            /* Área útil del mapa a la derecha del panel flotante (actualiza JS: ficSyncMapChromeInset) */
+            --fic-map-chrome-inset-left: 0px;
+            /* Reserva inferior (legado); la leyenda va centrada en vertical y ya no depende de este valor. */
+            --fic-map-chrome-bottom-offset: 0px;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body.fic-explorer {
@@ -40,9 +44,10 @@
             font-size: clamp(15.5px, calc(0.38vw + 14px), 17px);
             line-height: 1.5;
         }
-        /* App: panel izquierdo de borde a borde + etapa de mapa */
+        /* App: mapa a ancho completo; panel lateral flotante */
         .fic-app {
-            display: flex;
+            position: relative;
+            display: block;
             width: 100%;
             height: 100dvh;
             height: 100vh;
@@ -50,8 +55,8 @@
         }
         .fic-map-stage {
             position: relative;
-            flex: 1;
-            min-width: 0;
+            width: 100%;
+            height: 100%;
             min-height: 0;
             background: #0d120f;
         }
@@ -69,17 +74,35 @@
         .fic-explorer .leaflet-control-zoom a { width: 34px; height: 34px; line-height: 34px; font-size: 18px; color: var(--fic-ag-ink) !important; background: rgba(255,255,255,.96) !important; border-bottom-color: rgba(0,0,0,.06) !important; }
         .fic-explorer .leaflet-control-layers { border: none !important; border-radius: 14px !important; box-shadow: 0 6px 24px rgba(0,0,0,.14) !important; background: rgba(255,255,255,.96) !important; padding: 6px 10px !important; }
         .fic-explorer .leaflet-bar { border: none !important; }
+        .fic-map-stage .leaflet-container .leaflet-bottom.leaflet-left,
+        .fic-sat-map-stage .leaflet-container .leaflet-bottom.leaflet-left {
+            margin-left: var(--fic-map-chrome-inset-left);
+        }
         @media (max-width: 720px) {
-            .fic-app { flex-direction: column; }
-            :root { --fic-panel-w: 100%; }
-            .fic-side-panel { max-height: 42dvh; width: 100% !important; border-right: none !important; border-bottom: 1px solid var(--fic-ag-border-soft); }
-            .fic-map-stage { flex: 1; min-height: 48dvh; }
+            :root { --fic-panel-w: min(100% - 20px, 400px); }
+            .fic-side-panel {
+                left: 50% !important;
+                right: auto !important;
+                transform: translateX(-50%);
+                width: var(--fic-panel-w) !important;
+                max-height: min(52dvh, 420px) !important;
+                top: max(8px, env(safe-area-inset-top)) !important;
+            }
+            .fic-map-stage { min-height: 100%; }
             .fic-panel-brand__pill {
                 flex-wrap: wrap;
                 justify-content: center;
                 row-gap: 0.35rem;
             }
             .fic-topbar-headings { text-align: center; }
+            #ficSatBottomStack .fic-sat-period-float {
+                padding: 8px 10px 9px;
+            }
+            #ficSatBottomStack .fic-sat-chart-dock:not(.fic-sat-chart-dock--collapsed) {
+                max-height: min(42vh, 340px);
+            }
+            .fic-sat-compare-yrs__v { font-size: 0.86rem; }
+            .fic-sat-period-step { width: 36px; height: 36px; }
         }
 
         /* Marca FIC (dentro del panel lateral, centrada) */
@@ -161,21 +184,26 @@
             .fic-topbar-title { color: var(--fic-ag-dark); background: none; filter: none; }
         }
 
-        /* Panel lateral: columna normal, alto completo, bordes suaves */
+        /* Panel lateral flotante sobre el mapa */
         .fic-side-panel {
+            position: absolute;
+            left: max(12px, env(safe-area-inset-left));
+            top: max(12px, env(safe-area-inset-top));
+            bottom: max(12px, env(safe-area-inset-bottom));
             width: var(--fic-panel-w);
-            flex-shrink: 0;
-            height: 100%;
-            min-height: 0;
-            padding: max(10px, env(safe-area-inset-top)) 18px max(12px, env(safe-area-inset-bottom)) 18px;
+            max-height: calc(100dvh - 24px);
+            padding: max(10px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom)) 16px;
             display: flex;
             flex-direction: column;
             gap: 0;
             overflow: hidden;
             background: linear-gradient(175deg, #fbfdf9 0%, #f3f8f3 38%, #ebf3ec 100%);
-            border-right: 1px solid var(--fic-ag-border-soft);
-            box-shadow: 12px 0 40px rgba(18, 42, 28, 0.07);
-            z-index: 5;
+            border: 1px solid rgba(29, 107, 74, 0.12);
+            border-radius: 26px;
+            box-shadow:
+                0 12px 48px rgba(18, 42, 28, 0.18),
+                0 2px 12px rgba(18, 42, 28, 0.08);
+            z-index: 45;
         }
         .fic-side-panel__scroll {
             flex: 1;
@@ -196,7 +224,7 @@
         .fic-panel-block {
             background: rgba(255, 255, 255, 0.72);
             border: 1px solid rgba(255, 255, 255, 0.85);
-            border-radius: var(--fic-radius-inner);
+            border-radius: 20px;
             padding: 1.05rem 1.05rem 1.1rem;
             box-shadow:
                 0 2px 20px rgba(18, 42, 28, 0.05),
@@ -247,7 +275,104 @@
             color: var(--fic-ag-dark);
         }
 
-        .fic-panel-block--tight .fic-sidebar-title { margin-top: 0.5rem; }
+        /* Flujo panel: ámbito → origen imagen → capa; la caja sat/dron sigue al selector de predio */
+        .fic-sbar-section-head--panel-flow {
+            margin-top: 0.85rem;
+        }
+        .fic-sidebar-block + .fic-panel-map-source-box {
+            margin-top: 0.55rem;
+        }
+        .fic-panel-map-source-box + .fic-sbar-section-head {
+            margin-top: 0.7rem;
+        }
+        .fic-panel-map-source-box {
+            margin: 0;
+        }
+        .fic-panel-map-source-box[hidden] { display: none !important; }
+        .fic-panel-map-source-box__inner {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(29, 107, 74, 0.14);
+            box-shadow: 0 2px 14px rgba(18, 42, 28, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        }
+        .fic-panel-map-source-box__text {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+        }
+        .fic-panel-map-source-box__title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.82rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            line-height: 1.2;
+            color: var(--fic-ag-dark);
+        }
+        .fic-panel-map-source-box__sub {
+            font-size: 0.74rem;
+            font-weight: 600;
+            line-height: 1.3;
+            color: var(--fic-ag-muted);
+        }
+        .fic-source-pills--sidebar-icons {
+            display: flex;
+            flex-wrap: nowrap;
+            align-items: center;
+            gap: 12px;
+            margin: 0;
+            padding: 0;
+            border: none;
+            border-radius: 0;
+            background: transparent;
+        }
+        .fic-source-pills--sidebar-icons > .fic-source-pill {
+            flex: 0 0 auto;
+            width: 52px;
+            height: 52px;
+            min-width: 52px;
+            padding: 0;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid rgba(29, 107, 74, 0.16);
+            background: rgba(248, 252, 249, 0.98);
+            color: var(--fic-ag-muted);
+            box-shadow: 0 1px 6px rgba(18, 42, 28, 0.05);
+            font-size: 0;
+            line-height: 0;
+        }
+        .fic-source-pills--sidebar-icons > .fic-source-pill:hover {
+            color: var(--fic-ag-dark);
+            border-color: rgba(29, 107, 74, 0.28);
+            background: #fff;
+        }
+        .fic-source-pills--sidebar-icons > .fic-source-pill.fic-source-pill--active {
+            background: #fff;
+            color: var(--fic-ag-mid);
+            border-color: var(--fic-ag-mid);
+            box-shadow: 0 2px 14px rgba(29, 107, 74, 0.16);
+        }
+        .fic-source-pills--sidebar-icons > .fic-source-pill:not(.fic-source-pill--active) .fic-src-img {
+            opacity: 0.82;
+        }
+        .fic-source-pills--sidebar-icons > .fic-source-pill.fic-source-pill--active .fic-src-img {
+            opacity: 1;
+        }
+        .fic-source-pills--sidebar-icons .fic-src-img {
+            display: block;
+            width: 30px;
+            height: 30px;
+            object-fit: contain;
+            pointer-events: none;
+            user-select: none;
+        }
         .fic-source-pills-wrap {
             margin: 0.4rem 0 0.85rem;
         }
@@ -297,13 +422,10 @@
             color: var(--fic-ag-dark);
             box-shadow: 0 2px 12px rgba(18, 42, 28, 0.1);
         }
-        .fic-sidebar-title {
-            font-family: 'Outfit', sans-serif;
-            font-size: 1.05rem;
-            font-weight: 700;
-            color: var(--fic-ag-dark);
-            margin: 0.35rem 0 0.5rem;
+        .fic-source-pills--single .fic-source-pill {
+            flex: 1 1 auto;
         }
+
         .helper { font-size: 0.9rem; color: var(--fic-ag-muted); line-height: 1.45; margin-bottom: 0.65rem; }
         .fic-sidebar-block { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.7rem; }
         .fic-sidebar-block:first-of-type { margin-top: 0; }
@@ -348,14 +470,18 @@
             left: 0;
             right: 0;
             bottom: 0;
+            box-sizing: border-box;
+            padding-left: var(--fic-map-chrome-inset-left);
         }
         .map-note {
             position: absolute;
             top: max(10px, env(safe-area-inset-top));
-            left: 50%;
-            right: auto;
-            transform: translateX(-50%);
-            max-width: min(420px, calc(100% - 100px));
+            left: var(--fic-map-chrome-inset-left);
+            right: 12px;
+            transform: none;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: min(420px, calc(100% - var(--fic-map-chrome-inset-left) - 24px));
             width: max-content;
             padding: 0.5rem 0.85rem;
             background: rgba(255, 255, 255, 0.94);
@@ -367,11 +493,661 @@
             box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
             text-align: center;
         }
+
+        /* === Sidebar: secciones (ámbito, vista, escala temporal) =================== */
+        .fic-sbar-section-head {
+            margin: 0.35rem 0 0.45rem;
+        }
+        .fic-sat-temporal-block {
+            margin-top: 0.75rem;
+            padding-top: 0.35rem;
+            border-top: 1px solid rgba(29, 107, 74, 0.08);
+        }
+        .fic-sat-temporal-block > .fic-sbar-section-head:first-child {
+            margin-top: 0;
+        }
+        .fic-panel-help-tip.helper {
+            margin: 0.55rem 0 0;
+            font-size: 0.82rem;
+            line-height: 1.42;
+        }
+        .fic-sbar-section-heading {
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: rgba(26, 32, 24, 0.62);
+            margin: 0;
+        }
+        .fic-temporal-scale-band__mount {
+            box-sizing: border-box;
+            width: 100%;
+            padding: 0.5rem 0.44rem 0.55rem;
+            background: rgba(255, 255, 255, 0.82);
+            border-radius: 14px;
+            border: 1px solid rgba(29, 107, 74, 0.12);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
+        }
+        .fic-sat-mode-pills--sidebar {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.36rem 0.3rem;
+            align-items: stretch;
+        }
+        .fic-sat-mode-pill-col {
+            padding: 0;
+            margin: 0;
+        }
+        .fic-sat-mode-pills--sidebar .fic-sat-mode-pill {
+            width: 100%;
+            min-height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 10px;
+            border-radius: 9999px;
+            border: 1px solid rgba(29, 107, 74, 0.22);
+            background: rgba(255, 255, 255, 0.96);
+            box-shadow:
+                0 1px 3px rgba(18, 42, 28, 0.06),
+                inset 0 1px 0 rgba(255, 255, 255, 0.95);
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--fic-ag-muted);
+            transition: transform 0.15s ease, box-shadow 0.18s ease, border-color 0.18s ease, color 0.15s;
+        }
+        .fic-sat-mode-pills--sidebar .fic-sat-mode-pill:hover {
+            transform: translateY(-1px);
+            border-color: rgba(45, 157, 110, 0.45);
+            box-shadow: 0 4px 12px rgba(29, 107, 74, 0.12);
+            color: var(--fic-ag-dark);
+        }
+        .fic-sat-mode-pills--sidebar .fic-sat-mode-pill--active {
+            border-color: var(--fic-ag-mid);
+            box-shadow:
+                0 0 0 2px rgba(45, 157, 110, 0.22),
+                0 5px 16px rgba(29, 107, 74, 0.14);
+            color: var(--fic-ag-mid);
+        }
+
+        /* === Satelital: comparativa con divisor (un mapa) ===================== */
+        #ficSatSplitStage {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            background: #0d120f;
+            z-index: 1;
+            /* Espacio sobre el botón «Mostrar gráfico» + altura del selector temporal (la ajusta JS). */
+            --fic-sat-toggle-clear: calc(44px + max(12px, env(safe-area-inset-bottom)));
+            --fic-sat-period-float-measured: 0px;
+        }
+        #ficSatSplitStage[hidden] { display: none !important; }
+
+        .fic-sat-maps-row {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            position: relative;
+        }
+        .fic-sat-compare {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .fic-sat-compare__mapwrap {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .fic-sat-compare__body {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+            width: 100%;
+        }
+        .fic-sat-map-stage {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            isolation: isolate;
+        }
+        /* Título sobre el mapa (patrón GENIUS: vidrio centrado arriba) */
+        .fic-sat-map-stage .fic-map-title {
+            position: absolute;
+            top: max(12px, env(safe-area-inset-top));
+            left: var(--fic-map-chrome-inset-left);
+            right: 12px;
+            transform: none;
+            margin-left: auto;
+            margin-right: auto;
+            z-index: 1002;
+            box-sizing: border-box;
+            text-align: center;
+            letter-spacing: 0.01em;
+            font-size: clamp(1.02rem, 1.45vw, 1.2rem);
+            font-weight: 500;
+            width: fit-content;
+            max-width: min(520px, calc(100% - var(--fic-map-chrome-inset-left) - 24px));
+            white-space: normal;
+            line-height: 1.38;
+            padding: 0.58rem 1.05rem 0.62rem;
+            pointer-events: none;
+            color: var(--fic-ag-ink);
+            background: linear-gradient(
+                165deg,
+                rgba(255, 255, 255, 0.96) 0%,
+                rgba(251, 253, 250, 0.93) 45%,
+                rgba(235, 243, 236, 0.9) 100%
+            );
+            border: 1px solid rgba(29, 107, 74, 0.12);
+            border-left: 3px solid var(--fic-ag-accent);
+            border-radius: 16px;
+            box-shadow:
+                0 4px 18px rgba(18, 42, 28, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(14px) saturate(1.06);
+            -webkit-backdrop-filter: blur(14px) saturate(1.06);
+        }
+        .fic-sat-map-stage .fic-map-title strong {
+            font-weight: 700;
+            color: var(--fic-ag-dark);
+        }
+        /* Años histórico / actual a cada lado del comparador (debajo del título central). */
+        .fic-sat-compare-yrs {
+            position: absolute;
+            top: max(52px, calc(env(safe-area-inset-top) + 46px));
+            left: calc(var(--fic-map-chrome-inset-left) + 8px);
+            right: max(10px, env(safe-area-inset-right));
+            z-index: 1001;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            align-items: flex-start;
+            gap: 10px;
+            pointer-events: none;
+        }
+        .fic-sat-compare-yrs__side {
+            min-width: 0;
+            max-width: min(240px, 100%);
+            width: fit-content;
+            justify-self: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            padding: 5px 12px 6px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(29, 107, 74, 0.12);
+            box-shadow: 0 3px 14px rgba(18, 42, 28, 0.08);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            text-align: center;
+        }
+        .fic-sat-compare-yrs__k {
+            font-size: 0.62rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(26, 32, 24, 0.55);
+        }
+        .fic-sat-compare-yrs__v {
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: var(--fic-ag-dark);
+            line-height: 1.15;
+        }
+        .fic-sat-panel__map {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .fic-sat-map-stage .leaflet-container {
+            width: 100%;
+            height: 100%;
+            border-radius: 0;
+        }
+        .fic-sat-swipe {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            z-index: 910;
+            pointer-events: none;
+        }
+        .fic-sat-swipe__grip {
+            pointer-events: auto;
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            width: 48px;
+            margin-left: -24px;
+            cursor: ew-resize;
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .fic-sat-swipe__grip:focus {
+            outline: 2px solid var(--fic-ag-accent);
+            outline-offset: 2px;
+        }
+        .fic-sat-swipe__grip::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            transform: translateX(-50%);
+            z-index: 0;
+            border-radius: 3px;
+            background: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(236, 244, 239, 0.96) 50%, rgba(255,255,255,1) 100%);
+            box-shadow:
+                0 0 0 1px rgba(0, 0, 0, 0.5),
+                0 0 0 2px rgba(255, 255, 255, 0.45),
+                0 0 20px rgba(0, 0, 0, 0.4);
+        }
+        .fic-sat-swipe__grip::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            z-index: 1;
+            width: 44px;
+            height: 44px;
+            margin: -22px 0 0 -22px;
+            border-radius: 50%;
+            box-sizing: border-box;
+            border: 2.5px solid rgba(29, 107, 74, 0.55);
+            background: rgba(255, 255, 255, 0.96);
+            box-shadow:
+                0 2px 12px rgba(0, 0, 0, 0.22),
+                inset 0 1px 0 rgba(255, 255, 255, 0.95);
+            pointer-events: none;
+        }
+        .fic-sat-swipe__icon {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            z-index: 2;
+            width: 22px;
+            height: 14px;
+            transform: translate(-50%, -50%);
+            color: rgba(29, 107, 74, 0.92);
+            pointer-events: none;
+        }
+        .fic-sat-swipe__icon svg {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .fic-sat-month-pills {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 3px;
+            max-width: min(560px, 100%);
+        }
+        .fic-sat-month-pill {
+            padding: 3px 9px;
+            border-radius: 999px;
+            border: 1px solid rgba(29, 107, 74, 0.22);
+            background: rgba(255, 255, 255, 0.92);
+            color: var(--fic-ag-muted);
+            font-size: 0.72rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.12s, color 0.12s, border-color 0.12s;
+            min-width: 1.85rem;
+        }
+        .fic-sat-month-pill:hover {
+            background: rgba(232, 244, 233, 0.95);
+            color: var(--fic-ag-dark);
+        }
+        .fic-sat-month-pill--active {
+            background: var(--fic-ag-mid);
+            color: #fff;
+            border-color: var(--fic-ag-mid);
+        }
+        .fic-sat-month-pills.fic-sat-month-pills--weeks .fic-sat-month-pill {
+            padding: 2px 6px;
+            font-size: 0.64rem;
+            min-width: 1.5rem;
+        }
+        /** Bloque inferior alineado: selector temporal + gráfico (misma anchura). */
+        #ficSatSplitStage > .fic-sat-bottom-stack {
+            position: absolute;
+            left: calc(var(--fic-map-chrome-inset-left) + 8px);
+            right: max(8px, env(safe-area-inset-right));
+            bottom: var(--fic-sat-toggle-clear);
+            z-index: 935;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0;
+            width: auto;
+            max-width: min(1180px, calc(100% - 16px));
+            margin: 0 auto;
+            box-sizing: border-box;
+            pointer-events: none;
+        }
+        #ficSatSplitStage > .fic-sat-bottom-stack > * {
+            pointer-events: auto;
+        }
+        #ficSatSplitStage > .fic-sat-bottom-stack[hidden] {
+            display: none !important;
+        }
+        #ficSatBottomStack .fic-sat-period-float {
+            position: relative;
+            left: auto;
+            right: auto;
+            bottom: auto;
+            transform: none;
+            z-index: 2;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0;
+            padding: 8px 12px 10px;
+            box-sizing: border-box;
+            background: linear-gradient(165deg, rgba(255, 255, 255, 0.98) 0%, rgba(251, 253, 250, 0.95) 100%);
+            border: 1px solid rgba(29, 107, 74, 0.14);
+            border-radius: 18px;
+            box-shadow:
+                0 8px 28px rgba(18, 42, 28, 0.12),
+                inset 0 1px 0 rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(12px) saturate(1.05);
+            -webkit-backdrop-filter: blur(12px) saturate(1.05);
+            transition: border-radius 0.34s ease, transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
+        }
+        #ficSatBottomStack.fic-sat-bottom-stack--chart-open .fic-sat-period-float {
+            border-radius: 16px 16px 0 0;
+            border-bottom: none;
+            box-shadow: 0 4px 18px rgba(18, 42, 28, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+            transform: translateY(-3px);
+        }
+        #ficSatBottomStack .fic-sat-period-float[hidden] {
+            display: none !important;
+        }
+        .fic-sat-period-toolbar {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 4px;
+        }
+        .fic-sat-period-toolbar__row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+        }
+        .fic-sat-period-custom-slider {
+            flex: 1;
+            min-width: 0;
+            position: relative;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            touch-action: none;
+        }
+        .fic-sat-period-custom-slider__track {
+            position: relative;
+            width: 100%;
+            height: 7px;
+            border-radius: 999px;
+            background: rgba(29, 107, 74, 0.16);
+            cursor: pointer;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+        }
+        .fic-sat-period-custom-slider__fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 0%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, rgba(45, 157, 110, 0.35), rgba(29, 107, 74, 0.55));
+            pointer-events: none;
+        }
+        .fic-sat-period-custom-slider__thumb {
+            position: absolute;
+            left: 0%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            min-width: 4.75rem;
+            max-width: min(40vw, 10rem);
+            padding: 6px 11px 7px;
+            border-radius: 12px;
+            background: var(--fic-ag-mid);
+            color: #fff;
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-align: center;
+            line-height: 1.2;
+            letter-spacing: -0.02em;
+            box-shadow: 0 4px 16px rgba(29, 107, 74, 0.38);
+            pointer-events: none;
+            z-index: 2;
+            border: 1.5px solid rgba(255, 255, 255, 0.35);
+        }
+        .fic-sat-period-custom-slider__thumb-label {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .fic-sat-period-step {
+            flex: 0 0 auto;
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            border: 1.5px solid rgba(29, 107, 74, 0.28);
+            background: rgba(255, 255, 255, 0.96);
+            color: var(--fic-ag-dark);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            line-height: 0;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.12s, border-color 0.12s;
+        }
+        .fic-sat-period-step svg {
+            display: block;
+        }
+        .fic-sat-period-step:hover {
+            background: rgba(232, 244, 233, 0.98);
+            border-color: var(--fic-ag-mid);
+        }
+
+        /* === Dock del gráfico (dentro de #ficSatBottomStack, alineado al selector) === */
+        #ficSatBottomStack .fic-sat-chart-dock {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            width: 100%;
+            box-sizing: border-box;
+            margin: 0;
+            min-height: 0;
+            padding: 0 10px 8px 12px;
+            background: rgba(255, 255, 255, 0.97);
+            border: 1px solid rgba(29, 107, 74, 0.14);
+            border-top: none;
+            border-radius: 0 0 16px 16px;
+            box-shadow: 0 14px 40px rgba(18, 42, 28, 0.14);
+            backdrop-filter: blur(12px) saturate(1.04);
+            -webkit-backdrop-filter: blur(12px) saturate(1.04);
+            overflow: hidden;
+        }
+        #ficSatBottomStack .fic-sat-chart-dock.fic-sat-chart-dock--collapsed {
+            max-height: 0 !important;
+            opacity: 0;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin: 0 !important;
+            border-width: 0 !important;
+            overflow: hidden !important;
+            pointer-events: none !important;
+            transition:
+                max-height 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+                opacity 0.26s ease,
+                padding 0.26s ease,
+                border-width 0.2s ease,
+                margin 0.2s ease;
+        }
+        #ficSatBottomStack .fic-sat-chart-dock:not(.fic-sat-chart-dock--collapsed) {
+            max-height: min(50vh, 460px);
+            opacity: 1;
+            transition:
+                max-height 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+                opacity 0.32s ease 0.06s,
+                padding 0.28s ease;
+        }
+        .fic-sat-chart-dock {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+        .fic-sat-chart-head {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            justify-content: space-between;
+            padding: 7px 14px 6px;
+            flex-wrap: wrap;
+        }
+        .fic-sat-chart-titles { min-width: 0; flex: 1; }
+        .fic-sat-chart-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.88rem;
+            font-weight: 800;
+            color: var(--fic-ag-dark);
+            letter-spacing: -0.01em;
+            line-height: 1.2;
+            margin: 0;
+        }
+        .fic-sat-chart-sub {
+            font-size: 0.72rem;
+            color: var(--fic-ag-muted);
+            margin: 0.18rem 0 0;
+        }
+        .fic-sat-chart-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        .fic-sat-chart-series-pills {
+            display: inline-flex;
+            gap: 4px;
+            margin-right: 4px;
+        }
+        .fic-sat-chart-series-pill {
+            padding: 3px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(29, 107, 74, 0.28);
+            background: rgba(255, 255, 255, 0.95);
+            font-size: 0.72rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            color: var(--fic-ag-muted);
+        }
+        .fic-sat-chart-series-pill--active {
+            background: var(--fic-ag-mid);
+            color: #fff;
+            border-color: var(--fic-ag-mid);
+        }
+        .fic-sat-chart-bandlabel {
+            font-size: 0.7rem;
+            color: var(--fic-ag-muted);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .fic-sat-chart-bandsel {
+            padding: 3px 8px;
+            border-radius: 8px;
+            border: 1px solid rgba(29,107,74,0.25);
+            background: #fff;
+            color: var(--fic-ag-ink);
+            font-family: inherit;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            max-width: 160px;
+        }
+        .fic-sat-chart-toggle {
+            padding: 4px 13px;
+            border-radius: 999px;
+            border: 1.5px solid var(--fic-ag-mid);
+            background: var(--fic-ag-mid);
+            color: #fff;
+            font-size: 0.78rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        /** Pill sobre el mapa comparativo: hijo directo del stage para quedar por encima del dock flotante (z-index). */
+        #ficSatSplitStage > .fic-sat-chart-toggle.fic-sat-chart-toggle--mapfloat {
+            position: absolute;
+            left: calc((100% + var(--fic-map-chrome-inset-left)) / 2);
+            transform: translateX(-50%);
+            bottom: max(12px, env(safe-area-inset-bottom));
+            z-index: 950;
+            pointer-events: auto;
+            box-shadow: 0 6px 22px rgba(18, 42, 28, 0.18);
+        }
+        .fic-sat-chart-toggle:hover { background: var(--fic-ag-accent); border-color: var(--fic-ag-accent); }
+        .fic-sat-chart-toggle[aria-expanded="true"] {
+            background: var(--fic-ag-accent);
+            border-color: var(--fic-ag-accent);
+        }
+        .fic-sat-chart-canvas-wrap {
+            width: 100%;
+            height: min(38vh, 280px);
+            min-height: 180px;
+            padding: 4px 14px 10px;
+        }
+        .fic-sat-chart-canvas-wrap[hidden] { display: none; }
+        .fic-sat-chart-canvas-wrap canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+        }
+        @media (max-width: 720px) {
+            .fic-sat-chart-canvas-wrap { height: min(34vh, 230px); }
+            .fic-sat-chart-bandsel { max-width: 120px; }
+        }
         .colorbar-box {
             position: absolute;
-            left: max(14px, env(safe-area-inset-left));
+            left: calc(var(--fic-map-chrome-inset-left) + max(10px, env(safe-area-inset-left)));
             top: 50%;
+            bottom: auto;
             transform: translateY(-50%);
+            max-height: min(320px, calc(100% - 48px));
             background: rgba(255, 255, 255, 0.94);
             border: 1px solid rgba(29, 107, 74, 0.1);
             border-radius: 18px;
@@ -382,6 +1158,38 @@
             gap: 8px;
             min-width: 86px;
             box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
+        }
+        .fic-drone-opacity-float {
+            position: absolute;
+            left: calc((100% + var(--fic-map-chrome-inset-left)) / 2);
+            transform: translateX(-50%);
+            bottom: max(72px, calc(14px + env(safe-area-inset-bottom)));
+            z-index: 840;
+            pointer-events: auto;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            min-width: min(300px, calc(100% - var(--fic-map-chrome-inset-left) - 28px));
+            max-width: min(360px, calc(100% - var(--fic-map-chrome-inset-left) - 28px));
+            padding: 10px 14px 12px;
+            margin: 0;
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid rgba(29, 107, 74, 0.12);
+            border-radius: 16px;
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+        }
+        .fic-drone-opacity-float[hidden] {
+            display: none !important;
+            pointer-events: none;
+        }
+        .fic-drone-opacity-float .selector-label {
+            font-size: 0.72rem;
+            margin-bottom: 0.35rem;
+        }
+        .fic-drone-opacity-float input[type="range"] {
+            width: 100%;
+            accent-color: var(--fic-ag-mid);
         }
         .colorbar-title { font-size: 0.72rem; font-weight: 700; color: var(--fic-ag-muted); text-align: center; }
         .colorbar-scale { display: flex; flex-direction: column; align-items: center; gap: 6px; }
@@ -417,6 +1225,7 @@
             right: 0;
             bottom: 0;
             padding: 0 14px 14px;
+            padding-left: calc(14px + var(--fic-map-chrome-inset-left));
             pointer-events: none;
             display: flex;
             justify-content: center;
@@ -529,7 +1338,7 @@
 </head>
 <body class="fic-explorer">
 <div class="fic-app">
-<aside class="fic-side-panel" aria-label="Controles y resumen">
+<aside class="fic-side-panel" aria-label="Controles del mapa: ámbito, origen de imagen, capa y tiempo">
     <header class="fic-panel-brand" id="ficTopbar" role="banner">
         <div class="fic-panel-brand__pill">
             <div class="fic-brand" title="Monitoreo Agricola — TeleAmb UPLA">
@@ -550,30 +1359,134 @@
             <p class="fic-ctx-hint fic-welcome" id="ficWelcomeBanner" role="status" hidden></p>
             <p class="fic-ctx-hint" id="ficHierarchyContextHint" role="status" hidden></p>
             <p class="fic-panel-error" id="ficLoadHint" role="alert" hidden></p>
-            <h2 class="fic-sidebar-title">Mapa</h2>
-            <div class="fic-source-pills-wrap" id="ficSourcePillsWrap" hidden role="group" aria-label="Origen de las imágenes del mapa">
-                <span class="fic-source-pills-label" id="ficSourcePillsLabel">Fuente del mapa</span>
-                <div class="fic-source-pills">
-                    <button type="button" class="fic-source-pill fic-source-pill--active" id="ficPillSatellite" aria-pressed="true">Satélite</button>
-                    <button type="button" class="fic-source-pill" id="ficPillDrone" aria-pressed="false">Dron</button>
-                </div>
+
+            <div class="fic-sbar-section-head fic-sbar-section-head--panel-flow">
+                <h3 class="fic-sbar-section-heading" id="ficPanelScopeHeading">Ámbito</h3>
             </div>
-            <p class="helper" id="ficPredioHelper">Elige predio y capa. La fecha mostrada es la <strong>última imagen disponible</strong> para esa combinación.</p>
             <div class="fic-sidebar-block">
                 <label class="selector-label" for="globalWetland">Predio</label>
                 <select id="globalWetland"></select>
+            </div>
+
+            <div class="fic-panel-map-source-box" id="ficSourcePillsWrap" hidden>
+                <div class="fic-panel-map-source-box__inner">
+                    <div class="fic-panel-map-source-box__text">
+                        <span class="fic-panel-map-source-box__title">Origen de la imagen</span>
+                        <span class="fic-panel-map-source-box__sub">Satélite u ortofoto del dron en el mapa</span>
+                    </div>
+                    <div class="fic-source-pills fic-source-pills--sidebar-icons" id="ficSidebarSourcePillsRow" role="group" aria-label="Elegí si el mapa muestra imágenes de satélite o de dron">
+                        <button type="button" class="fic-source-pill fic-source-pill--active" id="ficPillSatellite" aria-pressed="true" title="Ver imágenes de satélite" aria-label="Satélite: imágenes de satélite en el mapa">
+                            <img class="fic-src-img" src="assets/img/satelite.png" alt="" width="64" height="64" decoding="async" loading="lazy">
+                        </button>
+                        <button type="button" class="fic-source-pill" id="ficPillDrone" aria-pressed="false" title="Ver ortofotos del dron" aria-label="Dron: ortofotos y vuelos en el mapa">
+                            <img class="fic-src-img" src="assets/img/dron.png" alt="" width="64" height="64" decoding="async" loading="lazy">
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="fic-sbar-section-head">
+                <h3 class="fic-sbar-section-heading" id="ficPanelMapViewHeading">Vista en el mapa</h3>
             </div>
             <div class="fic-sidebar-block">
                 <label class="selector-label" for="mapIndex">Capa (índice o vista)</label>
                 <select id="mapIndex" title="Elegir capa: RGB, NDVI, NDWI…"></select>
             </div>
             <p class="fic-layer-hint" id="ficLayerPillHint"></p>
+            <p class="helper fic-panel-help-tip" id="ficPredioHelper">Elegí predio y capa. Si tenés satélite y vuelos de dron, usá <strong>Origen de la imagen</strong> (arriba) para alternar. La fecha es la <strong>última imagen disponible</strong> para esa combinación.</p>
+
+            <!-- Comparativa satelital: tras capa, elegir agregación temporal (mensual / semanal) -->
+            <div class="fic-sat-temporal-block" id="ficSatTemporalBlock" hidden>
+                <div class="fic-sbar-section-head">
+                    <h3 class="fic-sbar-section-heading">Escala temporal</h3>
+                </div>
+                <div class="fic-temporal-scale-band__mount" aria-label="Modo temporal del comparador">
+                    <div class="fic-sat-mode-pills fic-sat-mode-pills--sidebar" role="group" aria-label="Modo temporal">
+                        <div class="fic-sat-mode-pill-col">
+                            <button type="button" class="fic-sat-mode-pill fic-sat-mode-pill--active" data-satmode="monthly">Mensual</button>
+                        </div>
+                        <div class="fic-sat-mode-pill-col">
+                            <button type="button" class="fic-sat-mode-pill" data-satmode="weekly">Semanal</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </aside>
 
 <div class="fic-map-stage">
     <div id="mapa" role="application" aria-label="Mapa interactivo"></div>
+
+    <!-- Vista comparativa satelital (un mapa + divisor) -->
+    <div id="ficSatSplitStage" hidden role="region" aria-label="Vista comparativa satelital con divisor">
+        <div class="fic-sat-maps-row">
+            <div class="fic-sat-compare" id="ficSatCompareRoot">
+                <div class="fic-sat-compare__mapwrap" id="ficSatCompareMapWrap">
+                    <div class="fic-sat-compare__body" id="ficSatCompareBody">
+                        <div class="fic-sat-map-stage" id="ficSatMapStage">
+                            <div class="fic-sat-panel__map" id="mapaSatCompare" role="application" aria-label="Mapa comparativo satelital"></div>
+                            <div id="ficSatMapTitle" class="fic-map-title" role="status" aria-live="polite"><strong>Comparativa satelital</strong></div>
+                            <div class="fic-sat-compare-yrs" id="ficSatCompareYrs" hidden role="group" aria-label="Año de referencia por lado del comparador">
+                                <div class="fic-sat-compare-yrs__side fic-sat-compare-yrs__side--left" id="ficSatSideYearLeft"></div>
+                                <div class="fic-sat-compare-yrs__side fic-sat-compare-yrs__side--right" id="ficSatSideYearRight"></div>
+                            </div>
+                            <div class="fic-sat-swipe" id="ficSatSwipeLine">
+                                <div
+                                    class="fic-sat-swipe__grip"
+                                    id="ficSatSwipeGrip"
+                                    role="slider"
+                                    tabindex="0"
+                                    aria-label="Divisor entre referencia y actual"
+                                    aria-orientation="vertical"
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"
+                                    aria-valuenow="50"
+                                >
+                                    <span class="fic-sat-swipe__icon" aria-hidden="true">
+                                        <svg viewBox="0 0 22 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M8 2L3 7l5 5M14 2l5 5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Selector temporal + gráfico: misma anchura, gráfico se despliega debajo con animación. -->
+        <div class="fic-sat-bottom-stack" id="ficSatBottomStack" hidden>
+            <div class="fic-sat-period-float" id="ficSatPeriodFloat" hidden>
+                <div class="fic-sat-period-toolbar" id="ficSatPeriodToolbar" hidden></div>
+                <div class="fic-sat-month-pills" id="ficSatPeriodPills" hidden aria-hidden="true"></div>
+            </div>
+            <div class="fic-sat-chart-dock fic-sat-chart-dock--collapsed" id="ficSatChartDock" role="region" aria-label="Series temporales histórico vs año actual">
+                <div class="fic-sat-chart-head">
+                    <div class="fic-sat-chart-titles">
+                        <h3 class="fic-sat-chart-title" id="ficSatChartTitle">Serie temporal</h3>
+                        <p class="fic-sat-chart-sub" id="ficSatChartSubtitle">Histórico: mediana y P25–P75 entre medias espaciales anuales. Año en curso: media espacial por período (huecos = sin dato válido).</p>
+                    </div>
+                    <div class="fic-sat-chart-controls">
+                        <div class="fic-sat-chart-series-pills" role="group" aria-label="Escala del gráfico">
+                            <button type="button" class="fic-sat-chart-series-pill" data-satseries="week" id="ficSatChartSeriesWeek">Semanal</button>
+                            <button type="button" class="fic-sat-chart-series-pill fic-sat-chart-series-pill--active" data-satseries="month" id="ficSatChartSeriesMonth">Mensual</button>
+                        </div>
+                        <label class="fic-sat-chart-bandlabel" for="ficSatChartBand">Banda</label>
+                        <select id="ficSatChartBand" class="fic-sat-chart-bandsel" aria-label="Banda del gráfico"></select>
+                    </div>
+                </div>
+                <div class="fic-sat-chart-canvas-wrap" id="ficSatChartCanvasWeekWrap" hidden>
+                    <canvas id="ficSatChartCanvas" aria-label="Serie semanal: histórico (P25-P75 + mediana) y año actual"></canvas>
+                </div>
+                <div class="fic-sat-chart-canvas-wrap" id="ficSatChartCanvasMonthWrap" hidden>
+                    <canvas id="ficSatChartMonthCanvas" aria-label="Serie mensual: histórico (P25-P75 + mediana) y año actual hasta el último mes completo"></canvas>
+                </div>
+            </div>
+        </div>
+        <button type="button" class="fic-sat-chart-toggle fic-sat-chart-toggle--mapfloat" id="ficSatChartToggle" aria-expanded="false" aria-controls="ficSatChartCanvasMonthWrap">Mostrar gráfico</button>
+    </div>
+
     <div class="fic-map-hud" aria-hidden="true">
         <div class="map-note" id="mapNote">Cargando mapa…</div>
         <div class="colorbar-box" id="colorbarBox">
@@ -583,6 +1496,10 @@
                 <div class="colorbar-gradient" id="cbGradient"></div>
                 <span id="cbMin"></span>
             </div>
+        </div>
+        <div class="fic-drone-opacity-float" id="ficDroneIndexOpacityWrap" hidden>
+            <label class="selector-label" for="ficDroneIndexOpacity">Transparencia del índice sobre RGB</label>
+            <input type="range" id="ficDroneIndexOpacity" min="0" max="100" value="85" step="1" aria-valuemin="0" aria-valuemax="100" aria-valuenow="85" title="Opacidad de NDVI/NDWI sobre la ortofoto RGB" />
         </div>
     </div>
     <div class="fic-asesor-chart-dock" id="ficAsesorChartDock" hidden role="region" aria-label="Resumen de tu cartera: NDVI y NDWI">
@@ -612,6 +1529,63 @@ function ficPageDirPrefix() {
     return i <= 0 ? '/' : p.slice(0, i + 1);
 }
 const BASE = ficPageDirPrefix() + 'data_static';
+/** Máximo zoom nativo tiles Esri World Imagery (coherente con ``maxNativeZoom`` del layer). */
+const FIC_ESRI_MAX_NATIVE_ZOOM = 19;
+/**
+ * Zoom máximo con ráster sobre Esri: un nivel por debajo del nativo (z19) para un poco más de basemap visible
+ * sin alejarse tanto como un tope bajo fijo.
+ */
+const FIC_RASTER_VIEW_MAX_ZOOM = FIC_ESRI_MAX_NATIVE_ZOOM - 1;
+/** Tope de zoom manual (+) con basemap Esri; el encuadre inicial sigue limitado por ``FIC_RASTER_VIEW_MAX_ZOOM``. */
+const FIC_MAP_USER_MAX_ZOOM = 24;
+
+/** Desplaza leyendas y docks al área del mapa a la derecha del panel lateral flotante. */
+function ficSyncMapChromeInset() {
+    try {
+        var panel = document.querySelector('.fic-side-panel');
+        var stage = document.querySelector('.fic-map-stage');
+        if (!panel || !stage) {
+            ficSyncColorbarBottomOffset();
+            return;
+        }
+        var pr = panel.getBoundingClientRect();
+        var sr = stage.getBoundingClientRect();
+        var overlap = Math.max(0, pr.right - sr.left);
+        var inset = overlap + 16;
+        document.documentElement.style.setProperty('--fic-map-chrome-inset-left', Math.round(inset) + 'px');
+    } catch (e) { /* noop */ }
+    ficSyncColorbarBottomOffset();
+}
+
+/** Reserva medida del stack inferior en vista comparativa satélite (solo ``#ficSatSplitStage``). */
+function ficSyncColorbarBottomOffset() {
+    try {
+        var split = document.getElementById('ficSatSplitStage');
+        if (split && !split.hidden) {
+            var stackEl = document.getElementById('ficSatBottomStack');
+            var stackH = 0;
+            if (stackEl && !stackEl.hidden) {
+                stackH = Math.ceil(stackEl.getBoundingClientRect().height);
+            }
+            split.style.setProperty('--fic-sat-period-float-measured', stackH + 'px');
+        } else {
+            if (split) split.style.removeProperty('--fic-sat-period-float-measured');
+        }
+    } catch (e) { /* noop */ }
+}
+
+/** En comparativa satélite el mapa principal está oculto: ocultar la nota superior del HUD. */
+function ficSyncMapNoteVisibility() {
+    var note = document.getElementById('mapNote');
+    if (!note) return;
+    if (isSatSplitMode()) {
+        note.hidden = true;
+        note.textContent = '';
+    } else {
+        note.hidden = false;
+    }
+}
+
 /** Datos de origen: AOI maestro (= ``shapefile_path`` → ``data/shapefiles/aoi.geojson``). */
 const SOURCE_DATA_ROOT = ficPageDirPrefix() + 'data';
 const LS_HIER = 'fic-hierarchy-level';
@@ -643,7 +1617,105 @@ const CBAR = {
     ndwi: { gradient: 'linear-gradient(to top,#a50026,#d73027,#f46d43,#fdae61,#fee090,#ffffbf,#e0f3f8,#abd9e9,#74add1,#4575b4,#313695)', label: 'Agua (NDWI)' }
 };
 
+/** Gradientes CSS (``to top``: ``vmax`` arriba) por nombre de colormap en metadata. Las variantes ``*_r`` se invierten en ``ficColormapToGradient``. */
+const FIC_CMAP = {
+    RdYlGn: CBAR.ndvi.gradient,
+    RdYlBu: CBAR.ndwi.gradient,
+    YlGn: 'linear-gradient(to top,#ffffcc,#d9f0a3,#addd8e,#78c679,#41ab5d,#238443,#005a32)',
+    Blues: 'linear-gradient(to top,#f7fbff,#deebf7,#c6dbef,#9ecae1,#6baed6,#3182bd,#08519c,#08306b)',
+    RdPu: 'linear-gradient(to top,#fff7f3,#fde0dd,#fcc5c0,#fa9fb5,#f768a1,#dd3497,#ae017e,#7a0177,#49006a)',
+    viridis: 'linear-gradient(to top,#440154,#482575,#414487,#355f8d,#2a788e,#21908d,#22a884,#44bf70,#7ad151,#bdd26c,#fde725)',
+};
+const FIC_CMAP_DEFAULT = FIC_CMAP.RdYlGn;
+
+function ficReverseLinearGradient(grad) {
+    var m = /^linear-gradient\(\s*to\s+top\s*,\s*(.+)\)\s*$/i.exec(String(grad).trim());
+    if (!m) return grad;
+    var stops = m[1].split(',').map(function (s) { return s.trim(); }).filter(Boolean).reverse();
+    return 'linear-gradient(to top,' + stops.join(',') + ')';
+}
+
+function ficColormapToGradient(name) {
+    var n = name != null ? String(name).trim() : '';
+    if (!n) return FIC_CMAP_DEFAULT;
+    if (FIC_CMAP[n]) return FIC_CMAP[n];
+    var nl = n.toLowerCase();
+    for (var k in FIC_CMAP) {
+        if (k.toLowerCase() === nl) return FIC_CMAP[k];
+    }
+    if (n.length > 2 && n.slice(-2).toLowerCase() === '_r') {
+        var base = n.slice(0, -2);
+        if (FIC_CMAP[base]) return ficReverseLinearGradient(FIC_CMAP[base]);
+        for (var j in FIC_CMAP) {
+            if (j.toLowerCase() === base.toLowerCase()) return ficReverseLinearGradient(FIC_CMAP[j]);
+        }
+    }
+    return FIC_CMAP_DEFAULT;
+}
+
+/** Resuelve entrada de ``indices`` con distinta capitalización. */
+function ficIndexMeta(meta, idxKey) {
+    var ix = meta && meta.indices ? meta.indices : {};
+    if (idxKey == null || idxKey === '') return null;
+    if (ix[idxKey]) return ix[idxKey];
+    var l = String(idxKey).toLowerCase();
+    var u = String(idxKey).toUpperCase();
+    if (ix[l]) return ix[l];
+    if (ix[u]) return ix[u];
+    var keys = Object.keys(ix);
+    for (var i = 0; i < keys.length; i++) {
+        if (String(keys[i]).toLowerCase() === l) return ix[keys[i]];
+    }
+    return null;
+}
+
+function ficFormatLegendScalar(v) {
+    if (v == null || v === '') return '';
+    var n = Number(v);
+    if (!isFinite(n)) return String(v);
+    if (n === 0) return '0';
+    var a = Math.abs(n);
+    if (a >= 10000 || (a < 0.001 && a > 0)) return n.toExponential(2).replace('+', '');
+    return (Math.round(n * 10000) / 10000).toString();
+}
+
+/** Muestra u oculta la leyenda vertical según metadata del índice (``vmin``/``vmax`` en escala del producto). */
+function ficApplyColorbar(meta, idxKey) {
+    var colorbar = document.getElementById('colorbarBox');
+    var gEl = document.getElementById('cbGradient');
+    var tEl = document.getElementById('cbTitle');
+    var minEl = document.getElementById('cbMin');
+    var maxEl = document.getElementById('cbMax');
+    if (!colorbar || !gEl || !tEl || !minEl || !maxEl) return;
+    var idxMeta = ficIndexMeta(meta, idxKey);
+    if (!idxMeta || idxMeta.visual_only) {
+        colorbar.style.display = 'none';
+        return;
+    }
+    var vmin = idxMeta.vmin;
+    var vmax = idxMeta.vmax;
+    if (vmin == null || vmax == null) {
+        colorbar.style.display = 'none';
+        return;
+    }
+    var vn = Number(vmin);
+    var vx = Number(vmax);
+    if (!isFinite(vn) || !isFinite(vx)) {
+        colorbar.style.display = 'none';
+        return;
+    }
+    var cmap = idxMeta.colormap != null ? String(idxMeta.colormap) : '';
+    var gradient = ficColormapToGradient(cmap);
+    gEl.style.background = gradient;
+    tEl.textContent = idxMeta.label || String(idxKey || '').toUpperCase();
+    minEl.textContent = ficFormatLegendScalar(vmin);
+    maxEl.textContent = ficFormatLegendScalar(vmax);
+    colorbar.style.display = 'flex';
+}
+
 let mapa, aoiLayer, rasterOverlay;
+let rasterDroneRgb = null;
+let rasterDroneIndex = null;
 /** Gráfico cartera NDVI/NDWI (SAT y asesor); se destruye al ocultar o actualizar. */
 window.ficAsesorBarChart = null;
 
@@ -731,14 +1803,33 @@ const state = {
     hierarchyLevel: null,
     mapLayerKind: 'ndvi',
     mapPeriodKey: null,
-    ficDbByPredio: {}
+    ficDbByPredio: {},
+    // Comparativa satelital (un mapa, divisor)
+    satViewMode: 'monthly',
+    satLeftMonth: null,
+    satLeftWeek: null,
+    satChartBand: null,
+    /** ``week`` | ``month``: qué serie muestra el dock del gráfico comparativo (alineado con ``satViewMode``). */
+    satChartSeries: 'month',
+    /** 0..1 opacidad de NDVI/NDWI sobre RGB (solo dron). */
+    droneIndexOpacity: 0.85,
+    /** 0..1 posición del divisor desde la izquierda del mapa (izquierda = ráster referencia). */
+    satSwipeRatio: 0.5,
+    /** Último contexto predio|fuente|periodKey para el que se hizo fitBounds al WebP en el mapa principal. */
+    _lastMapFitContextKey: null,
+    /** Firma predio|modo|leftCK|rightCK del último fitBounds en el mapa comparativo satelital. */
+    _satMapFitSig: null
 };
 
 window.addEventListener('resize', function () {
+    ficSyncMapChromeInset();
     if (mapa) mapa.invalidateSize({ animate: false });
+    if (mapaSat) mapaSat.invalidateSize({ animate: false });
     if (window.ficAsesorBarChart && typeof window.ficAsesorBarChart.resize === 'function') {
         window.ficAsesorBarChart.resize();
     }
+    applySatSwipeClip();
+    ficSyncColorbarBottomOffset();
 });
 
 function ficTrim(v) {
@@ -756,8 +1847,8 @@ function updatePredioSidebarCopy() {
     var sel = document.getElementById('globalWetland');
     if (usesAgricultorNamesInPredioSelect()) {
         if (helper) {
-            helper.textContent =
-                'Elige agricultor y capa. Al pasar el cursor sobre cada nombre verás el código de predio. La fecha mostrada es la última imagen disponible para esa combinación.';
+            helper.innerHTML =
+                'Elegí agricultor o predio y la capa. Al pasar el cursor sobre cada nombre verás el código de predio. Con satélite publicado, <strong>Origen de la imagen</strong> (entre ámbito y capa) alterna satélite y dron si hay vuelos en tu contexto. La fecha es la última imagen disponible para esa combinación.';
         }
         if (lab) lab.textContent = 'Agricultor / predio';
         if (sel) {
@@ -767,7 +1858,7 @@ function updatePredioSidebarCopy() {
     } else {
         if (helper) {
             helper.innerHTML =
-                'Elige predio y capa. La fecha mostrada es la <strong>última imagen disponible</strong> para esa combinación.';
+                'Elegí predio y capa. Con satélite publicado y vuelos de dron cargados, <strong>Origen de la imagen</strong> (entre ámbito y capa) alterna satélite y dron. La fecha mostrada es la <strong>última imagen disponible</strong> para esa combinación.';
         }
         if (lab) lab.textContent = 'Predio';
         if (sel) sel.title = 'Código de predio (G1, G2, NOG…)';
@@ -835,6 +1926,7 @@ async function applyWetlandSelection(wid) {
     updateWelcomeBanner();
     syncSourcePillsDom();
     renderAll();
+    if (isSatSplitMode()) updateSatSplitOverlays();
 }
 
 function updateAsesorPortfolioChart() {
@@ -1127,20 +2219,32 @@ function contextShowsDronePill() {
 function syncSourcePillsDom() {
     var wrap = document.getElementById('ficSourcePillsWrap');
     var satKey = getSatelliteSourceKey();
-    if (!wrap) return;
-    if (!satKey) {
-        wrap.hidden = true;
-        return;
-    }
-    wrap.hidden = !contextShowsDronePill();
+    var showDroneOpt = contextShowsDronePill();
+
     var bSat = document.getElementById('ficPillSatellite');
     var bDrone = document.getElementById('ficPillDrone');
-    if (!bSat || !bDrone) return;
+
+    function applyPressed(onSat, satBtn, droneBtn) {
+        if (!satBtn || !droneBtn) return;
+        satBtn.setAttribute('aria-pressed', onSat ? 'true' : 'false');
+        droneBtn.setAttribute('aria-pressed', onSat ? 'false' : 'true');
+        satBtn.classList.toggle('fic-source-pill--active', onSat);
+        droneBtn.classList.toggle('fic-source-pill--active', !onSat);
+    }
+
     var onSat = state.selectedSource !== 'drone';
-    bSat.setAttribute('aria-pressed', onSat ? 'true' : 'false');
-    bDrone.setAttribute('aria-pressed', onSat ? 'false' : 'true');
-    bSat.classList.toggle('fic-source-pill--active', onSat);
-    bDrone.classList.toggle('fic-source-pill--active', !onSat);
+
+    var rowSidebar = document.getElementById('ficSidebarSourcePillsRow');
+    if (wrap) {
+        if (!satKey) {
+            wrap.hidden = true;
+        } else {
+            wrap.hidden = false;
+            if (bDrone) bDrone.hidden = !showDroneOpt;
+            if (rowSidebar) rowSidebar.classList.toggle('fic-source-pills--single', !showDroneOpt);
+        }
+        if (bSat && bDrone) applyPressed(onSat, bSat, bDrone);
+    }
 }
 
 function ficBindSourcePills() {
@@ -1326,43 +2430,1429 @@ function initFromQuery() {
 
 window.addEventListener('load', initFromQuery);
 
+// ============================================================
+// Comparativa satelital: un mapa + divisor entre dos rásteres
+// ============================================================
+
+var mapaSat = null;
+var satOverlayLeft = null, satOverlayRight = null;
+var _satSwipeDividerBound = false;
+
+/** ¿La fuente activa es satélite con metadata de vista dividida? */
+function isSatSplitMode() {
+    if (!state.selectedSource) return false;
+    var sm = state.metadata[state.selectedSource];
+    return !!(sm && sm.view_modes);
+}
+
+function getSatMeta() {
+    return state.metadata[state.selectedSource] || {};
+}
+
+/** Devuelve la banda activa para el side-by-side (sigue al selector ``mapIndex`` cuando aplica). */
+function satBand() {
+    var indices = getSatMeta().indices || {};
+    var keys = Object.keys(indices);
+    var sel = String(state.mapLayerKind || '').toUpperCase();
+    if (sel && keys.indexOf(sel) >= 0) return sel;
+    if (keys.indexOf('NDVI') >= 0) return 'NDVI';
+    if (keys.indexOf('ndvi') >= 0) return 'ndvi';
+    return keys[0] || 'NDVI';
+}
+
+/** Construye un descriptor de raster: ``{visual: {path, bounds, opacity}, label, n}``.
+ *  La metadata compacta solo guarda ``{p,l,n}``; bounds vienen de ``wetlands[predio]``. */
+function satFindRaster(predio, compositeKey, band) {
+    if (!compositeKey || !predio || !band) return null;
+    var sm = getSatMeta();
+    var rasters = sm.rasters || {};
+    var key = (predio + '_' + compositeKey + '_' + band).toLowerCase();
+    var entry = rasters[key];
+    if (!entry) return null;
+    var wl = (sm.wetlands || {})[String(predio).toLowerCase()] || {};
+    var bounds = wl.leaflet_bounds;
+    if (!bounds || bounds.length !== 2) return null;
+    var defaults = sm.raster_defaults || {};
+    return {
+        label: entry.l || '',
+        n_inputs: entry.n || 0,
+        visual: {
+            path: entry.p,
+            bounds: bounds,
+            render_mode: defaults.render_mode || 'smooth',
+            opacity: defaults.opacity != null ? defaults.opacity : 0.88,
+        },
+    };
+}
+
+/** Devuelve la config de view_mode (templates de composite_key) y el valor activo del pill. */
+function satViewModeMeta(viewMode) {
+    var vm = (getSatMeta().view_modes || {})[viewMode || 'monthly'];
+    return vm || {};
+}
+
+function satCurrentPillValue(viewMode) {
+    if (viewMode === 'monthly') return state.satLeftMonth;
+    if (viewMode === 'weekly') return state.satLeftWeek;
+    return null;
+}
+
+/** Sustituye {year}, {month:02d}, {week:02d} en el template. */
+function satFormatComposite(template, vars) {
+    if (!template) return null;
+    return template
+        .replace('{year}', vars.year != null ? vars.year : '')
+        .replace('{month:02d}', vars.month != null ? String(vars.month).padStart(2, '0') : '')
+        .replace('{month}', vars.month != null ? String(vars.month) : '')
+        .replace('{week:02d}', vars.week != null ? String(vars.week).padStart(2, '0') : '')
+        .replace('{week}', vars.week != null ? String(vars.week) : '');
+}
+
+/** Composite key del panel ``side`` ('left' | 'right'): izquierda histórico, derecha actual (misma ventana temporal). */
+function satCompositeKeyForSide(side, viewMode) {
+    var vm = satViewModeMeta(viewMode);
+    var pill = satCurrentPillValue(viewMode);
+    if (viewMode === 'monthly') {
+        var m = pill || 1;
+        if (side === 'left') {
+            return satFormatComposite(vm.left_composite_template || 'monthly_hist_{month:02d}', { month: m });
+        }
+        return satFormatComposite(vm.right_composite_template || 'monthly_current_{month:02d}', { month: m });
+    }
+    if (viewMode === 'weekly') {
+        var w = pill || 1;
+        if (side === 'left') {
+            return satFormatComposite(vm.left_composite_template || 'weekly_hist_W{week:02d}', { week: w });
+        }
+        return satFormatComposite(vm.right_composite_template || 'weekly_current_W{week:02d}', { week: w });
+    }
+    return null;
+}
+
+/** Garantiza que ``state.satLeftMonth/Week`` tengan defaults razonables (a partir de metadata). */
+function ensureSatLeftDefaults() {
+    var sm = getSatMeta();
+    var vmW = (sm.view_modes && sm.view_modes.weekly) || {};
+    if (!state.satViewMode) state.satViewMode = 'monthly';
+    if (state.satLeftMonth == null) {
+        var lcm = sm.last_complete_month && sm.last_complete_month.month;
+        state.satLeftMonth = lcm || ((new Date()).getMonth() || 12);
+    }
+    if (state.satLeftWeek == null) {
+        var lcw = (sm.last_complete_week && sm.last_complete_week.week) || vmW.default_week;
+        if (!lcw) {
+            var jan1 = new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1));
+            var doy = Math.floor((Date.now() - jan1.getTime()) / 86400000);
+            lcw = Math.max(1, Math.min(52, Math.ceil(doy / 7)));
+        }
+        state.satLeftWeek = lcw;
+    }
+}
+
+function mapFitContextKey() {
+    return String(state.selectedWetland || '') + '|' + String(state.selectedSource || '') + '|' + String(state.mapPeriodKey || '');
+}
+
+function satTemporalFitSignature(predio, viewMode) {
+    var leftCK = satCompositeKeyForSide('left', viewMode);
+    var rightCK = satCompositeKeyForSide('right', viewMode);
+    return String(predio || '') + '|' + String(viewMode || '') + '|' + String(leftCK || '') + '|' + String(rightCK || '');
+}
+
+function clampSatPillToViewModeItems(viewMode) {
+    var sm = getSatMeta();
+    var vm = (sm.view_modes || {})[viewMode] || {};
+    if (viewMode === 'monthly') {
+        var months = vm.months || [];
+        if (months.length && months.indexOf(state.satLeftMonth) < 0) {
+            state.satLeftMonth = months[0];
+        }
+    } else if (viewMode === 'weekly') {
+        var weeks = vm.weeks || [];
+        if (weeks.length && weeks.indexOf(state.satLeftWeek) < 0) {
+            state.satLeftWeek = weeks[0];
+        }
+    }
+}
+
+/** Un solo mapa Leaflet: base + dos rásteres (clip en el de referencia) + divisor arrastrable. */
+function initSatCompareMap() {
+    if (mapaSat) return;
+    if (!document.getElementById('mapaSatCompare')) return;
+    mapaSat = L.map('mapaSatCompare', { center: [-33.45, -70.74], zoom: 12, zoomControl: false, maxZoom: FIC_MAP_USER_MAX_ZOOM, attributionControl: false });
+    mapaSat.createPane('ficSatRasterRight');
+    mapaSat.getPane('ficSatRasterRight').style.zIndex = '650';
+    mapaSat.createPane('ficSatRasterLeft');
+    mapaSat.getPane('ficSatRasterLeft').style.zIndex = '651';
+    mapaSat.createPane('ficSatAoiPane');
+    mapaSat.getPane('ficSatAoiPane').style.zIndex = '680';
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 24, maxNativeZoom: FIC_ESRI_MAX_NATIVE_ZOOM,
+    }).addTo(mapaSat);
+    L.control.zoom({ position: 'topright' }).addTo(mapaSat);
+    mapaSat.on('move zoom moveend zoomend', applySatSwipeClip);
+    bindSatSwipeDivider();
+}
+
+function applySatSwipeClip() {
+    var ratio = state.satSwipeRatio;
+    if (ratio == null || !isFinite(ratio)) ratio = 0.5;
+    ratio = Math.min(1, Math.max(0, ratio));
+    state.satSwipeRatio = ratio;
+
+    var insetPx = ficReadMapChromeInsetLeftPx();
+    var stage = document.getElementById('ficSatMapStage');
+    var line = document.getElementById('ficSatSwipeLine');
+    var grip = document.getElementById('ficSatSwipeGrip');
+    if (line && stage) {
+        var sr = stage.getBoundingClientRect();
+        var usableW = Math.max(1, sr.width - insetPx);
+        var leftPx = insetPx + ratio * usableW;
+        line.style.left = (leftPx / Math.max(1, sr.width) * 100) + '%';
+    }
+    if (grip) grip.setAttribute('aria-valuenow', String(Math.round(ratio * 100)));
+
+    if (!mapaSat || !satOverlayLeft) return;
+    var el = typeof satOverlayLeft.getElement === 'function' ? satOverlayLeft.getElement() : null;
+    if (!el) return;
+
+    var mc = mapaSat.getContainer();
+    if (!mc) return;
+    var mr = mc.getBoundingClientRect();
+    if (mr.width <= 0) return;
+
+    var usableMapW = Math.max(1, mr.width - insetPx);
+    var splitScreenX = mr.left + insetPx + ratio * usableMapW;
+    var ir = el.getBoundingClientRect();
+    if (ir.width <= 0) {
+        el.style.clipPath = '';
+        return;
+    }
+
+    var frac = (splitScreenX - ir.left) / ir.width;
+    if (!isFinite(frac)) return;
+    frac = Math.max(0, Math.min(1, frac));
+
+    var lw = el.offsetWidth;
+    if (!lw || lw < 1) lw = ir.width;
+    var clipPx = frac * lw;
+
+    if (clipPx <= 0.5) {
+        el.style.clipPath = 'inset(0 100% 0 0)';
+    } else if (clipPx >= lw - 0.5) {
+        el.style.clipPath = 'none';
+    } else {
+        el.style.clipPath = 'polygon(0 0, ' + clipPx + 'px 0, ' + clipPx + 'px 100%, 0 100%)';
+    }
+}
+
+function bindSatSwipeDivider() {
+    if (_satSwipeDividerBound) return;
+    var grip = document.getElementById('ficSatSwipeGrip');
+    var track = document.getElementById('ficSatMapStage');
+    if (!grip || !track) return;
+    _satSwipeDividerBound = true;
+
+    function ratioFromClientX(clientX) {
+        var r = track.getBoundingClientRect();
+        if (r.width <= 0) return state.satSwipeRatio;
+        var insetPx = ficReadMapChromeInsetLeftPx();
+        var usable = Math.max(1, r.width - insetPx);
+        return Math.min(1, Math.max(0, (clientX - r.left - insetPx) / usable));
+    }
+
+    function startDrag(ev) {
+        if (ev.type === 'mousedown' && ev.button !== 0) return;
+        ev.preventDefault();
+        function move(ev2) {
+            if (ev2.type === 'touchmove' && ev2.cancelable) ev2.preventDefault();
+            var x = ev2.clientX != null ? ev2.clientX : (ev2.touches && ev2.touches[0] ? ev2.touches[0].clientX : null);
+            if (x == null) return;
+            state.satSwipeRatio = ratioFromClientX(x);
+            applySatSwipeClip();
+        }
+        function end() {
+            document.removeEventListener('mousemove', move);
+            document.removeEventListener('mouseup', end);
+            document.removeEventListener('touchmove', move);
+            document.removeEventListener('touchend', end);
+            document.removeEventListener('touchcancel', end);
+        }
+        document.addEventListener('mousemove', move);
+        document.addEventListener('mouseup', end);
+        document.addEventListener('touchmove', move, { passive: false });
+        document.addEventListener('touchend', end);
+        document.addEventListener('touchcancel', end);
+        move(ev);
+    }
+
+    grip.addEventListener('mousedown', startDrag);
+    grip.addEventListener('touchstart', startDrag, { passive: false });
+
+    grip.addEventListener('keydown', function (e) {
+        var step = e.shiftKey ? 0.08 : 0.03;
+        if (e.key === 'ArrowLeft' || e.key === 'Home') {
+            e.preventDefault();
+            state.satSwipeRatio = e.key === 'Home' ? 0 : Math.max(0, state.satSwipeRatio - step);
+            applySatSwipeClip();
+        } else if (e.key === 'ArrowRight' || e.key === 'End') {
+            e.preventDefault();
+            state.satSwipeRatio = e.key === 'End' ? 1 : Math.min(1, state.satSwipeRatio + step);
+            applySatSwipeClip();
+        }
+    });
+}
+
+function _setSatOverlay(side, raster) {
+    if (!mapaSat) return null;
+    if (side === 'left') {
+        if (satOverlayLeft) { mapaSat.removeLayer(satOverlayLeft); satOverlayLeft = null; }
+    } else {
+        if (satOverlayRight) { mapaSat.removeLayer(satOverlayRight); satOverlayRight = null; }
+    }
+    if (!raster) return null;
+    var bounds = raster.visual && raster.visual.bounds;
+    if (!bounds || bounds.length !== 2) return null;
+    var imgClass = raster.visual.render_mode === 'smooth' ? '' : 'preview-raster';
+    var opacity = raster.visual.opacity != null ? raster.visual.opacity : 0.85;
+    var pane = side === 'left' ? 'ficSatRasterLeft' : 'ficSatRasterRight';
+    var overlay = L.imageOverlay(BASE + '/' + raster.visual.path, bounds, {
+        opacity: opacity,
+        className: imgClass,
+        interactive: false,
+        pane: pane,
+    }).addTo(mapaSat);
+    if (side === 'left') {
+        satOverlayLeft = overlay;
+        overlay.on('load', function () { applySatSwipeClip(); });
+    } else {
+        satOverlayRight = overlay;
+    }
+    return overlay;
+}
+
+function satViewModeLabel() {
+    var m = state.satViewMode || 'monthly';
+    if (m === 'monthly') return 'Mensual';
+    if (m === 'weekly') return 'Semanal';
+    return 'Mensual';
+}
+
+/** ``monthly``|``weekly`` del comparador ↔ ``month``|``week`` del gráfico Chart.js */
+function ficSatViewModeToChartSeries(viewMode) {
+    return viewMode === 'weekly' ? 'week' : 'month';
+}
+function ficSatChartSeriesToViewMode(series) {
+    return series === 'week' ? 'weekly' : 'monthly';
+}
+
+function ficReadMapChromeInsetLeftPx() {
+    try {
+        var raw = getComputedStyle(document.documentElement).getPropertyValue('--fic-map-chrome-inset-left').trim();
+        var n = parseInt(raw, 10);
+        return isNaN(n) ? 0 : Math.max(0, n);
+    } catch (e0) {
+        return 0;
+    }
+}
+
+/**
+ * Opciones de ``fitBounds`` del mapa principal con ráster (satélite o dron): mismo criterio asimétrico
+ * que el comparador satelital (``mapaSat``), para centrar la huella respecto al panel lateral.
+ */
+function ficMainMapRasterFitBoundsOpts() {
+    var insetPx = ficReadMapChromeInsetLeftPx();
+    var m = 36;
+    return {
+        paddingTopLeft: L.point(Math.round(insetPx + m), m),
+        paddingBottomRight: L.point(m, m),
+        maxZoom: FIC_RASTER_VIEW_MAX_ZOOM,
+    };
+}
+
+/** Título flotante sobre el comparador (estilo GENIUS: capa + escala temporal). */
+function updateSatMapTitle() {
+    var el = document.getElementById('ficSatMapTitle');
+    if (!el || !isSatSplitMode()) return;
+    var strong = el.querySelector('strong');
+    if (!strong) return;
+    var band = satBand();
+    var sm = getSatMeta();
+    var idx = (sm.indices || {})[band] || (sm.indices || {})[String(band).toUpperCase()] || {};
+    var bandHuman = idx.label || idx.title || band;
+    strong.textContent = bandHuman + ' — comparativa satelital · ' + satViewModeLabel();
+}
+
+/** SVG flecha anterior / siguiente para el paso de período. */
+function ficSatPeriodStepArrowSvg(pointLeft) {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('width', '20');
+    svg.setAttribute('height', '20');
+    svg.setAttribute('aria-hidden', 'true');
+    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'currentColor');
+    path.setAttribute('stroke-width', '2.2');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    path.setAttribute('d', pointLeft ? 'M14 7l-5 5 5 5' : 'M10 7l5 5-5 5');
+    svg.appendChild(path);
+    return svg;
+}
+
+/** Construye el selector temporal compacto (slider con thumb etiquetado; sin fila de pills). */
+function buildSatPeriodPills() {
+    var container = document.getElementById('ficSatPeriodPills');
+    var floatWrap = document.getElementById('ficSatPeriodFloat');
+    var toolbar = document.getElementById('ficSatPeriodToolbar');
+    var stack = document.getElementById('ficSatBottomStack');
+    if (!container) return;
+    ensureSatLeftDefaults();
+    var sm = getSatMeta();
+    var viewMode = state.satViewMode || 'monthly';
+    var vm = (sm.view_modes || {})[viewMode] || {};
+
+    var items = [];
+    if (viewMode === 'monthly') {
+        items = (vm.months || []).slice();
+    } else if (viewMode === 'weekly') {
+        items = (vm.weeks || []).slice();
+    }
+
+    var monthLong = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+    function hideChrome() {
+        container.hidden = true;
+        container.innerHTML = '';
+        if (toolbar) {
+            toolbar.hidden = true;
+            toolbar.innerHTML = '';
+        }
+        if (floatWrap) floatWrap.hidden = true;
+        if (stack) stack.hidden = true;
+    }
+
+    if (!items.length) {
+        hideChrome();
+        if (satChartIsOpen()) satChartSetOpen(false);
+        updateSatChartDock();
+        ficSyncSatPlotChromeVisibility();
+        ficSyncColorbarBottomOffset();
+        return;
+    }
+
+    if (stack) stack.hidden = false;
+    if (floatWrap) floatWrap.hidden = false;
+    container.hidden = true;
+    container.innerHTML = '';
+
+    if (toolbar) {
+        if (viewMode === 'monthly' || viewMode === 'weekly') {
+            var activeRaw = satCurrentPillValue(viewMode);
+            var idx0 = items.indexOf(activeRaw);
+            if (idx0 < 0) {
+                if (viewMode === 'monthly') state.satLeftMonth = items[0];
+                else state.satLeftWeek = items[0];
+            }
+            toolbar.hidden = false;
+            toolbar.innerHTML = '';
+
+            function formatThumb(v) {
+                if (viewMode === 'weekly') {
+                    return 'Sem. ' + String(v).padStart(2, '0');
+                }
+                var mo = monthLong[(Number(v) - 1 + 12) % 12] || String(v);
+                return mo.charAt(0).toUpperCase() + mo.slice(1);
+            }
+
+            function currentIdx() {
+                var a = satCurrentPillValue(viewMode);
+                var i = items.indexOf(a);
+                return i >= 0 ? i : 0;
+            }
+
+            function pctForIdx(i) {
+                var n = items.length;
+                if (n <= 1) return 50;
+                return (i / (n - 1)) * 100;
+            }
+
+            var row = document.createElement('div');
+            row.className = 'fic-sat-period-toolbar__row';
+            var btnMinus = document.createElement('button');
+            btnMinus.type = 'button';
+            btnMinus.className = 'fic-sat-period-step';
+            btnMinus.setAttribute('aria-label', 'Período anterior');
+            btnMinus.appendChild(ficSatPeriodStepArrowSvg(true));
+
+            var wrap = document.createElement('div');
+            wrap.className = 'fic-sat-period-custom-slider';
+            var track = document.createElement('div');
+            track.className = 'fic-sat-period-custom-slider__track';
+            track.tabIndex = 0;
+            track.setAttribute('role', 'slider');
+            track.setAttribute('aria-label', viewMode === 'monthly' ? 'Mes en el comparador' : 'Semana ISO en el comparador');
+            var fill = document.createElement('div');
+            fill.className = 'fic-sat-period-custom-slider__fill';
+            var thumb = document.createElement('div');
+            thumb.className = 'fic-sat-period-custom-slider__thumb';
+            var thumbLabel = document.createElement('span');
+            thumbLabel.className = 'fic-sat-period-custom-slider__thumb-label';
+            thumb.appendChild(thumbLabel);
+            track.appendChild(fill);
+            track.appendChild(thumb);
+
+            var btnPlus = document.createElement('button');
+            btnPlus.type = 'button';
+            btnPlus.className = 'fic-sat-period-step';
+            btnPlus.setAttribute('aria-label', 'Período siguiente');
+            btnPlus.appendChild(ficSatPeriodStepArrowSvg(false));
+
+            function syncUiFromState() {
+                var i = currentIdx();
+                var pct = pctForIdx(i);
+                thumb.style.left = pct + '%';
+                fill.style.width = pct + '%';
+                var v = items[i];
+                thumbLabel.textContent = formatThumb(v);
+                track.setAttribute('aria-valuenow', String(v));
+                track.setAttribute('aria-valuetext', thumbLabel.textContent);
+                track.setAttribute('aria-valuemin', String(items[0]));
+                track.setAttribute('aria-valuemax', String(items[items.length - 1]));
+            }
+            syncUiFromState();
+
+            function idxFromClientX(cx) {
+                var r = track.getBoundingClientRect();
+                var t = Math.max(0, Math.min(1, (cx - r.left) / Math.max(1, r.width)));
+                var n = items.length;
+                if (n <= 1) return 0;
+                return Math.round(t * (n - 1));
+            }
+
+            var dragActive = false;
+            function applyIndexNoRebuild(i) {
+                i = Math.max(0, Math.min(items.length - 1, i));
+                if (viewMode === 'monthly') state.satLeftMonth = items[i];
+                else state.satLeftWeek = items[i];
+                syncUiFromState();
+            }
+
+            track.addEventListener('pointerdown', function (ev) {
+                dragActive = true;
+                try { track.setPointerCapture(ev.pointerId); } catch (eCap) { /* noop */ }
+                applyIndexNoRebuild(idxFromClientX(ev.clientX));
+            });
+            track.addEventListener('pointermove', function (ev) {
+                if (!dragActive || !track.hasPointerCapture(ev.pointerId)) return;
+                applyIndexNoRebuild(idxFromClientX(ev.clientX));
+            });
+            function endDrag(ev) {
+                if (!dragActive) return;
+                dragActive = false;
+                try { track.releasePointerCapture(ev.pointerId); } catch (eRel) { /* noop */ }
+                updateSatSplitOverlays();
+            }
+            track.addEventListener('pointerup', endDrag);
+            track.addEventListener('pointercancel', endDrag);
+            track.addEventListener('lostpointercapture', function () {
+                if (dragActive) {
+                    dragActive = false;
+                    updateSatSplitOverlays();
+                }
+            });
+
+            track.addEventListener('keydown', function (ev) {
+                if (ev.key === 'ArrowLeft' || ev.key === 'ArrowDown') {
+                    ev.preventDefault();
+                    applyIndexNoRebuild(currentIdx() - 1);
+                    updateSatSplitOverlays();
+                } else if (ev.key === 'ArrowRight' || ev.key === 'ArrowUp') {
+                    ev.preventDefault();
+                    applyIndexNoRebuild(currentIdx() + 1);
+                    updateSatSplitOverlays();
+                } else if (ev.key === 'Home') {
+                    ev.preventDefault();
+                    applyIndexNoRebuild(0);
+                    updateSatSplitOverlays();
+                } else if (ev.key === 'End') {
+                    ev.preventDefault();
+                    applyIndexNoRebuild(items.length - 1);
+                    updateSatSplitOverlays();
+                }
+            });
+
+            function step(delta) {
+                var i = currentIdx() + delta;
+                if (i < 0 || i >= items.length) return;
+                if (viewMode === 'monthly') state.satLeftMonth = items[i];
+                else state.satLeftWeek = items[i];
+                updateSatSplitOverlays();
+            }
+            btnMinus.addEventListener('click', function () { step(-1); });
+            btnPlus.addEventListener('click', function () { step(1); });
+
+            row.appendChild(btnMinus);
+            row.appendChild(wrap);
+            row.appendChild(btnPlus);
+            wrap.appendChild(track);
+            toolbar.appendChild(row);
+        } else {
+            toolbar.hidden = true;
+            toolbar.innerHTML = '';
+        }
+    }
+
+    ficSyncSatPlotChromeVisibility();
+    requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+            ficSyncColorbarBottomOffset();
+        });
+    });
+}
+/** Años en subtítulos a cada lado del mapa comparativo (histórico vs actual). */
+function syncSatCompareYearSubtitles() {
+    var wrap = document.getElementById('ficSatCompareYrs');
+    var leftEl = document.getElementById('ficSatSideYearLeft');
+    var rightEl = document.getElementById('ficSatSideYearRight');
+    if (!wrap || !leftEl || !rightEl) return;
+    if (!isSatSplitMode()) {
+        wrap.hidden = true;
+        return;
+    }
+    wrap.hidden = false;
+    var sm = getSatMeta();
+    var hy = sm.historic_years;
+    var leftYear = '';
+    if (hy && hy.length) {
+        leftYear = hy.length === 1 ? String(hy[0]) : String(hy[0]) + '–' + String(hy[hy.length - 1]);
+    } else {
+        leftYear = '—';
+    }
+    var rightYear = sm.current_year != null ? String(sm.current_year) : '—';
+    leftEl.textContent = '';
+    rightEl.textContent = '';
+    var kL = document.createElement('span');
+    kL.className = 'fic-sat-compare-yrs__k';
+    kL.textContent = 'Histórico';
+    var vL = document.createElement('span');
+    vL.className = 'fic-sat-compare-yrs__v';
+    vL.textContent = leftYear;
+    leftEl.appendChild(kL);
+    leftEl.appendChild(vL);
+    var kR = document.createElement('span');
+    kR.className = 'fic-sat-compare-yrs__k';
+    kR.textContent = 'Actual';
+    var vR = document.createElement('span');
+    vR.className = 'fic-sat-compare-yrs__v';
+    vR.textContent = rightYear;
+    rightEl.appendChild(kR);
+    rightEl.appendChild(vR);
+}
+
+function updateSatSplitOverlays() {
+    if (isSatSplitMode()) syncSatCompareYearSubtitles();
+    else {
+        var yw = document.getElementById('ficSatCompareYrs');
+        if (yw) yw.hidden = true;
+    }
+    if (!mapaSat) return;
+    ensureSatLeftDefaults();
+    var viewMode = state.satViewMode || 'monthly';
+    clampSatPillToViewModeItems(viewMode);
+    var predio = state.selectedWetland;
+    var band = satBand();
+    var sm = getSatMeta();
+    var vm = (sm.view_modes || {})[viewMode] || {};
+    var satSig = satTemporalFitSignature(predio, viewMode);
+    var skipSatFit = state._satMapFitSig != null && state._satMapFitSig === satSig;
+
+    var leftCK = satCompositeKeyForSide('left', viewMode);
+    var leftRaster = predio ? satFindRaster(predio, leftCK, band) : null;
+    _setSatOverlay('left', leftRaster);
+
+    var rightCK = satCompositeKeyForSide('right', viewMode);
+    var rightRaster = predio ? satFindRaster(predio, rightCK, band) : null;
+    _setSatOverlay('right', rightRaster);
+
+    var fitRaster = leftRaster || rightRaster;
+    if (fitRaster && fitRaster.visual && fitRaster.visual.bounds) {
+        var bounds = fitRaster.visual.bounds;
+        if (!skipSatFit) {
+            var insetPx = ficReadMapChromeInsetLeftPx();
+            var m = 36;
+            mapaSat.fitBounds(bounds, {
+                paddingTopLeft: L.point(Math.round(insetPx + m), m),
+                paddingBottomRight: L.point(m, m),
+                animate: false,
+                maxZoom: FIC_RASTER_VIEW_MAX_ZOOM,
+            });
+            state._satMapFitSig = satSig;
+        }
+    } else {
+        state._satMapFitSig = null;
+    }
+
+    buildSatPeriodPills();
+    updateSatChartDock();
+    updateSatMapTitle();
+    ficApplyColorbar(getSatMeta(), satBand());
+    applySatSwipeClip();
+}
+
+/** Actualiza el mode bar (pills Mensual/Semanal). */
+function syncSatModeBar() {
+    var mode = state.satViewMode || 'monthly';
+    document.querySelectorAll('.fic-sat-mode-pill').forEach(function (btn) {
+        btn.classList.toggle('fic-sat-mode-pill--active', btn.dataset.satmode === mode);
+    });
+}
+
+/** Bind una sola vez los clicks de los pills de modo satélite. */
+var _satModePillsBound = false;
+function bindSatModeBarPills() {
+    if (_satModePillsBound) return;
+    _satModePillsBound = true;
+    document.querySelectorAll('.fic-sat-mode-pill').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            state.satViewMode = btn.dataset.satmode || 'monthly';
+            state.satChartSeries = ficSatViewModeToChartSeries(state.satViewMode);
+            try { localStorage.setItem(LS_SAT_CHART_SERIES, state.satChartSeries); } catch (e0) { /* noop */ }
+            syncSatModeBar();
+            syncSatChartSeriesPills();
+            ficUpdateSatChartToggleAriaControls();
+            updateSatSplitOverlays();
+            if (satChartIsOpen()) updateSatChartDock(true);
+        });
+    });
+}
+
+// ============================================================
+// Gráfico semanal del side-by-side (Chart.js)
+// ============================================================
+
+var ficSatChart = null;
+var ficSatMonthChart = null;
+var _satChartBindings = false;
+var LS_SAT_CHART_OPEN = 'fic_sat_chart_open';
+var LS_SAT_CHART_BAND = 'fic_sat_chart_band';
+var LS_SAT_CHART_SERIES = 'fic_sat_chart_series';
+
+/** Etiquetas cortas de mes (alineado al pipeline Python). */
+var MONTH_CHART_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+/** Índice en ``items`` del período del mapa (mes ISO o semana), o -1. */
+function ficSatMapPeriodAxisIndex(items, rawVal) {
+    if (!items || !items.length || rawVal == null) return -1;
+    var v = Number(rawVal);
+    var vs = String(rawVal).trim();
+    for (var i = 0; i < items.length; i++) {
+        var it = items[i];
+        if (it === rawVal) return i;
+        if (Number(it) === v && !isNaN(v)) return i;
+        if (String(it) === vs) return i;
+    }
+    return -1;
+}
+
+/** Línea vertical en el gráfico = período mostrado en el mapa comparativo. */
+var ficSatMapPeriodLinePlugin = {
+    id: 'ficSatMapPeriodLine',
+    afterDatasetsDraw: function (chart) {
+        var cfg = chart.options.plugins && chart.options.plugins.ficSatMapPeriodLine;
+        if (!cfg || cfg.index == null || cfg.index < 0) return;
+        var n = chart.data.labels ? chart.data.labels.length : 0;
+        if (!n || cfg.index >= n) return;
+        var x = null;
+        for (var d = chart.data.datasets.length - 1; d >= 0; d--) {
+            var meta = chart.getDatasetMeta(d);
+            if (!meta || meta.hidden || !meta.data) continue;
+            var el = meta.data[cfg.index];
+            if (el && typeof el.x === 'number' && isFinite(el.x)) {
+                x = el.x;
+                break;
+            }
+        }
+        if (x == null) {
+            try {
+                var xs = chart.scales.x;
+                if (xs && typeof xs.getPixelForTick === 'function') {
+                    x = xs.getPixelForTick(cfg.index);
+                }
+            } catch (e0) { /* noop */ }
+        }
+        if (x == null || !isFinite(x)) return;
+        var top = chart.chartArea.top;
+        var bot = chart.chartArea.bottom;
+        var ctx = chart.ctx;
+        ctx.save();
+        ctx.beginPath();
+        ctx.strokeStyle = (cfg && cfg.strokeStyle) || 'rgba(29, 107, 74, 0.92)';
+        ctx.lineWidth = (cfg && cfg.lineWidth != null) ? cfg.lineWidth : 2;
+        ctx.setLineDash((cfg && cfg.dash) || [5, 4]);
+        ctx.moveTo(x, top);
+        ctx.lineTo(x, bot);
+        ctx.stroke();
+        ctx.restore();
+    },
+};
+
+function satChartSeriesMode() {
+    return state.satChartSeries === 'month' ? 'month' : 'week';
+}
+
+/** Firma de datos del dock del gráfico (predio + banda + serie temporal). */
+function ficSatDockSig(predio, band, seriesMode) {
+    return String(predio || '') + '|' + String(band || '') + '|' + String(seriesMode || '');
+}
+
+/**
+ * Si el chart ya corresponde al mismo predio/banda/serie, solo mueve la línea del período del mapa.
+ * Evita destroy+recreate al cambiar mes/semana en el slider.
+ */
+function ficSatTryRefreshMapPeriodLineOnly(predio, band, seriesMode) {
+    var ts = satTimeseriesForPredio(predio);
+    var series = ts && ts[band];
+    var sig = ficSatDockSig(predio, band, seriesMode);
+    if (seriesMode === 'week') {
+        if (!ficSatChart || ficSatChart._ficSatDockSig !== sig) return false;
+        var weeks = series && series.weeks ? series.weeks : Array.from({ length: 52 }, function (_, i) { return i + 1; });
+        var mapLineWeek = isSatSplitMode() ? ficSatMapPeriodAxisIndex(weeks, state.satLeftWeek) : -1;
+        var pl = ficSatChart.options.plugins && ficSatChart.options.plugins.ficSatMapPeriodLine;
+        if (!pl) return false;
+        var nextIdx = mapLineWeek >= 0 ? mapLineWeek : null;
+        if (pl.index === nextIdx) return true;
+        pl.index = nextIdx;
+        ficSatChart.update('none');
+        return true;
+    }
+    if (seriesMode === 'month') {
+        if (!ficSatMonthChart || ficSatMonthChart._ficSatDockSig !== sig) return false;
+        var months = series && series.months ? series.months : Array.from({ length: 12 }, function (_, i) { return i + 1; });
+        var mapLineMonth = isSatSplitMode() ? ficSatMapPeriodAxisIndex(months, state.satLeftMonth) : -1;
+        var plM = ficSatMonthChart.options.plugins && ficSatMonthChart.options.plugins.ficSatMapPeriodLine;
+        if (!plM) return false;
+        var nextIdxM = mapLineMonth >= 0 ? mapLineMonth : null;
+        if (plM.index === nextIdxM) return true;
+        plM.index = nextIdxM;
+        ficSatMonthChart.update('none');
+        return true;
+    }
+    return false;
+}
+
+function syncSatChartSeriesPills() {
+    var mode = satChartSeriesMode();
+    document.querySelectorAll('.fic-sat-chart-series-pill').forEach(function (btn) {
+        var on = (btn.dataset.satseries || 'week') === mode;
+        btn.classList.toggle('fic-sat-chart-series-pill--active', on);
+    });
+}
+
+function ficUpdateSatChartToggleAriaControls() {
+    var toggle = document.getElementById('ficSatChartToggle');
+    if (!toggle) return;
+    var lid = satChartSeriesMode() === 'month' ? 'ficSatChartCanvasMonthWrap' : 'ficSatChartCanvasWeekWrap';
+    toggle.setAttribute('aria-controls', lid);
+}
+
+function satChartIsOpen() {
+    try { return localStorage.getItem(LS_SAT_CHART_OPEN) === '1'; }
+    catch (e) { return false; }
+}
+function satChartSetOpen(open) {
+    try {
+        if (open) localStorage.setItem(LS_SAT_CHART_OPEN, '1');
+        else localStorage.removeItem(LS_SAT_CHART_OPEN);
+    } catch (e) {}
+}
+
+/** Periodo flotante: visible si hay toolbar con slider (compartido con el stack inferior). */
+function ficSyncSatPlotChromeVisibility() {
+    var floatWrap = document.getElementById('ficSatPeriodFloat');
+    var stack = document.getElementById('ficSatBottomStack');
+    if (!floatWrap) return;
+    if (!isSatSplitMode()) {
+        floatWrap.hidden = true;
+        if (stack) stack.hidden = true;
+        return;
+    }
+    var tb = document.getElementById('ficSatPeriodToolbar');
+    var has = tb && !tb.hidden && tb.querySelector('.fic-sat-period-custom-slider');
+    floatWrap.hidden = !has;
+    if (stack) stack.hidden = floatWrap.hidden;
+}
+
+function satTimeseriesForPredio(predio) {
+    var ds = state.datasets[state.selectedSource] || {};
+    var wls = ds.wetlands || {};
+    return wls[String(predio || '').toLowerCase()] || null;
+}
+
+function satChartBandList() {
+    var sm = getSatMeta();
+    var keys = Object.keys(sm.indices || {});
+    // Excluir banda técnica del selector si está presente.
+    return keys.filter(function (b) { return b !== 'CLEAR_PIXEL_COUNT'; });
+}
+
+function satChartBand() {
+    var b = state.satChartBand;
+    if (b) return b;
+    var def = getSatMeta().default_chart_band;
+    if (def) return def;
+    var list = satChartBandList();
+    return list[0] || 'NDVI';
+}
+
+/** Evita bucles al enlazar capa del mapa (panel izq.) con banda del gráfico comparativo. */
+var _ficSyncingMapChartBand = false;
+
+/** En vista comparativa, al cambiar la banda del gráfico se actualiza la capa del mapa y los rásteres. */
+function ficSyncMapLayerKindFromSatChartBand(bandKey) {
+    if (!isSatSplitMode()) return;
+    var ix = getSatMeta().indices || {};
+    if (!bandKey || !ix[bandKey]) return;
+    var mapIndexSel = document.getElementById('mapIndex');
+    if (!mapIndexSel) return;
+    if (state.mapLayerKind === bandKey) return;
+    _ficSyncingMapChartBand = true;
+    state.mapLayerKind = bandKey;
+    mapIndexSel.value = bandKey;
+    if (state.selectedWetland) {
+        state.mapPeriodKey = findLatestPeriodKey(state.selectedWetland, state.mapLayerKind);
+    }
+    updateMapLayerHint();
+    updateSatSplitOverlays();
+    if (satChartIsOpen()) updateSatChartDock(true);
+    updateAsesorPortfolioChart();
+    _ficSyncingMapChartBand = false;
+}
+
+function bindSatChartControls() {
+    if (_satChartBindings) return;
+    _satChartBindings = true;
+
+    try {
+        var lsSer = localStorage.getItem(LS_SAT_CHART_SERIES);
+        if (lsSer === 'week' || lsSer === 'month') {
+            state.satChartSeries = lsSer;
+            state.satViewMode = ficSatChartSeriesToViewMode(lsSer);
+        } else {
+            state.satChartSeries = ficSatViewModeToChartSeries(state.satViewMode || 'monthly');
+        }
+    } catch (e) {
+        state.satChartSeries = ficSatViewModeToChartSeries(state.satViewMode || 'monthly');
+    }
+    syncSatModeBar();
+    syncSatChartSeriesPills();
+    ficUpdateSatChartToggleAriaControls();
+
+    var toggle = document.getElementById('ficSatChartToggle');
+    if (toggle) {
+        toggle.addEventListener('click', function () {
+            var nowOpen = !satChartIsOpen();
+            satChartSetOpen(nowOpen);
+            updateSatChartDock();
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    ficSyncColorbarBottomOffset();
+                    if (mapaSat) mapaSat.invalidateSize({ animate: false });
+                });
+            });
+        });
+    }
+
+    var bandSel = document.getElementById('ficSatChartBand');
+    if (bandSel) {
+        bandSel.addEventListener('change', function () {
+            if (_ficSyncingMapChartBand) return;
+            state.satChartBand = bandSel.value;
+            try { localStorage.setItem(LS_SAT_CHART_BAND, bandSel.value); } catch (e) {}
+            if (isSatSplitMode()) {
+                ficSyncMapLayerKindFromSatChartBand(bandSel.value);
+            } else {
+                updateSatChartDock(true);
+            }
+        });
+    }
+
+    document.querySelectorAll('.fic-sat-chart-series-pill').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var m = btn.dataset.satseries;
+            if (m !== 'week' && m !== 'month') return;
+            state.satChartSeries = m;
+            try { localStorage.setItem(LS_SAT_CHART_SERIES, m); } catch (e1) { /* noop */ }
+            state.satViewMode = ficSatChartSeriesToViewMode(m);
+            syncSatModeBar();
+            syncSatChartSeriesPills();
+            ficUpdateSatChartToggleAriaControls();
+            updateSatSplitOverlays();
+            if (satChartIsOpen()) updateSatChartDock(true);
+        });
+    });
+}
+
+function renderSatChartCanvas() {
+    var canvas = document.getElementById('ficSatChartCanvas');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    var predio = state.selectedWetland;
+    var ts = satTimeseriesForPredio(predio);
+    var band = satChartBand();
+    var series = ts && ts[band];
+    var weeks = series && series.weeks ? series.weeks : Array.from({ length: 52 }, function (_, i) { return i + 1; });
+    var p25 = series ? series.historical_p25 : weeks.map(function () { return null; });
+    var p75 = series ? series.historical_p75 : weeks.map(function () { return null; });
+    var med = series ? series.historical_median : weeks.map(function () { return null; });
+    var curYear = (series && series.current_year && series.current_year.year) || getSatMeta().current_year;
+    var curVals = series && series.current_year ? series.current_year.values_by_week : weeks.map(function () { return null; });
+
+    if (ficSatChart) { ficSatChart.destroy(); ficSatChart = null; }
+
+    var ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    var labels = weeks.map(function (w) { return 'W' + String(w).padStart(2, '0'); });
+
+    var mapLineWeek = isSatSplitMode() ? ficSatMapPeriodAxisIndex(weeks, state.satLeftWeek) : -1;
+
+    ficSatChart = new Chart(ctx, {
+        type: 'line',
+        plugins: [ficSatMapPeriodLinePlugin],
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'P25 histórico',
+                    data: p25,
+                    borderColor: 'rgba(29,107,74,0.0)',
+                    backgroundColor: 'rgba(29,107,74,0.18)',
+                    pointRadius: 0,
+                    fill: '+1',
+                    spanGaps: true,
+                    tension: 0.25,
+                },
+                {
+                    label: 'P75 histórico',
+                    data: p75,
+                    borderColor: 'rgba(29,107,74,0.0)',
+                    backgroundColor: 'rgba(29,107,74,0.18)',
+                    pointRadius: 0,
+                    fill: false,
+                    spanGaps: true,
+                    tension: 0.25,
+                },
+                {
+                    label: 'Mediana histórica',
+                    data: med,
+                    borderColor: 'rgba(29,107,74,0.92)',
+                    backgroundColor: 'rgba(29,107,74,0.92)',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    fill: false,
+                    spanGaps: true,
+                    tension: 0.25,
+                },
+                {
+                    label: curYear ? ('Año ' + curYear) : 'Año actual',
+                    data: curVals,
+                    borderColor: 'rgba(196, 80, 53, 1)',
+                    backgroundColor: 'rgba(196, 80, 53, 1)',
+                    borderWidth: 2.2,
+                    pointRadius: 2.5,
+                    pointHoverRadius: 4,
+                    fill: false,
+                    spanGaps: false,
+                    tension: 0.2,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 320 },
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: {
+                    position: 'top', align: 'end',
+                    labels: {
+                        filter: function (item) { return item.text !== 'P25 histórico'; },
+                        boxWidth: 12, boxHeight: 8, font: { size: 11 },
+                    },
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (item) {
+                            var v = item.parsed.y;
+                            if (v == null || !isFinite(v)) return item.dataset.label + ': —';
+                            return item.dataset.label + ': ' + v.toFixed(3);
+                        },
+                    },
+                },
+                ficSatMapPeriodLine: {
+                    index: mapLineWeek >= 0 ? mapLineWeek : null,
+                    strokeStyle: 'rgba(29, 107, 74, 0.92)',
+                    lineWidth: 2,
+                    dash: [5, 4],
+                },
+            },
+            scales: {
+                x: {
+                    title: { display: true, text: 'Semana ISO', font: { size: 10 } },
+                    ticks: { autoSkip: true, maxTicksLimit: 14, font: { size: 10 } },
+                    grid: { display: false },
+                },
+                y: {
+                    title: { display: true, text: band, font: { size: 10 } },
+                    ticks: { font: { size: 10 } },
+                    grid: { color: 'rgba(0,0,0,0.05)' },
+                },
+            },
+        },
+    });
+    ficSatChart._ficSatDockSig = ficSatDockSig(predio, band, 'week');
+}
+
+function renderSatMonthChartCanvas() {
+    var canvas = document.getElementById('ficSatChartMonthCanvas');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    var predio = state.selectedWetland;
+    var ts = satTimeseriesForPredio(predio);
+    var band = satChartBand();
+    var series = ts && ts[band];
+    var months = series && series.months ? series.months : Array.from({ length: 12 }, function (_, i) { return i + 1; });
+    var p25 = series && series.historical_p25_by_month ? series.historical_p25_by_month : months.map(function () { return null; });
+    var p75 = series && series.historical_p75_by_month ? series.historical_p75_by_month : months.map(function () { return null; });
+    var med = series && series.historical_median_by_month ? series.historical_median_by_month : months.map(function () { return null; });
+    var curYear = (series && series.current_year && series.current_year.year) || getSatMeta().current_year;
+    var curVals = series && series.current_year && series.current_year.values_by_month
+        ? series.current_year.values_by_month
+        : months.map(function () { return null; });
+
+    if (ficSatMonthChart) { ficSatMonthChart.destroy(); ficSatMonthChart = null; }
+
+    var ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    var labels = months.map(function (mo, i) {
+        var m = Number(mo) || (i + 1);
+        return MONTH_CHART_LABELS[Math.max(0, Math.min(11, m - 1))] || String(m);
+    });
+
+    var mapLineMonth = isSatSplitMode() ? ficSatMapPeriodAxisIndex(months, state.satLeftMonth) : -1;
+
+    ficSatMonthChart = new Chart(ctx, {
+        type: 'line',
+        plugins: [ficSatMapPeriodLinePlugin],
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'P25 histórico',
+                    data: p25,
+                    borderColor: 'rgba(29,107,74,0.0)',
+                    backgroundColor: 'rgba(29,107,74,0.18)',
+                    pointRadius: 0,
+                    fill: '+1',
+                    spanGaps: true,
+                    tension: 0.25,
+                },
+                {
+                    label: 'P75 histórico',
+                    data: p75,
+                    borderColor: 'rgba(29,107,74,0.0)',
+                    backgroundColor: 'rgba(29,107,74,0.18)',
+                    pointRadius: 0,
+                    fill: false,
+                    spanGaps: true,
+                    tension: 0.25,
+                },
+                {
+                    label: 'Mediana histórica',
+                    data: med,
+                    borderColor: 'rgba(29,107,74,0.92)',
+                    backgroundColor: 'rgba(29,107,74,0.92)',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    fill: false,
+                    spanGaps: true,
+                    tension: 0.25,
+                },
+                {
+                    label: curYear ? ('Año ' + curYear) : 'Año actual',
+                    data: curVals,
+                    borderColor: 'rgba(196, 80, 53, 1)',
+                    backgroundColor: 'rgba(196, 80, 53, 1)',
+                    borderWidth: 2.2,
+                    pointRadius: 2.5,
+                    pointHoverRadius: 4,
+                    fill: false,
+                    spanGaps: false,
+                    tension: 0.2,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 320 },
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: {
+                    position: 'top', align: 'end',
+                    labels: {
+                        filter: function (item) { return item.text !== 'P25 histórico'; },
+                        boxWidth: 12, boxHeight: 8, font: { size: 11 },
+                    },
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (item) {
+                            var v = item.parsed.y;
+                            if (v == null || !isFinite(v)) return item.dataset.label + ': —';
+                            return item.dataset.label + ': ' + v.toFixed(3);
+                        },
+                    },
+                },
+                ficSatMapPeriodLine: {
+                    index: mapLineMonth >= 0 ? mapLineMonth : null,
+                    strokeStyle: 'rgba(29, 107, 74, 0.92)',
+                    lineWidth: 2,
+                    dash: [5, 4],
+                },
+            },
+            scales: {
+                x: {
+                    title: { display: true, text: 'Mes calendario', font: { size: 10 } },
+                    ticks: { autoSkip: false, maxRotation: 0, font: { size: 10 } },
+                    grid: { display: false },
+                },
+                y: {
+                    title: { display: true, text: band, font: { size: 10 } },
+                    ticks: { font: { size: 10 } },
+                    grid: { color: 'rgba(0,0,0,0.05)' },
+                },
+            },
+        },
+    });
+    ficSatMonthChart._ficSatDockSig = ficSatDockSig(predio, band, 'month');
+}
+
+function syncSatChartBandSelect() {
+    var sel = document.getElementById('ficSatChartBand');
+    if (!sel) return;
+    var bands = satChartBandList();
+    var current = sel.value;
+    if (sel.children.length !== bands.length || !bands.length) {
+        sel.innerHTML = '';
+        bands.forEach(function (b) {
+            var opt = document.createElement('option');
+            opt.value = b;
+            opt.textContent = b;
+            sel.appendChild(opt);
+        });
+    }
+    if (!state.satChartBand) {
+        try { state.satChartBand = localStorage.getItem(LS_SAT_CHART_BAND) || ''; }
+        catch (e) {}
+    }
+    var pick;
+    if (isSatSplitMode() && bands.indexOf(state.mapLayerKind) >= 0) {
+        pick = state.mapLayerKind;
+    } else if (state.satChartBand && bands.indexOf(state.satChartBand) >= 0) {
+        pick = state.satChartBand;
+    } else {
+        pick = bands[0] || satChartBand();
+    }
+    state.satChartBand = pick;
+    sel.value = pick;
+    if (isSatSplitMode() && pick === state.mapLayerKind) {
+        try { localStorage.setItem(LS_SAT_CHART_BAND, pick); } catch (e) {}
+    }
+    return pick;
+}
+
+function updateSatChartDock(forceRedraw) {
+    var dock = document.getElementById('ficSatChartDock');
+    var weekWrap = document.getElementById('ficSatChartCanvasWeekWrap');
+    var monthWrap = document.getElementById('ficSatChartCanvasMonthWrap');
+    var toggle = document.getElementById('ficSatChartToggle');
+    var subtitle = document.getElementById('ficSatChartSubtitle');
+    if (!dock || !weekWrap || !monthWrap || !toggle) return;
+    ficSyncColorbarBottomOffset();
+    var open = satChartIsOpen();
+    dock.classList.toggle('fic-sat-chart-dock--collapsed', !open);
+    var bottomStack = document.getElementById('ficSatBottomStack');
+    if (bottomStack) bottomStack.classList.toggle('fic-sat-bottom-stack--chart-open', open);
+    var seriesMode = satChartSeriesMode();
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    toggle.textContent = open ? 'Ocultar gráfico' : 'Mostrar gráfico';
+    weekWrap.hidden = !open || seriesMode !== 'week';
+    monthWrap.hidden = !open || seriesMode !== 'month';
+    if (!open) {
+        if (ficSatChart) { ficSatChart.destroy(); ficSatChart = null; }
+        if (ficSatMonthChart) { ficSatMonthChart.destroy(); ficSatMonthChart = null; }
+        ficSyncSatPlotChromeVisibility();
+        ficSyncColorbarBottomOffset();
+        return;
+    }
+    var band = syncSatChartBandSelect();
+    var predio = state.selectedWetland;
+    var ts = satTimeseriesForPredio(predio);
+    var series = ts && ts[band];
+    var sm = getSatMeta();
+    var lcm = sm.last_complete_month || {};
+    var lcy = lcm.year;
+    var lcmNum = lcm.month;
+    var lcmLabel = lcmNum ? (MONTH_CHART_LABELS[Math.max(0, Math.min(11, Number(lcmNum) - 1))] || String(lcmNum)) : '';
+    if (subtitle) {
+        if (seriesMode === 'week') {
+            if (predio && series) {
+                var ny = (series.years_used || []).length;
+                subtitle.textContent = 'Histórico (' + ny + ' año(s)): mediana y P25–P75 sobre la media espacial de cada año por semana ISO. '
+                    + (series.current_year && series.current_year.year ? series.current_year.year : 'Año actual')
+                    + ': media espacial semanal (sin punto = esa semana sin valores válidos en el raster).';
+            } else {
+                subtitle.textContent = 'Histórico: mediana y P25–P75 entre medias espaciales anuales. Año en curso: media semanal (huecos = sin dato válido).';
+            }
+        } else {
+            var hasMonth = series && Array.isArray(series.historical_median_by_month);
+            if (!hasMonth) {
+                subtitle.textContent = 'Serie mensual no incluida en los datos estáticos actuales. Regenerá las salidas con scripts/static_site/build_sentinel2_local.py (GeoTIFF semanales en data/sentinel2).';
+            } else if (predio && series) {
+                var ny2 = (series.years_used || []).length;
+                subtitle.textContent = 'Histórico (' + ny2 + ' año(s)): mediana y P25–P75 sobre la media espacial de cada año por mes calendario. '
+                    + (series.current_year && series.current_year.year ? series.current_year.year : 'Año actual')
+                    + ': media espacial mensual hasta el último mes completo'
+                    + (lcy && lcmNum ? ' (' + lcmLabel + ' ' + lcy + ').' : '.')
+                    + ' Meses futuros sin punto.';
+            } else {
+                subtitle.textContent = 'Histórico por mes calendario; año en curso hasta el último mes completo'
+                    + (lcy && lcmNum ? ' (' + lcmLabel + ' ' + lcy + ').' : '.');
+            }
+        }
+    }
+    if (!forceRedraw && ficSatTryRefreshMapPeriodLineOnly(predio, band, seriesMode)) {
+        ficSyncSatPlotChromeVisibility();
+        ficSyncColorbarBottomOffset();
+        return;
+    }
+    if (seriesMode === 'week') {
+        if (ficSatMonthChart) { ficSatMonthChart.destroy(); ficSatMonthChart = null; }
+        renderSatChartCanvas();
+        if (forceRedraw && ficSatChart) ficSatChart.update();
+    } else {
+        if (ficSatChart) { ficSatChart.destroy(); ficSatChart = null; }
+        renderSatMonthChartCanvas();
+        if (forceRedraw && ficSatMonthChart) ficSatMonthChart.update();
+    }
+    ficSyncSatPlotChromeVisibility();
+    ficSyncColorbarBottomOffset();
+}
+
+/** Muestra u oculta el split stage vs el mapa normal. */
+function applySatSplitVisibility() {
+    var splitStage = document.getElementById('ficSatSplitStage');
+    var mapaEl = document.getElementById('mapa');
+    var temporalBlock = document.getElementById('ficSatTemporalBlock');
+    if (!splitStage || !mapaEl) return;
+    var isSplit = isSatSplitMode();
+    splitStage.hidden = !isSplit;
+    mapaEl.style.display = isSplit ? 'none' : '';
+    if (temporalBlock) temporalBlock.hidden = !isSplit;
+    if (!isSplit) {
+        state._satMapFitSig = null;
+        var splitEl = document.getElementById('ficSatSplitStage');
+        if (splitEl) splitEl.style.removeProperty('--fic-sat-period-float-measured');
+        ficSyncColorbarBottomOffset();
+    }
+    if (isSplit) {
+        ensureSatLeftDefaults();
+        initSatCompareMap();
+        bindSatModeBarPills();
+        bindSatChartControls();
+        syncSatModeBar();
+        setTimeout(function () {
+            ficSyncMapChromeInset();
+            if (mapaSat) mapaSat.invalidateSize({ animate: false });
+            updateSatSplitOverlays();
+            renderAOI();
+            updateSatChartDock(true);
+        }, 80);
+    }
+    ficSyncMapChromeInset();
+    ficSyncSatPlotChromeVisibility();
+    ficSyncColorbarBottomOffset();
+    ficSyncMapNoteVisibility();
+    syncSatCompareYearSubtitles();
+}
+
+/** Capas base del mapa principal (referencias para alternar relieve / Esri imagen). */
+var ficBaseTopo = null;
+var ficBaseSat = null;
+var ficBaseOsm = null;
+var ficBaseDark = null;
+
+/** Con ráster satélite/dron visible: basemap Esri y zoom máximo alineado a tiles. Sin ráster: relieve y zoom 24. */
+function ficEnsureMainMapBasemapForRaster(showRaster) {
+    if (!mapa || !ficBaseTopo || !ficBaseSat) return;
+    var toRemove = [];
+    mapa.eachLayer(function (ly) {
+        if (ly instanceof L.TileLayer) toRemove.push(ly);
+    });
+    toRemove.forEach(function (ly) {
+        mapa.removeLayer(ly);
+    });
+    if (showRaster) {
+        ficBaseSat.addTo(mapa);
+        mapa.setMaxZoom(FIC_MAP_USER_MAX_ZOOM);
+    } else {
+        ficBaseTopo.addTo(mapa);
+        mapa.setMaxZoom(24);
+    }
+}
+
 function initMap() {
     if (mapa) return;
     mapa = L.map('mapa', { center: [-33.45, -70.74], zoom: 11, zoomControl: false, maxZoom: 24 });
     L.control.zoom({ position: 'topright' }).addTo(mapa);
     L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(mapa);
-    const dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    ficBaseDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '© <a href="https://carto.com/">Carto</a>',
         maxZoom: 24,
         maxNativeZoom: 20,
     });
-    const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    ficBaseSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: '© Esri',
         maxZoom: 24,
-        maxNativeZoom: 19,
+        maxNativeZoom: FIC_ESRI_MAX_NATIVE_ZOOM,
     });
-    const topo = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+    ficBaseTopo = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
         attribution: '© Esri',
         maxZoom: 24,
         maxNativeZoom: 19,
     });
     /** OSM: buen detalle hasta ~z19 sin “map data not yet available”; no es imagen satélite. */
-    const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    ficBaseOsm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 24,
         maxNativeZoom: 19,
     });
-    topo.addTo(mapa);
+    ficBaseTopo.addTo(mapa);
     L.control.layers(
         {
-            'Mapa de relieve': topo,
-            'Imagen satélite (Esri)': sat,
-            'Mapa callejero (OSM)': osm,
-            'Mapa oscuro (Carto)': dark,
+            'Mapa de relieve': ficBaseTopo,
+            'Imagen satélite (Esri)': ficBaseSat,
+            'Mapa callejero (OSM)': ficBaseOsm,
+            'Mapa oscuro (Carto)': ficBaseDark,
         },
         {},
         { position: 'bottomright', collapsed: true }
     ).addTo(mapa);
+    ficSyncMapChromeInset();
 }
 
 async function loadWetlandsAoiGeojson() {
@@ -1430,15 +3920,21 @@ async function loadManifest() {
 
 async function setSource(sourceKey) {
     state.selectedSource = sourceKey;
+    state._lastMapFitContextKey = null;
+    state._satMapFitSig = null;
     if (!state.datasets[sourceKey]) {
         const source = state.manifest.sources[sourceKey];
-        state.datasets[sourceKey] = await fetchJson(BASE + '/' + source.timeseries_path);
-        state.metadata[sourceKey] = await fetchJson(BASE + '/' + source.metadata_path);
+        const hasMeta = source.metadata_path;
+        const hasTs   = source.timeseries_path;
+        state.datasets[sourceKey] = hasTs ? await fetchJson(BASE + '/' + source.timeseries_path) : {};
+        state.metadata[sourceKey] = hasMeta ? await fetchJson(BASE + '/' + source.metadata_path) : {};
     }
+    if (isSatSplitMode()) ensureSatLeftDefaults();
     buildSelectors();
     renderAOI();
     renderAll();
     syncSourcePillsDom();
+    ficEnsureDroneOpacityControl();
 }
 
 /** Si el dron ya no aplica al contexto, vuelve a satélite (evita quedar en dron sin pill). */
@@ -1490,6 +3986,47 @@ function selectedIndex() {
 }
 
 var mapIndexSelectBound = false;
+var _droneOpacityRangeBound = false;
+
+function ficEnsureDroneOpacityControl() {
+    var wrap = document.getElementById('ficDroneIndexOpacityWrap');
+    var rng = document.getElementById('ficDroneIndexOpacity');
+    if (!wrap || !rng) return;
+    if (isSatSplitMode() || state.selectedSource !== 'drone') {
+        wrap.hidden = true;
+        return;
+    }
+    var show = state.mapLayerKind === 'ndvi' || state.mapLayerKind === 'ndwi';
+    wrap.hidden = !show;
+    if (!show) return;
+    if (!window._ficDroneOpacityLoaded) {
+        window._ficDroneOpacityLoaded = true;
+        try {
+            var sv = localStorage.getItem('fic_drone_index_opacity_pct');
+            if (sv != null && sv !== '') {
+                var p = parseInt(sv, 10);
+                if (!isNaN(p)) state.droneIndexOpacity = Math.max(0, Math.min(1, p / 100));
+            }
+        } catch (e0) { /* noop */ }
+    }
+    rng.value = String(Math.round(state.droneIndexOpacity * 100));
+    rng.setAttribute('aria-valuenow', rng.value);
+    if (!_droneOpacityRangeBound) {
+        _droneOpacityRangeBound = true;
+        rng.addEventListener('input', function () {
+            if (isSatSplitMode() || state.selectedSource !== 'drone') return;
+            var pct = parseInt(rng.value, 10);
+            if (isNaN(pct)) pct = 85;
+            state.droneIndexOpacity = Math.max(0, Math.min(1, pct / 100));
+            rng.setAttribute('aria-valuenow', String(pct));
+            try { localStorage.setItem('fic_drone_index_opacity_pct', String(pct)); } catch (e1) { /* noop */ }
+            if (state.selectedSource === 'drone' && rasterDroneIndex && typeof rasterDroneIndex.setOpacity === 'function') {
+                rasterDroneIndex.setOpacity(state.droneIndexOpacity);
+            }
+        });
+    }
+}
+
 function updateMapLayerHint() {
     var hint = document.getElementById('ficLayerPillHint');
     if (!hint) return;
@@ -1529,7 +4066,8 @@ function refreshMapLayerState() {
         return;
     }
     if (idxKeys.indexOf(state.mapLayerKind) < 0) {
-        if (idxKeys.indexOf('rgb') >= 0 && state.selectedSource === 'drone') state.mapLayerKind = 'rgb';
+        if (state.selectedSource === 'drone' && idxKeys.indexOf('ndvi') >= 0) state.mapLayerKind = 'ndvi';
+        else if (idxKeys.indexOf('rgb') >= 0 && state.selectedSource === 'drone') state.mapLayerKind = 'rgb';
         else if (idxKeys.indexOf('ndvi') >= 0) state.mapLayerKind = 'ndvi';
         else state.mapLayerKind = idxKeys[0];
     }
@@ -1545,8 +4083,14 @@ function refreshMapLayerState() {
                 state.mapPeriodKey = null;
             }
             updateMapLayerHint();
-            updateMapOverlay();
+            if (isSatSplitMode()) {
+                updateSatSplitOverlays();
+                updateSatChartDock(true);
+            } else {
+                updateMapOverlay();
+            }
             updateAsesorPortfolioChart();
+            ficEnsureDroneOpacityControl();
         });
     }
 
@@ -1558,6 +4102,8 @@ function refreshMapLayerState() {
     }
     updateMapLayerHint();
     updateAsesorPortfolioChart();
+    ficEnsureDroneOpacityControl();
+    ficSyncMapChromeInset();
 }
 
 function pickDefaultWetland() {
@@ -1602,20 +4148,26 @@ function buildSelectors() {
 }
 
 function renderAll() {
-    updateMapOverlay();
+    ficSyncMapChromeInset();
+    applySatSplitVisibility();
+    ficSyncMapNoteVisibility();
+    if (!isSatSplitMode()) {
+        updateMapOverlay();
+    }
     updateWelcomeBanner();
     updateAsesorPortfolioChart();
-    if (mapa) {
+    if (mapa && !isSatSplitMode()) {
         mapa.invalidateSize({ animate: false });
         setTimeout(function () { if (mapa) mapa.invalidateSize({ animate: false }); }, 200);
     }
+    ficSyncMapChromeInset();
 }
 
-function renderAOI() {
-    if (aoiLayer) { mapa.removeLayer(aoiLayer); aoiLayer = null; }
-    if (!state.aoi || !mapa) return;
-    const idCol = currentMeta().aoi_id_column || 'wetland_id';
-    aoiLayer = L.geoJSON(state.aoi, {
+var aoiLayerSat = null;
+
+function _buildAoiLayer(targetMap, idCol, paneName) {
+    if (!state.aoi || !targetMap) return null;
+    var gjOpts = {
         style: function (feature) {
             const wid = String(feature.properties[idCol] || '').toLowerCase();
             const active = wid === state.selectedWetland;
@@ -1628,72 +4180,152 @@ function renderAOI() {
             const name = info.name || feature.properties.nombre || wid;
             const html = buildPolygonTooltipHtml(wid, name, info);
             layer.bindTooltip(html, { sticky: true, opacity: 0.95 });
-        }
-    }).addTo(mapa);
+        },
+    };
+    if (paneName) gjOpts.pane = paneName;
+    return L.geoJSON(state.aoi, gjOpts).addTo(targetMap);
+}
+
+function renderAOI() {
+    const idCol = currentMeta().aoi_id_column || 'wetland_id';
+    if (isSatSplitMode()) {
+        if (aoiLayerSat && mapaSat) { mapaSat.removeLayer(aoiLayerSat); aoiLayerSat = null; }
+        if (mapaSat) aoiLayerSat = _buildAoiLayer(mapaSat, idCol, 'ficSatAoiPane');
+        return;
+    }
+    if (aoiLayer) { mapa.removeLayer(aoiLayer); aoiLayer = null; }
+    if (!state.aoi || !mapa) return;
+    aoiLayer = _buildAoiLayer(mapa, idCol);
     /* El zoom lo define updateMapOverlay (extent del WebP) o fitMapToPredioAOI si no hay ráster. */
 }
 
 function updateMapOverlay() {
     if (!mapa) return;
     if (rasterOverlay) { mapa.removeLayer(rasterOverlay); rasterOverlay = null; }
+    if (rasterDroneRgb) { mapa.removeLayer(rasterDroneRgb); rasterDroneRgb = null; }
+    if (rasterDroneIndex) { mapa.removeLayer(rasterDroneIndex); rasterDroneIndex = null; }
     const note = document.getElementById('mapNote');
     const colorbar = document.getElementById('colorbarBox');
     colorbar.style.display = 'none';
     if (!state.selectedWetland) {
+        state._lastMapFitContextKey = null;
         note.textContent = usesAgricultorNamesInPredioSelect()
             ? 'No hay agricultor seleccionado.'
             : 'No hay predio seleccionado.';
+        ficEnsureMainMapBasemapForRaster(false);
         return;
     }
     if (!currentSource().has_data) {
         note.textContent = 'Esta fuente aún no tiene mapas listos.';
+        ficEnsureMainMapBasemapForRaster(false);
         fitMapToPredioAOI();
         return;
     }
     if (!state.mapPeriodKey) {
         note.textContent = 'No hay imagen disponible para la capa ' + String(selectedIndex()).toUpperCase() + ' en este predio en las fechas que tenemos cargadas.';
+        ficEnsureMainMapBasemapForRaster(false);
         fitMapToPredioAOI();
         return;
     }
-    const rasterKey = state.selectedWetland + '_' + selectedPeriod() + '_' + selectedIndex();
-    const raster = currentMeta().rasters && currentMeta().rasters[rasterKey];
+    var meta = currentMeta();
+    var isDrone = state.selectedSource === 'drone';
+    var period = selectedPeriod();
+    var wid = String(state.selectedWetland);
+    var rkBase = (wid + '_' + period + '_').toLowerCase();
+    var ixKind = String(state.mapLayerKind || 'ndvi').toLowerCase();
+
+    function pickRaster(indexKey) {
+        var k = rkBase + String(indexKey).toLowerCase();
+        return meta.rasters && meta.rasters[k] ? meta.rasters[k] : null;
+    }
+
+    var raster = pickRaster(selectedIndex());
     if (!raster) {
         note.textContent = 'No hay capa ' + String(selectedIndex()).toUpperCase() + ' para este predio. Prueba otra opción en el desplegable.';
+        ficEnsureMainMapBasemapForRaster(false);
         fitMapToPredioAOI();
         return;
     }
-    note.textContent = raster.index.toUpperCase() + ' · ' + raster.season + ' ' + raster.year + ' · ' + raster.visual.display_size[0] + '×' + raster.visual.display_size[1];
+
     var cornerBounds = raster.visual.bounds;
     if (!leafletBoundsCornersValid(cornerBounds)) {
-        var u = unionRasterBoundsForWetland(currentMeta(), state.selectedWetland);
+        var u = unionRasterBoundsForWetland(meta, state.selectedWetland);
         if (u && u.isValid()) {
             cornerBounds = [[u.getSouth(), u.getWest()], [u.getNorth(), u.getEast()]];
         }
     }
     if (!leafletBoundsCornersValid(cornerBounds)) {
         note.textContent = 'Esta vista no puede alinearse bien en el mapa. Prueba otra capa o avisa al equipo de soporte.';
+        ficEnsureMainMapBasemapForRaster(false);
         fitMapToPredioAOI();
         return;
     }
-    const imgClass = raster.visual.render_mode === 'smooth' ? '' : 'preview-raster';
-    const overlayOpacity = raster.index === 'rgb'
-        ? 1
-        : (raster.visual.opacity != null ? raster.visual.opacity : 0.9);
-    rasterOverlay = L.imageOverlay(BASE + '/' + raster.visual.path, cornerBounds, { opacity: overlayOpacity, className: imgClass, interactive: false }).addTo(mapa);
-    mapa.fitBounds(cornerBounds, { padding: [36, 36] });
 
-    const idx = selectedIndex();
-    const idxMeta = currentMeta().indices && currentMeta().indices[idx];
-    const isVisualOnly = idxMeta && idxMeta.visual_only;
-    if (!isVisualOnly && CBAR[idx]) {
-        const cbar = CBAR[idx];
-        document.getElementById('cbGradient').style.background = cbar.gradient;
-        document.getElementById('cbTitle').textContent = cbar.label;
-        document.getElementById('cbMin').textContent = idxMeta.vmin != null ? idxMeta.vmin : '';
-        document.getElementById('cbMax').textContent = idxMeta.vmax != null ? idxMeta.vmax : '';
-        colorbar.style.display = 'flex';
+    var ctxKey = mapFitContextKey();
+    var skipRasterFit = state._lastMapFitContextKey === ctxKey;
+
+    function addImageOverlayFromRaster(r, opacity, className) {
+        var p = r.visual.path;
+        var op = opacity != null ? opacity : (r.visual.opacity != null ? r.visual.opacity : 0.9);
+        return L.imageOverlay(BASE + '/' + p, cornerBounds, { opacity: op, className: className || '', interactive: false }).addTo(mapa);
+    }
+
+    if (isDrone && (ixKind === 'ndvi' || ixKind === 'ndwi')) {
+        var rgbR = pickRaster('rgb');
+        var ixR = pickRaster(ixKind);
+        if (rgbR && ixR && rgbR.visual && ixR.visual) {
+            var rgbClass = rgbR.visual.render_mode === 'smooth' ? '' : 'preview-raster';
+            var ixClass = ixR.visual.render_mode === 'smooth' ? '' : 'preview-raster';
+            rasterDroneRgb = addImageOverlayFromRaster(rgbR, 1, rgbClass);
+            rasterDroneIndex = addImageOverlayFromRaster(ixR, state.droneIndexOpacity, ixClass);
+            var pct = Math.round(state.droneIndexOpacity * 100);
+            note.textContent = raster.index.toUpperCase() + ' · ' + raster.season + ' ' + raster.year
+                + ' · RGB + índice (' + pct + '%)';
+        } else if (ixR && ixR.visual) {
+            var imgClass = ixR.visual.render_mode === 'smooth' ? '' : 'preview-raster';
+            rasterDroneIndex = addImageOverlayFromRaster(ixR, ixR.index === 'rgb' ? 1 : (ixR.visual.opacity != null ? ixR.visual.opacity : 0.9), imgClass);
+            note.textContent = raster.index.toUpperCase() + ' · ' + raster.season + ' ' + raster.year + ' · ' + ixR.visual.display_size[0] + '×' + ixR.visual.display_size[1];
+        } else if (rgbR && rgbR.visual) {
+            var rgbClass2 = rgbR.visual.render_mode === 'smooth' ? '' : 'preview-raster';
+            rasterDroneRgb = addImageOverlayFromRaster(rgbR, 1, rgbClass2);
+            note.textContent = 'Solo RGB disponible para esta fecha (falta ' + ixKind.toUpperCase() + ').';
+        } else {
+            note.textContent = 'No hay ortofoto para esta combinación.';
+            ficEnsureMainMapBasemapForRaster(false);
+            fitMapToPredioAOI();
+            return;
+        }
+    } else if (isDrone) {
+        var imgClass = raster.visual.render_mode === 'smooth' ? '' : 'preview-raster';
+        var overlayOpacity = raster.index === 'rgb'
+            ? 1
+            : (raster.visual.opacity != null ? raster.visual.opacity : 0.9);
+        rasterOverlay = addImageOverlayFromRaster(raster, overlayOpacity, imgClass);
+        note.textContent = raster.index.toUpperCase() + ' · ' + raster.season + ' ' + raster.year + ' · ' + raster.visual.display_size[0] + '×' + raster.visual.display_size[1];
     } else {
-        colorbar.style.display = 'none';
+        var idxLab = (meta.indices[state.mapLayerKind] && meta.indices[state.mapLayerKind].label)
+            || String(state.mapLayerKind || selectedIndex()).toUpperCase();
+        var per = (meta.periods || []).filter(function (p) { return p.key === state.mapPeriodKey; })[0];
+        var perLab = per ? per.label : String(selectedPeriod() || '');
+        note.textContent = perLab ? (idxLab + ' · ' + perLab) : idxLab;
+        var imgClassSat = raster.visual.render_mode === 'smooth' ? '' : 'preview-raster';
+        var opSat = raster.index === 'rgb'
+            ? 1
+            : (raster.visual.opacity != null ? raster.visual.opacity : 0.9);
+        rasterOverlay = addImageOverlayFromRaster(raster, opSat, imgClassSat);
+    }
+
+    ficEnsureMainMapBasemapForRaster(true);
+
+    if (!skipRasterFit) {
+        mapa.fitBounds(cornerBounds, ficMainMapRasterFitBoundsOpts());
+        state._lastMapFitContextKey = ctxKey;
+    }
+
+    if (isDrone && (ixKind === 'ndvi' || ixKind === 'ndwi')) {
+        ficApplyColorbar(meta, ixKind);
+    } else {
+        ficApplyColorbar(meta, selectedIndex());
     }
 }
 
@@ -1771,9 +4403,10 @@ function unionRasterBoundsForWetland(meta, wetlandId) {
 /** Si no hay WebP o bounds corruptos: zoom a la huella agregada de los GeoTIFF; si no, al AOI del GeoJSON maestro. */
 function fitMapToPredioAOI() {
     if (!mapa || !state.selectedWetland) return;
+    state._lastMapFitContextKey = null;
     var fromRasters = unionRasterBoundsForWetland(currentMeta(), state.selectedWetland);
     if (fromRasters && fromRasters.isValid()) {
-        mapa.fitBounds(fromRasters.pad(0.06), { padding: [36, 36] });
+        mapa.fitBounds(fromRasters.pad(0.06), ficMainMapRasterFitBoundsOpts());
         return;
     }
     if (!state.aoi) return;
@@ -1792,7 +4425,7 @@ function fitMapToPredioAOI() {
             break;
         }
     }
-    if (fitBounds && fitBounds.isValid()) mapa.fitBounds(fitBounds.pad(0.18));
+    if (fitBounds && fitBounds.isValid()) mapa.fitBounds(fitBounds.pad(0.18), ficMainMapRasterFitBoundsOpts());
 }
 </script>
 </body>

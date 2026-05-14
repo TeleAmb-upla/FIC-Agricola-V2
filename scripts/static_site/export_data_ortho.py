@@ -8,6 +8,8 @@ genera WebP en ``data_static/drone/rasters/`` y referencias en ``metadata.json``
 explorador (Leaflet ``imageOverlay``).
 Los GeoTIFF flat se procesan uno tras otro; opcional ``pause_between_drone_tiffs_sec``.
 Los índices (NDVI, etc.) pasan a WebP con ``vmin``/``vmax`` desde config tras remuestreo tipo RGB (sin cargar TIFF completo en RAM).
+
+Ejecución típica desde la raíz del repo: ``python scripts/static_site/export_data_ortho.py``.
 """
 from __future__ import annotations
 
@@ -51,7 +53,7 @@ from pipeline_utils import (
 
 OUTPUT_DIR = Path("data_static")
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Subir cuando cambien máscaras / recorte RGB en ``build_preview_rgb`` (invalida WebP cacheados con reuse).
 RGB_PREVIEW_MASK_REVISION = 3

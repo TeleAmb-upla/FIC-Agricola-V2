@@ -4,7 +4,8 @@ Escaneo ligero de data/drone: detecta códigos de predio temporal tipo G1, G12 a
 de carpetas/archivos (no abre rásteres).
 
 Uso desde la raíz del repo::
-  python scripts/scan_drone_predio_codes.py
+
+  python scripts/data_prep/scan_drone_predio_codes.py
 
 La carpeta data/ suele estar en .gitignore; el script igual crea rutas relativas locales.
 """
@@ -46,7 +47,7 @@ def main() -> None:
     ap.add_argument(
         "--root",
         type=Path,
-        default=Path(__file__).resolve().parents[1] / "data" / "drone",
+        default=Path(__file__).resolve().parents[2] / "data" / "drone",
         help="Carpeta raíz de dron (default: data/drone).",
     )
     args = ap.parse_args()

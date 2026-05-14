@@ -1,11 +1,31 @@
 {
-  "generated_at": "2026-04-30T19:44:56+00:00",
+  "generated_at": "2026-05-14T15:47:16.299709+00:00",
   "aoi_path": "wetlands_aoi.geojson",
   "year_range": {
     "start": 2024,
     "end": 2026
   },
   "sources": {
+    "sentinel2": {
+      "id": "sentinel2",
+      "label": "Satélite Sentinel-2",
+      "description": "Mosaicos semanales Sentinel-2 por predio (agregados locales).",
+      "color": "#1d6b4a",
+      "has_data": true,
+      "timeseries_path": "sentinel2/timeseries.json",
+      "metadata_path": "sentinel2/metadata.json",
+      "csv_dir": "sentinel2/csv",
+      "status": "ready",
+      "summary": {
+        "n_wetlands": 7,
+        "raster_count": 17248,
+        "available_years": [
+          2024,
+          2025,
+          2026
+        ]
+      }
+    },
     "drone": {
       "id": "drone",
       "label": "Dron multiespectral",

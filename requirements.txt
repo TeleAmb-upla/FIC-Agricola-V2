@@ -1,0 +1,13 @@
+# Google Earth Engine + Drive API (export & verificación remota).
+# earthengine-api: client_id/secret por defecto si faltan en el JSON de credentials.
+earthengine-api>=0.1.374
+google-api-python-client>=2.100.0
+google-auth>=2.23.0
+google-auth-httplib2>=0.2.0
+google-auth-oauthlib>=1.1.0
+
+# Pipeline local Sentinel-2 (scripts/static_site/build_sentinel2_local.py).
+rasterio>=1.3
+numpy>=1.24
+Pillow>=10.0
+matplotlib>=3.7

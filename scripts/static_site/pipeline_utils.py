@@ -12,12 +12,6 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-import subprocess
-import sys
-import tempfile
-from datetime import datetime
-from pathlib import Path
-
 from shapely import make_valid
 from shapely.geometry import box, mapping, shape as shp_shape
 
@@ -250,7 +244,7 @@ def read_wetland_aoi_dataset(aoi_source: str | Path, forced_crs: str | None = No
     return gdf
 
 
-# Igual que ``export_data_ortho.FLAT_DRONE_NAME`` (GeoTIFF planos; separador _ o espacio).
+# Igual que ``static_site.export_data_ortho.FLAT_DRONE_NAME`` (GeoTIFF planos; separador _ o espacio).
 _FLAT_DRONE_NAME = re.compile(
     r"^((?:[Gg]\d+)|(?:[Nn][Oo][Gg]))(?:[\s_]+)"
     r"((?:\d{8})|(?:\d{4}[_-]\d{2}[_-]\d{2}))(?:[\s_]+)"
@@ -698,13 +692,6 @@ def ensure_master_aoi(config: dict) -> Path:
     return output_path
 
 
-def get_source_config(config: dict, source_key: str) -> dict:
-    sources = config.get("sources", {})
-    if source_key not in sources:
-        raise KeyError(f"Fuente '{source_key}' no configurada")
-    return sources[source_key]
-
-
 def get_source_input_roots(source_cfg: dict) -> list[Path]:
     roots = [Path(source_cfg["input_root"])]
     roots.extend(Path(item) for item in source_cfg.get("legacy_input_roots", []))
@@ -713,7 +700,3 @@ def get_source_input_roots(source_cfg: dict) -> list[Path]:
         if root not in seen:
             seen.append(root)
     return seen
-
-
-def relative_posix(path: str | Path, start: str | Path = ".") -> str:
-    return Path(path).resolve().relative_to(Path(start).resolve()).as_posix()

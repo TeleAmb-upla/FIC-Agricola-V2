@@ -1,6 +1,6 @@
 # FIC Agro — Dron y Sentinel-2 (explorador web)
 
-Proyecto con la **misma convención de carpetas** que `wetland_ortho_monitoring`: configuración YAML, utilidades de pipeline, exportación a `data_static/` y frontend en `index.html`.
+Proyecto con convención similar a `wetland_ortho_monitoring`: `config.yaml`, utilidades en `scripts/`, exportación a `data_static/` y frontend (`index.html` + `explorador.html`).
 
 - **Dron multiespectral**: fuente principal (`data/drone/...`).
 - **Sentinel-2**: desactivada por defecto (`enabled: false` en `config.yaml`); activa la fuente cuando quieras series de referencia.
@@ -10,13 +10,14 @@ Proyecto con la **misma convención de carpetas** que `wetland_ortho_monitoring`
 ```text
 fic_agro/
 ├── config.yaml
-├── pipeline_utils.py
-├── download_sentinel2_gee.py
-├── export_data_ortho.py
-├── migrate_data_folders.py
 ├── index.html
-├── test_imports.py
+├── explorador.html
 ├── requirements.txt
+├── assets/
+├── scripts/
+│   ├── static_site/       # export_data_ortho, pipeline_utils → data_static/
+│   ├── data_prep/         # KMZ → shapefile, escaneo de códigos en data/drone
+│   └── gee/               # export_s2, Drive sync, previews, estadísticas
 ├── data/
 │   ├── shapefiles/
 │   ├── sentinel2/
@@ -43,8 +44,21 @@ El lote de ejemplo en config es `lote_demo`. Sustituye o agrega entradas bajo `w
 cd fic_agro
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python export_data_ortho.py
+
+# Dron multiespectral (campañas de vuelo en data/drone/...)
+python scripts/static_site/export_data_ortho.py
+
+# Sentinel-2 local: agrega data/sentinel2/*.tif → data_static/sentinel2/{rasters,csv,metadata.json,timeseries.json}
+python scripts/static_site/build_sentinel2_local.py --force
 ```
+
+El pipeline Sentinel-2 produce, por predio, agregados temporales pixel-a-pixel:
+
+- **Anual**: mediana de cada año histórico vs mediana del año en curso (pills de año).
+- **Mensual**: mediana histórica por mes vs mes en curso (pills 1..12).
+- **Semanal**: mediana histórica por semana ISO vs semana en curso (pills 1..52).
+- **CSV / serie temporal**: mediana, P25, P75 hist. + valores semanales del año actual,
+  por banda. Se grafica en el frontend (toggle pill, banda seleccionable).
 
 ## Ver el mapa
 

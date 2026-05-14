@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """
 Estadísticas zonal sobre mosaicos semanales S2 ya exportados a Earth Engine
-(la misma convención que ``export_s2.py``: ``year``, ``week``, bandas tipo ``NDVI``, …).
+(la misma convención que ``export_s2.py``: ``year``, ``week``, bandas de índices, etc.).
 
 Carga geometrías de predios desde ``data/shapefiles/aoi.geojson`` (por defecto) o desde
 ``.shp`` bajo ese directorio, recorre cada imagen de la colección y calcula por predio:
 
-- reducción espacial (**media**) de la banda elegida en cada semana (ya es mediana temporal
-  en el pipeline de exportación).
+- reducción espacial (**media**) de **todas las bandas de imagen** de la colección (por defecto),
+  o un subconjunto con ``--bands`` / ``--band``.
 
 **Serie anual** (solo **años calendario completos** en el explorador JSON, ``≤ año_actual − 1``):
 
-  Por predio: **mediana** semanal dentro del año (sobre valores de media espacial ya agregados).
-  Entre predios: **mediana central**, **P25** y **P75** de esas medianas predio-año.
+  Por predio y **banda**: **mediana** semanal dentro del año (sobre valores de media espacial ya agregados).
+  Entre predios: **mediana central**, **P25** y **P75** de esas medianas predio-año (CSV con columna ``band``).
 
 **Serie mensual**:
-  Por predio y (año, mes calendario): promedio de las medias semanales cuya
+  Por predio, banda y (año, mes calendario): promedio de las medias semanales cuya
   ``system:time_start`` cae en ese mes.
   - Columna histórica: **mediana** de todos los valores (todos los predios y todos los
     años **<= último año completo**, excluido **el año civil actual**).
@@ -23,16 +23,9 @@ Carga geometrías de predios desde ``data/shapefiles/aoi.geojson`` (por defecto)
   ``último año completo``: ``año_actual - 1`` (p. ej. en 2026 el histórico usa hasta 2025).
   - Columna año actual: **promedio** entre predios de ese mes del año civil en curso.
 
-Salida: CSV (anual/mensual) y gráficos PNG opcionales (matplotlib).
+Salida: CSV (anual/mensual con columna ``band``, semanal con una columna por banda) y gráficos PNG opcionales.
 
-Extracción zonal tipo ``genius_upla/scripts/gee/products/ndvi`` (solo raster + CSV/table):
-
-- Zonal por semana: ``im.select(banda).addBands(ee.Image(1)).reduceRegions(..., ee.Reducer.mean())``
-  como en NDVI yearly GeoJSON/table; así el mean es coherente con ese pipeline.
-- Resumen tabular local: una ``getInfo()`` por **año** (colección flatten de todas las semanas).
-- Opcional Drive: CSV zonal año a año (``Export.table.toDrive``, ``CSV``) y raster anual median
-  (``Export.image.toDrive``, ``EPSG:4326``, escala m, NDVI escalado ``int16`` / divisor 10000
-  igual que NDVI yearly en genius_upla).
+Extracción zonal: ``reduceRegions(..., ee.Reducer.mean())`` sobre todas las bandas solicitadas a la vez.
 
 Autenticación: ``earthengine authenticate``; proyecto: ``EE_CLOUD_PROJECT`` / ``--project``.
 """
@@ -53,10 +46,24 @@ import pandas as pd
 from shapely.geometry import mapping
 from shapely.ops import unary_union
 
-DEFAULT_CLOUD_PROJECT = "ee-javiermedinam"
-DEFAULT_COLLECTION = "projects/ee-javiermedinam/assets/S2_weekly_walpo"
+DEFAULT_CLOUD_PROJECT = "teleambagr"
+DEFAULT_COLLECTION = "projects/teleambagr/assets/S2_weekly_valpo"
 DEFAULT_SHAPES = "data/shapefiles/aoi.geojson"
 DEFAULT_BAND = "NDVI"
+
+# Columnas de la tabla semanal que no son medias zonales de bandas de imagen
+WEEKLY_META_COLUMNS = frozenset(
+    {"predio_id", "year", "week", "month", "iso_week_start"}
+)
+
+def reorder_weekly_dataframe_columns(df: pd.DataFrame, band_names: list[str]) -> pd.DataFrame:
+    """Metadatos temporales y predio primero; atributos de shapefile; luego bandas en orden estable."""
+    meta = [c for c in ("predio_id", "year", "week", "month", "iso_week_start") if c in df.columns]
+    known_b = [b for b in sorted(band_names) if b in df.columns]
+    rest = sorted(c for c in df.columns if c not in meta and c not in known_b)
+    order = meta + rest + known_b
+    return df[[c for c in order if c in df.columns]]
+
 
 MONTH_NAMES_ES = [
     "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -78,18 +85,41 @@ def ee_initialize(project: str) -> None:
     ee.Initialize(project=project)
 
 
+def discover_collection_band_names(collection_id: str) -> list[str]:
+    """Nombres de banda de la primera imagen de la colección (orden estable al ordenar)."""
+    ic = ee.ImageCollection(collection_id.strip().rstrip("/"))
+    names = ic.sort("system:time_start").limit(1).first().bandNames().getInfo() or []
+    return sorted(str(b) for b in names)
+
+
+def resolve_band_names(collection_id: str, bands_arg: str | None, single_band_arg: str | None) -> list[str]:
+    """
+    Orden: ``--bands`` (coma); si no, ``--band``; si no, todas las bandas de la colección.
+    """
+    if bands_arg and str(bands_arg).strip():
+        out = [b.strip() for b in str(bands_arg).split(",") if b.strip()]
+        if not out:
+            raise ValueError("--bands no puede ser solo comas/espacios.")
+        return out
+    if single_band_arg and str(single_band_arg).strip():
+        return [str(single_band_arg).strip()]
+    return discover_collection_band_names(collection_id)
+
+
 def load_features_from_aoi_geojson(path: Path, *, exclude_patterns: tuple[str, ...]) -> tuple[gpd.GeoDataFrame, ee.FeatureCollection]:
     gdf = gpd.read_file(path)
     if gdf.crs is None:
         gdf = gdf.set_crs(epsg=4326)
     else:
         gdf = gdf.to_crs(epsg=4326)
-    id_candidates = ["wetland_id", "predio_id", "name", "id"]
+    if "predio_id" not in gdf.columns and "wetland_id" in gdf.columns:
+        gdf = gdf.rename(columns={"wetland_id": "predio_id"})
+    id_candidates = ["predio_id", "name", "id", "ID", "Nombre", "PREDIO", "plot_id"]
     id_col = next((c for c in id_candidates if c in gdf.columns), None)
     if id_col is None:
         gdf = gdf.reset_index(drop=True).assign(predio_id=lambda d: index_to_ids(d.index))
         id_col = "predio_id"
-    else:
+    elif id_col != "predio_id":
         gdf = gdf.rename(columns={id_col: "predio_id"})
     gdf["predio_id"] = gdf["predio_id"].astype(str).str.strip()
     mask = ~(gdf["predio_id"].str.lower().isin({p.lower() for p in exclude_patterns}))
@@ -98,7 +128,8 @@ def load_features_from_aoi_geojson(path: Path, *, exclude_patterns: tuple[str, .
     gdf = gdf.loc[mask].copy()
     feats = [_gdf_row_to_feature(r) for _, r in gdf.iterrows()]
     ee_fc = ee.FeatureCollection(feats)
-    return gdf[["predio_id", "geometry"]], ee_fc
+    keep = ["predio_id", "geometry"] + [c for c in gdf.columns if c not in ("predio_id", "geometry")]
+    return gdf[keep], ee_fc
 
 
 def index_to_ids(idx):
@@ -107,9 +138,19 @@ def index_to_ids(idx):
 
 
 def _gdf_row_to_feature(row) -> ee.Feature:
+    """Incluye propiedades del predio (p. ej. nombre) para que aparezcan en CSV/reduceRegions."""
     geom_js = mapping(row.geometry)
-    pid = str(row["predio_id"]).strip()
-    return ee.Feature(geom_js, {"predio_id": pid})
+    props: dict = {"predio_id": str(row["predio_id"]).strip()}
+    for k, v in row.items():
+        if k in ("geometry", "predio_id") or k not in row.index:
+            continue
+        if pd.isna(v):
+            continue
+        if isinstance(v, (bool, int, float)):
+            props[k] = v
+        else:
+            props[k] = str(v).strip()
+    return ee.Feature(geom_js, props)
 
 
 def gdf_union_ee_geometry(gdf: gpd.GeoDataFrame) -> ee.Geometry:
@@ -145,10 +186,12 @@ def load_features_from_shapefiles(root: Path) -> tuple[gpd.GeoDataFrame, ee.Feat
 
 
 def _spatial_mean_scalar_from_props(prop: dict, band: str) -> float:
-    """Lee la media zonala reducida; con ``addBands(1)`` el resultado puede llamarse como la banda o ``mean``."""
+    """Lee la media zonala: nombre de banda, ``<band>_mean`` (GEE) o ``mean`` (legacy una banda)."""
     if not prop:
         return float("nan")
     raw = prop.get(band)
+    if raw is None:
+        raw = prop.get(f"{band}_mean")
     if raw is None:
         raw = prop.get("mean")
     try:
@@ -163,30 +206,17 @@ def _distinct_year_lookup(ic: ee.ImageCollection) -> dict[int, object]:
     return {int(y): y for y in raw}
 
 
-def fc_zonal_weekly_genius_like(img: ee.Image, fc_ee: ee.FeatureCollection, band: str, scale_m: float) -> ee.FeatureCollection:
+def fc_zonal_weekly_multi_band(
+    img: ee.Image, fc_ee: ee.FeatureCollection, band_names: list[str], scale_m: float
+) -> ee.FeatureCollection:
     """
-    Misma mecánica que NDVI zonal yearly en ``products/ndvi/linear/geojson.py``:
-    ``select(banda) + ee.Image(1)`` antes de ``reduceRegions`` con ``Reducer.mean()`` y escala típica 10.
-    Devuelve un ``FeatureCollection`` donde cada feature incluye año/semana/fecha/mediana zonala.
+    Media zonal por banda (todas a la vez) + metadatos de semana. ``reduceRegions`` con
+    ``Reducer.mean()`` deja una propiedad por banda (nombre de banda o ``*_mean`` según GEE).
     """
     im = ee.Image(img)
-    reduced = (
-        im.select(band)
-        .addBands(ee.Image(1))
-        .reduceRegions(
-            collection=fc_ee,
-            reducer=ee.Reducer.mean(),
-            scale=scale_m,
-            tileScale=8,
-        )
-    )
-
-    band_const = ee.String(band)
 
     def attach_meta(f: ee.Feature | ee.ComputedObject) -> ee.Feature:
         ff = ee.Feature(f)
-        has_b = ee.List(ff.propertyNames()).contains(band_const)
-        val = ee.Algorithms.If(has_b, ff.get(band), ff.get("mean"))
         ts = im.get("system:time_start")
         return ee.Feature(ff).set(
             {
@@ -194,10 +224,15 @@ def fc_zonal_weekly_genius_like(img: ee.Image, fc_ee: ee.FeatureCollection, band
                 "week": im.get("week"),
                 "month": ee.Date(ts).get("month"),
                 "iso_week_start": ee.Date(ts).format("YYYY-MM-dd"),
-                "spatial_mean_week": val,
             }
         )
 
+    reduced = im.select(band_names).reduceRegions(
+        collection=fc_ee,
+        reducer=ee.Reducer.mean(),
+        scale=scale_m,
+        tileScale=8,
+    )
     return reduced.map(attach_meta)
 
 
@@ -205,13 +240,13 @@ def collect_weekly_table(
     collection_id: str,
     fc_ee,
     *,
-    band: str,
+    band_names: list[str],
     years: list[int],
     scale_m: float,
 ) -> pd.DataFrame:
     """
     Construye la tabla semanal local con **una petición GeoJSON grande por año**
-    en lugar de N semanas × reduceRegions().
+    en lugar de N semanas × reduceRegions(). Una columna numérica por banda de imagen.
     """
     ic_full = ee.ImageCollection(collection_id)
     rows: list[dict] = []
@@ -225,7 +260,7 @@ def collect_weekly_table(
             continue
 
         def _mapped_loc(im):
-            return fc_zonal_weekly_genius_like(ee.Image(im), fc_ee, band, scale_m)
+            return fc_zonal_weekly_multi_band(ee.Image(im), fc_ee, band_names, scale_m)
 
         merged = ee.FeatureCollection(col_y.map(_mapped_loc)).flatten()
         feats = merged.getInfo()["features"]
@@ -235,7 +270,6 @@ def collect_weekly_table(
             pid = prop.get("predio_id")
             if pid is None:
                 continue
-            m = _spatial_mean_scalar_from_props(prop, band)
             yv = prop.get("year")
             wv = prop.get("week")
             iso = prop.get("iso_week_start") or ""
@@ -250,16 +284,25 @@ def collect_weekly_table(
             else:
                 mo = None
 
-            rows.append(
-                {
-                    "year": iy,
-                    "week": iw,
-                    "month": mo,
-                    "predio_id": str(pid).strip(),
-                    "spatial_mean_week": m,
-                    "iso_week_start": str(iso)[:10],
-                }
-            )
+            row: dict = {
+                "year": iy,
+                "week": iw,
+                "month": mo,
+                "predio_id": str(pid).strip(),
+                "iso_week_start": str(iso)[:10],
+            }
+            for bn in band_names:
+                row[bn] = _spatial_mean_scalar_from_props(prop, bn)
+            for k, v in prop.items():
+                if k in row or k in WEEKLY_META_COLUMNS or k.endswith("_mean"):
+                    continue
+                if k == "predio_id":
+                    continue
+                if pd.isna(v) if not isinstance(v, (list, dict)) else False:
+                    continue
+                if isinstance(v, (int, float, bool, str)):
+                    row[k] = v
+            rows.append(row)
     return pd.DataFrame(rows)
 
 
@@ -267,18 +310,20 @@ def enqueue_drive_weekly_zonal_csv_tasks(
     collection_id: str,
     fc_ee: ee.FeatureCollection,
     *,
-    band: str,
+    band_names: list[str],
     years: list[int],
     scale_m: float,
     drive_folder: str,
     description_prefix: str,
 ) -> list[ee.batch.Task]:
-    """Un ``Export.table.toDrive`` (CSV) por año, mismo FeatureCollection que la tabla local."""
+    """Un ``Export.table.toDrive`` (CSV) por año, mismas columnas que la tabla local."""
     ic_full = ee.ImageCollection(collection_id)
     tasks: list[ee.batch.Task] = []
     year_lookup = _distinct_year_lookup(ic_full)
 
-    selectors = ["predio_id", "year", "week", "month", "iso_week_start", "spatial_mean_week"]
+    selectors = sorted(
+        frozenset(["predio_id", "year", "week", "month", "iso_week_start"]) | frozenset(band_names)
+    )
 
     for yr in years:
         orig_y = year_lookup.get(int(yr), yr)
@@ -290,7 +335,7 @@ def enqueue_drive_weekly_zonal_csv_tasks(
         stem = f"{description_prefix}_weekly_zonal_{yr}"
 
         def _mapped_csv(im):
-            return fc_zonal_weekly_genius_like(ee.Image(im), fc_ee, band, scale_m)
+            return fc_zonal_weekly_multi_band(ee.Image(im), fc_ee, band_names, scale_m)
 
         merged = ee.FeatureCollection(col_y.map(_mapped_csv)).flatten()
         t = ee.batch.Export.table.toDrive(
@@ -310,7 +355,7 @@ def enqueue_drive_weekly_zonal_csv_tasks(
 def enqueue_yearly_median_raster_tasks_drive(
     collection_id: str,
     *,
-    band: str,
+    band_names: list[str],
     years: list[int],
     scale_m: float,
     clip_geom: ee.Geometry,
@@ -318,71 +363,81 @@ def enqueue_yearly_median_raster_tasks_drive(
     stem_prefix: str,
     quantize_divisor: float,
 ) -> list[ee.batch.Task]:
-    """Patrón ``yearly_median_raster_exports_from_yearmonth`` (genius NDVI yearly raster): median anual → int16_scaled → Drive."""
+    """Un GeoTIFF Drive por (año × banda): mediana anual → int16_scaled."""
     ic_full = ee.ImageCollection(collection_id)
     tasks: list[ee.batch.Task] = []
     year_lookup = _distinct_year_lookup(ic_full)
 
     for yr in sorted(years):
         orig_y = year_lookup.get(int(yr), yr)
-        median_img = (
-            ic_full.filter(ee.Filter.eq("year", orig_y))
-            .select(band)
-            .median()
-            .rename(band)
-            .clip(clip_geom)
-            .set({"year_export": yr})
-        )
-        out = int16_scaled_band(median_img, band, quantize_divisor)
-        stem = f"{stem_prefix}_{yr}"
-        t = ee.batch.Export.image.toDrive(
-            image=out,
-            description=stem,
-            folder=drive_folder,
-            fileNamePrefix=stem,
-            scale=scale_m,
-            region=clip_geom,
-            crs="EPSG:4326",
-            maxPixels=1e13,
-        )
-        t.start()
-        tasks.append(t)
+        for band in band_names:
+            median_img = (
+                ic_full.filter(ee.Filter.eq("year", orig_y))
+                .select(band)
+                .median()
+                .rename(band)
+                .clip(clip_geom)
+                .set({"year_export": yr, "band_export": band})
+            )
+            out = int16_scaled_band(median_img, band, quantize_divisor)
+            stem = f"{stem_prefix}_{yr}_{band}"
+            t = ee.batch.Export.image.toDrive(
+                image=out,
+                description=stem.replace(" ", "_")[:100],
+                folder=drive_folder,
+                fileNamePrefix=stem.replace(" ", "_"),
+                scale=scale_m,
+                region=clip_geom,
+                crs="EPSG:4326",
+                maxPixels=1e13,
+            )
+            t.start()
+            tasks.append(t)
 
     return tasks
 
 
-def annual_summary(df_weekly: pd.DataFrame) -> pd.DataFrame:
-    """Una fila/año: mediana, P25 y P75 entre predios (cada predio = mediana semanal del año)."""
-    if df_weekly.empty:
-        return pd.DataFrame(columns=["year", "median_across_predios", "p25_across_predios", "p75_across_predios"])
-    agg_p = df_weekly.groupby(["predio_id", "year"], as_index=False)["spatial_mean_week"].median()
-    out_rows = []
-    for y in sorted(agg_p["year"].unique()):
-        s = agg_p.loc[agg_p["year"] == y, "spatial_mean_week"].dropna()
-        if s.empty:
+def annual_summary(df_weekly: pd.DataFrame, value_cols: list[str]) -> pd.DataFrame:
+    """Una fila por (banda, año): mediana, P25 y P75 entre predios (cada predio = mediana semanal del año)."""
+    cols = ["band", "year", "median_across_predios", "p25_across_predios", "p75_across_predios"]
+    if df_weekly.empty or not value_cols:
+        return pd.DataFrame(columns=cols)
+    out_rows: list[dict] = []
+    for band_col in value_cols:
+        if band_col not in df_weekly.columns:
             continue
-        out_rows.append(
-            {
-                "year": int(y),
-                "median_across_predios": float(np.median(s)),
-                "p25_across_predios": float(np.percentile(s, 25)),
-                "p75_across_predios": float(np.percentile(s, 75)),
-            }
-        )
+        agg_p = df_weekly.groupby(["predio_id", "year"], as_index=False)[band_col].median()
+        for y in sorted(agg_p["year"].unique()):
+            s = agg_p.loc[agg_p["year"] == y, band_col].dropna()
+            if s.empty:
+                continue
+            out_rows.append(
+                {
+                    "band": band_col,
+                    "year": int(y),
+                    "median_across_predios": float(np.median(s)),
+                    "p25_across_predios": float(np.percentile(s, 25)),
+                    "p75_across_predios": float(np.percentile(s, 75)),
+                }
+            )
     return pd.DataFrame(out_rows)
 
 
-def monthly_summary(df_weekly: pd.DataFrame, current_calendar_year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+def monthly_summary(
+    df_weekly: pd.DataFrame, current_calendar_year: int, value_cols: list[str]
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Histórico: mediana pooled (predio×año×mes), años <= año completo anterior (curr-1).
 
     Actual: por mes del año calendar actual, media entre predios.
-    Devuelve (tabla ancha mensual, detalle predio×año×mes con ``monthly_agg``).
+    Devuelve (tabla ancha mensual con columna ``band``, detalle predio×año×mes×band con ``monthly_agg``).
     """
-    if df_weekly.empty:
+    base_cols = ["band", "month", "month_label", "historic_monthly_median", "current_year_monthly_mean"]
+    if df_weekly.empty or not value_cols:
         empty = pd.DataFrame(
             [
                 {
+                    "band": "",
                     "month": m,
                     "month_label": MONTH_NAMES_ES[m - 1],
                     "historic_monthly_median": float("nan"),
@@ -391,34 +446,54 @@ def monthly_summary(df_weekly: pd.DataFrame, current_calendar_year: int) -> tupl
                 for m in range(1, 13)
             ]
         )
-        return empty, empty
+        return empty, pd.DataFrame(columns=["predio_id", "year", "month", "band", "monthly_agg"])
 
-    dm = (
-        df_weekly.groupby(["predio_id", "year", "month"], as_index=False)["spatial_mean_week"]
-        .mean()
-        .rename(columns={"spatial_mean_week": "monthly_agg"})
-    )
+    parts_merged: list[pd.DataFrame] = []
+    dm_parts: list[pd.DataFrame] = []
 
-    last_complete_year = current_calendar_year - 1
-    hist_pool = dm[dm["year"] <= last_complete_year].copy()
-    curr = dm[dm["year"] == current_calendar_year].copy()
-
-    hm = []
-    cm = []
-    for m in range(1, 13):
-        hvals = hist_pool.loc[hist_pool["month"] == m, "monthly_agg"].dropna().values
-        hm.append({"month": m, "month_label": MONTH_NAMES_ES[m - 1], "historic_monthly_median": float(np.median(hvals)) if hvals.size else float("nan")})
-
-        cv = curr.loc[curr["month"] == m, "monthly_agg"].dropna().values
-        cm_mean = float(np.mean(cv)) if cv.size else float("nan")
-        cm.append(
-            {"month": m, "month_label": MONTH_NAMES_ES[m - 1], "current_year_monthly_mean": cm_mean}
+    for band_col in value_cols:
+        if band_col not in df_weekly.columns:
+            continue
+        dm = (
+            df_weekly.groupby(["predio_id", "year", "month"], as_index=False)[band_col]
+            .mean()
+            .rename(columns={band_col: "monthly_agg"})
         )
+        dm["band"] = band_col
 
-    df_h = pd.DataFrame(hm)
-    df_c = pd.DataFrame(cm)
-    merged = df_h.merge(df_c[["month", "current_year_monthly_mean"]], on="month")
-    return merged, dm
+        last_complete_year = current_calendar_year - 1
+        hist_pool = dm[dm["year"] <= last_complete_year].copy()
+        curr = dm[dm["year"] == current_calendar_year].copy()
+
+        hm = []
+        cm = []
+        for m in range(1, 13):
+            hvals = hist_pool.loc[hist_pool["month"] == m, "monthly_agg"].dropna().values
+            hm.append(
+                {
+                    "band": band_col,
+                    "month": m,
+                    "month_label": MONTH_NAMES_ES[m - 1],
+                    "historic_monthly_median": float(np.median(hvals)) if hvals.size else float("nan"),
+                }
+            )
+
+            cv = curr.loc[curr["month"] == m, "monthly_agg"].dropna().values
+            cm_mean = float(np.mean(cv)) if cv.size else float("nan")
+            cm.append({"month": m, "current_year_monthly_mean": cm_mean})
+
+        df_h = pd.DataFrame(hm)
+        df_c = pd.DataFrame(cm)
+        merged = df_h.merge(df_c, on="month")
+        parts_merged.append(merged)
+        dm_parts.append(dm)
+
+    if not parts_merged:
+        return pd.DataFrame(columns=base_cols), pd.DataFrame(columns=["predio_id", "year", "month", "band", "monthly_agg"])
+
+    monthly_wide = pd.concat(parts_merged, ignore_index=True)
+    dm_detail = pd.concat(dm_parts, ignore_index=True)
+    return monthly_wide, dm_detail
 
 
 def _json_safe(x):
@@ -440,11 +515,13 @@ def build_explorer_json_payload(
     portfolio_monthly: pd.DataFrame,
     current_calendar_year: int,
     last_complete_year: int,
-    band: str,
+    explorer_band: str,
     collection_id: str,
+    bands_in_weekly_table: list[str],
 ) -> dict:
-    """JSON para explorador HTML: Sentinel-2 por predio (`wetland_id` en minúsculas) + cartera."""
+    """JSON para explorador HTML: serie Sentinel-2 por predio + cartera (una banda ``explorer_band``)."""
     gen = datetime.now(timezone.utc).isoformat()
+    band = explorer_band
 
     portfolio_annual_rows = []
     if not portfolio_annual.empty:
@@ -487,8 +564,8 @@ def build_explorer_json_payload(
             )
 
     by_predio: dict = {}
-    if not df_week.empty:
-        apr = df_week.groupby(["predio_id", "year"], as_index=False)["spatial_mean_week"].median()
+    if not df_week.empty and band in df_week.columns:
+        apr = df_week.groupby(["predio_id", "year"], as_index=False)[band].median()
 
         predios = apr["predio_id"].astype(str).str.strip().unique()
         dm = dm_detail.copy() if not dm_detail.empty else pd.DataFrame()
@@ -504,13 +581,13 @@ def build_explorer_json_payload(
                 ann.append(
                     {
                         "year": yi,
-                        "median_weekly_ndvi_agg": _json_safe(r["spatial_mean_week"]),
+                        "median_weekly_zonal": _json_safe(r[band]),
                     }
                 )
 
             months_out = []
             for m in range(1, 13):
-                if dm.empty:
+                if dm.empty or "band" not in dm.columns:
                     months_out.append(
                         {
                             "month": m,
@@ -520,7 +597,10 @@ def build_explorer_json_payload(
                         }
                     )
                     continue
-                mask_p = dm["predio_id"].astype(str).str.strip() == raw_pid
+                mask_p = (
+                    (dm["predio_id"].astype(str).str.strip() == raw_pid)
+                    & (dm["band"].astype(str) == str(band))
+                )
                 yrs_hist = (dm["year"] <= last_complete_year) & (dm["month"] == m) & mask_p
                 vals = dm.loc[yrs_hist, "monthly_agg"].dropna().astype(float).values
                 hist_m = float(np.median(vals)) if vals.size else float("nan")
@@ -542,6 +622,7 @@ def build_explorer_json_payload(
         "schema": "fic-agro/s2-explorer-charts/1",
         "generated_at": gen,
         "band": band,
+        "bands_in_weekly_table": bands_in_weekly_table,
         "gee_collection_id": collection_id.strip().rstrip("/"),
         "current_calendar_year": current_calendar_year,
         "last_complete_year": last_complete_year,
@@ -564,6 +645,7 @@ def try_plot_series(
     out_dir: Path,
     *,
     current_calendar_year: int,
+    explorer_band: str,
 ) -> None:
     try:
         import matplotlib
@@ -574,40 +656,43 @@ def try_plot_series(
         print("matplotlib no instalado; omito PNG.", flush=True)
         return
 
+    da = df_annual[df_annual["band"] == explorer_band] if not df_annual.empty and "band" in df_annual.columns else df_annual
+    dm = df_monthly[df_monthly["band"] == explorer_band] if not df_monthly.empty and "band" in df_monthly.columns else df_monthly
+
     out_dir.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(10, 5))
-    if not df_annual.empty:
-        ax.plot(df_annual["year"], df_annual["median_across_predios"], color="#1f77b4", label="Mediana entre predios")
+    if not da.empty:
+        ax.plot(da["year"], da["median_across_predios"], color="#1f77b4", label="Mediana entre predios")
         ax.fill_between(
-            df_annual["year"],
-            df_annual["p25_across_predios"],
-            df_annual["p75_across_predios"],
+            da["year"],
+            da["p25_across_predios"],
+            da["p75_across_predios"],
             color="#aad4ff",
             alpha=0.6,
             label="P25–P75 entre predios",
         )
         ax.legend()
         ax.set_xlabel("Año")
-        ax.set_ylabel("NDVI (valor agregado)")
+        ax.set_ylabel(f"{explorer_band} (valor agregado)")
         ax.grid(True, linestyle=":")
-    ax.set_title("Serie anual: mediana anual por predio y P25-P75 entre predios")
-    png_a = out_dir / "serie_anual_distribucion_predios.png"
+    ax.set_title(f"Serie anual ({explorer_band}): mediana anual por predio y P25–P75 entre predios")
+    png_a = out_dir / f"serie_anual_distribucion_predios_{explorer_band}.png"
     fig.savefig(png_a, dpi=144, bbox_inches="tight")
     plt.close(fig)
 
     fig2, ax2 = plt.subplots(figsize=(10, 5))
-    if not df_monthly.empty and "historic_monthly_median" in df_monthly.columns:
-        mx = df_monthly["month"]
-        ax2.plot(mx, df_monthly["historic_monthly_median"], "--o", color="#7f7f7f", label=f"Histórico (medianas mes, ≤ año {current_calendar_year - 1})")
-        ax2.plot(mx, df_monthly["current_year_monthly_mean"], "-o", color="#d62728", label=f"Año actual ({current_calendar_year}), media entre predios")
+    if not dm.empty and "historic_monthly_median" in dm.columns:
+        mx = dm["month"]
+        ax2.plot(mx, dm["historic_monthly_median"], "--o", color="#7f7f7f", label=f"Histórico (medianas mes, ≤ año {current_calendar_year - 1})")
+        ax2.plot(mx, dm["current_year_monthly_mean"], "-o", color="#d62728", label=f"Año actual ({current_calendar_year}), media entre predios")
         ax2.set_xticks(mx)
-        ax2.set_xticklabels(df_monthly["month_label"])
+        ax2.set_xticklabels(dm["month_label"])
         ax2.legend()
         ax2.set_xlabel("Mes")
-        ax2.set_ylabel("NDVI (valor agregado)")
+        ax2.set_ylabel(f"{explorer_band} (valor agregado)")
         ax2.grid(True, linestyle=":")
-    ax2.set_title("Serie mensual: baseline vs año actual")
-    png_m = out_dir / "serie_mensual_historico_vs_actual.png"
+    ax2.set_title(f"Serie mensual ({explorer_band}): histórico vs año actual")
+    png_m = out_dir / f"serie_mensual_historico_vs_actual_{explorer_band}.png"
     fig2.savefig(png_m, dpi=144, bbox_inches="tight")
     plt.close(fig2)
 
@@ -634,7 +719,24 @@ def main() -> None:
         help="Leer todas las geometrías de **/**/*.shp bajo shapes-root en lugar de aoi.geojson.",
     )
     parser.add_argument("--exclude-predio", action="append", default=[], metavar="ID", help="Excluir predio_id del conjunto.")
-    parser.add_argument("--band", default=DEFAULT_BAND, metavar="NAM", help="Banda dentro de cada imagen (default NDVI).")
+    parser.add_argument(
+        "--bands",
+        default=None,
+        metavar="B1,B2,...",
+        help="Bandas separadas por comas. Si se omite junto con --band, se usan todas las bandNames() de la colección.",
+    )
+    parser.add_argument(
+        "--band",
+        default=None,
+        metavar="NAM",
+        help="Una sola banda (compatibilidad). Equivale a --bands NAM.",
+    )
+    parser.add_argument(
+        "--explorer-chart-band",
+        default=None,
+        metavar="NAM",
+        help="Banda para JSON del explorador y PNG (default: NDVI si está en la tabla, si no la primera alfabética).",
+    )
     parser.add_argument("--scale", type=float, default=10.0, help="Escala metros reduceRegions.")
     parser.add_argument(
         "--start-year",
@@ -686,7 +788,7 @@ def main() -> None:
         "--drive-yearly-raster-folder",
         default=None,
         metavar="CARPETA",
-        help="Carpeta en Google Drive: mediana anual de la banda por pixel, GeoTIFF int16/divisor como NDVI_Yearly (Genius).",
+        help="Carpeta en Google Drive: mediana anual por banda y año (un GeoTIFF por banda×año), int16/divisor.",
     )
     parser.add_argument(
         "--drive-yearly-raster-stem-prefix",
@@ -717,7 +819,31 @@ def main() -> None:
     if gdf_plain.empty:
         raise SystemExit("No quedaron polígonos tras filtros (--exclude-predio).")
 
-    ic = ee.ImageCollection(args.collection.strip().rstrip("/"))
+    coll_id = args.collection.strip().rstrip("/")
+    available_bands = discover_collection_band_names(coll_id)
+    requested = resolve_band_names(coll_id, args.bands, args.band)
+    missing_req = [b for b in requested if b not in available_bands]
+    band_names = [b for b in requested if b in available_bands]
+    if missing_req:
+        print(f"Advertencia: bandas no presentes en la colección (omitidas): {missing_req}", flush=True)
+    if not band_names:
+        raise SystemExit(
+            "Ninguna banda válida: revisa --bands / --band frente a bandNames() de la primera imagen de la colección."
+        )
+
+    explorer_chart = (args.explorer_chart_band or "").strip() or None
+    if explorer_chart is None or explorer_chart not in band_names:
+        explorer_band = DEFAULT_BAND if DEFAULT_BAND in band_names else sorted(band_names)[0]
+        if explorer_chart is not None and explorer_chart not in band_names:
+            print(
+                f"Advertencia: --explorer-chart-band={explorer_chart!r} no está en las bandas procesadas; "
+                f"uso {explorer_band!r} para JSON/PNG.",
+                flush=True,
+            )
+    else:
+        explorer_band = explorer_chart
+
+    ic = ee.ImageCollection(coll_id)
     ylist_raw = ic.limit(50000).aggregate_array("year").distinct().getInfo()
     if not ylist_raw:
         raise SystemExit(f"Colección vacía o sin propiedad «year»: {args.collection}")
@@ -732,16 +858,23 @@ def main() -> None:
     print(f"Proyecto EE: {init_project}", flush=True)
     print(f"Colección: {args.collection}", flush=True)
     print(f"Predios: {list(gdf_plain['predio_id'])} ({len(gdf_plain)} geometrías)", flush=True)
-    print(f"Banda: {args.band} | años: {ymin}–{ymax} ({len(years)})", flush=True)
-    print("Descargando medias zonales (un getInfo grande por año, reduceRegions tipo NDVI Genius)...", flush=True)
+    print(f"Bandas ({len(band_names)}): {band_names}", flush=True)
+    print(f"JSON/gráficos usan la banda: {explorer_band}", flush=True)
+    print(f"Años: {ymin}–{ymax} ({len(years)})", flush=True)
+    print("Descargando medias zonales (un getInfo grande por año, reduceRegions sobre todas las bandas)...", flush=True)
 
-    coll_id = args.collection.strip().rstrip("/")
-    df_week = collect_weekly_table(coll_id, ee_fc, band=args.band, years=years, scale_m=float(args.scale))
+    df_week = collect_weekly_table(
+        coll_id, ee_fc, band_names=band_names, years=years, scale_m=float(args.scale)
+    )
     if df_week.empty:
-        print("Sin filas tabuladas: revisá banda, colección u años disponibles.", file=sys.stderr)
+        print("Sin filas tabuladas: revisá bandas, colección u años disponibles.", file=sys.stderr)
 
-    df_y = annual_summary(df_week)
-    df_month, dm_detail = monthly_summary(df_week, current_calendar_year=cy)
+    value_cols = [b for b in band_names if b in df_week.columns]
+    if not df_week.empty:
+        df_week = reorder_weekly_dataframe_columns(df_week, band_names)
+
+    df_y = annual_summary(df_week, value_cols)
+    df_month, dm_detail = monthly_summary(df_week, current_calendar_year=cy, value_cols=value_cols)
 
     out_dir = (args.output_dir or Path("data_processed/s2_shapes_stats")).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -774,7 +907,7 @@ def main() -> None:
         t_csv = enqueue_drive_weekly_zonal_csv_tasks(
             coll_id,
             ee_fc,
-            band=args.band,
+            band_names=band_names,
             years=years,
             scale_m=float(args.scale),
             drive_folder=folder,
@@ -787,7 +920,7 @@ def main() -> None:
         r_stem = str(args.drive_yearly_raster_stem_prefix).strip() or "S2_Yearly_median"
         t_r = enqueue_yearly_median_raster_tasks_drive(
             coll_id,
-            band=args.band,
+            band_names=band_names,
             years=years,
             scale_m=float(args.scale),
             clip_geom=geom_union,
@@ -798,19 +931,22 @@ def main() -> None:
         print(f"Tareas Export.image raster anual (Drive carpeta '{r_folder}'): {len(t_r)}", flush=True)
 
     if not args.no_plots:
-        try_plot_series(df_y, df_month, out_dir, current_calendar_year=cy)
+        try_plot_series(df_y, df_month, out_dir, current_calendar_year=cy, explorer_band=explorer_band)
 
     lc = cy - 1
     if not args.no_explorer_json:
+        df_y_e = df_y[df_y["band"] == explorer_band].drop(columns=["band"], errors="ignore") if not df_y.empty else df_y
+        df_m_e = df_month[df_month["band"] == explorer_band].drop(columns=["band"], errors="ignore") if not df_month.empty else df_month
         payload = build_explorer_json_payload(
             df_week=df_week,
             dm_detail=dm_detail,
-            portfolio_annual=df_y,
-            portfolio_monthly=df_month,
+            portfolio_annual=df_y_e,
+            portfolio_monthly=df_m_e,
             current_calendar_year=cy,
             last_complete_year=lc,
-            band=str(args.band),
+            explorer_band=explorer_band,
             collection_id=str(args.collection).strip().rstrip("/"),
+            bands_in_weekly_table=value_cols,
         )
         ej = args.explorer_json_out.resolve()
         ej.parent.mkdir(parents=True, exist_ok=True)
@@ -820,11 +956,15 @@ def main() -> None:
 
     print("\nInterpretación rápida:", flush=True)
     print(
-        " • Anual: por predio, mediana de semanas dentro del año; CSV = estadísticos entre predios (medianas + P25/P75). Solo años cerrados pasan al JSON explorador.",
+        " • Semanal: una columna por banda de la colección (más metadatos de semana y columnas extra del GeoJSON).",
         flush=True,
     )
     print(
-        f" • Mensual histórico: mediana pooled (predio/año mes) sólo años ≤ {cy - 1}; actual {cy}: media entre predios por mes.",
+        " • Anual/mensual: columna «band»; por predio, mediana de semanas dentro del año; CSV de cartera = estadísticos entre predios. Solo años cerrados pasan al JSON explorador.",
+        flush=True,
+    )
+    print(
+        f" • Mensual histórico: mediana pooled (predio/año/mes/banda) sólo años ≤ {cy - 1}; actual {cy}: media entre predios por mes.",
         flush=True,
     )
 
