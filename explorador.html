@@ -113,7 +113,7 @@
             align-items: stretch;
             justify-content: flex-start;
             width: 100%;
-            padding: 0 0 0.5rem;
+            padding: 0 0 0.38rem;
         }
         .fic-panel-brand__pill {
             display: flex;
@@ -210,10 +210,10 @@
             min-height: 0;
             overflow-y: auto;
             overflow-x: hidden;
-            padding: 2px 4px 10px 2px;
+            padding: 0 2px 8px;
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 0.5rem;
             -webkit-overflow-scrolling: touch;
         }
         .fic-side-panel__scroll::-webkit-scrollbar { width: 6px; }
@@ -224,21 +224,21 @@
         .fic-panel-block {
             background: rgba(255, 255, 255, 0.72);
             border: 1px solid rgba(255, 255, 255, 0.85);
-            border-radius: 20px;
-            padding: 1.05rem 1.05rem 1.1rem;
+            border-radius: 18px;
+            padding: 0.95rem 0.95rem 1rem;
             box-shadow:
                 0 2px 20px rgba(18, 42, 28, 0.05),
                 inset 0 1px 0 rgba(255, 255, 255, 0.9);
         }
-        .fic-panel-block--tight { padding: 0.95rem 0.95rem 1rem; }
+        .fic-panel-block--tight { padding: 0.78rem 0.85rem 0.88rem; }
         .fic-dock-nav {
             display: flex;
             flex-wrap: wrap;
             align-items: center;
-            gap: 8px 10px;
-            margin-bottom: 0.65rem;
-            padding-bottom: 0.7rem;
-            border-bottom: 1px solid rgba(29, 107, 74, 0.08);
+            gap: 6px 8px;
+            margin-bottom: 0.45rem;
+            padding-bottom: 0.55rem;
+            border-bottom: 1px solid rgba(29, 107, 74, 0.07);
         }
         .fic-hier-badge-wrap { font-size: 0.88rem; color: var(--fic-ag-muted); }
         .fic-hier-badge-wrap strong { color: var(--fic-ag-ink); font-weight: 700; }
@@ -275,15 +275,14 @@
             color: var(--fic-ag-dark);
         }
 
-        /* Flujo panel: ámbito → origen imagen → capa; la caja sat/dron sigue al selector de predio */
-        .fic-sbar-section-head--panel-flow {
-            margin-top: 0.85rem;
+        .fic-sidebar-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-top: 0.4rem;
         }
         .fic-sidebar-block + .fic-panel-map-source-box {
-            margin-top: 0.55rem;
-        }
-        .fic-panel-map-source-box + .fic-sbar-section-head {
-            margin-top: 0.7rem;
+            margin-top: 0;
         }
         .fic-panel-map-source-box {
             margin: 0;
@@ -292,33 +291,25 @@
         .fic-panel-map-source-box__inner {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            padding: 10px 12px;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.92);
-            border: 1px solid rgba(29, 107, 74, 0.14);
-            box-shadow: 0 2px 14px rgba(18, 42, 28, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+            gap: 0.5rem;
+            padding: 7px 9px 7px 10px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.94);
+            border: 1px solid rgba(29, 107, 74, 0.11);
+            box-shadow: 0 1px 10px rgba(18, 42, 28, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.92);
         }
         .fic-panel-map-source-box__text {
             flex: 1;
             min-width: 0;
-            display: flex;
-            flex-direction: column;
-            gap: 0.15rem;
         }
         .fic-panel-map-source-box__title {
             font-family: 'Outfit', sans-serif;
-            font-size: 0.82rem;
-            font-weight: 800;
-            letter-spacing: -0.02em;
-            line-height: 1.2;
-            color: var(--fic-ag-dark);
-        }
-        .fic-panel-map-source-box__sub {
-            font-size: 0.74rem;
-            font-weight: 600;
-            line-height: 1.3;
-            color: var(--fic-ag-muted);
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: rgba(26, 32, 24, 0.52);
+            line-height: 1.25;
         }
         .fic-source-pills--sidebar-icons {
             display: flex;
@@ -333,9 +324,9 @@
         }
         .fic-source-pills--sidebar-icons > .fic-source-pill {
             flex: 0 0 auto;
-            width: 52px;
-            height: 52px;
-            min-width: 52px;
+            width: 48px;
+            height: 48px;
+            min-width: 48px;
             padding: 0;
             border-radius: 50%;
             display: inline-flex;
@@ -367,8 +358,8 @@
         }
         .fic-source-pills--sidebar-icons .fic-src-img {
             display: block;
-            width: 30px;
-            height: 30px;
+            width: 28px;
+            height: 28px;
             object-fit: contain;
             pointer-events: none;
             user-select: none;
@@ -427,22 +418,21 @@
         }
 
         .helper { font-size: 0.9rem; color: var(--fic-ag-muted); line-height: 1.45; margin-bottom: 0.65rem; }
-        .fic-sidebar-block { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.7rem; }
-        .fic-sidebar-block:first-of-type { margin-top: 0; }
+        .fic-sidebar-block { display: flex; flex-direction: column; gap: 0.28rem; margin-top: 0; }
         .selector-label {
-            font-size: 0.72rem;
+            font-size: 0.68rem;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.07em;
+            letter-spacing: 0.065em;
             color: var(--fic-ag-muted);
         }
         .fic-sidebar-block select {
-            padding: 0.55rem 0.7rem;
-            border-radius: 12px;
+            padding: 0.48rem 0.62rem;
+            border-radius: 11px;
             border: none;
             background: rgba(255, 255, 255, 0.9);
             color: var(--fic-ag-ink);
-            font-size: 0.94rem;
+            font-size: 0.9rem;
             width: 100%;
             font-weight: 600;
             font-family: inherit;
@@ -455,10 +445,10 @@
             box-shadow: 0 0 0 3px rgba(45, 157, 110, 0.28), 0 2px 12px rgba(18, 42, 28, 0.08);
         }
         .fic-layer-hint {
-            font-size: 0.82rem;
+            font-size: 0.78rem;
             color: var(--fic-ag-muted);
-            margin-top: 0.45rem;
-            line-height: 1.4;
+            margin-top: 0.2rem;
+            line-height: 1.35;
         }
         .fic-panel-error { font-size: 0.86rem; color: #7a1e1e; line-height: 1.4; }
 
@@ -494,36 +484,31 @@
             text-align: center;
         }
 
-        /* === Sidebar: secciones (ámbito, vista, escala temporal) =================== */
-        .fic-sbar-section-head {
-            margin: 0.35rem 0 0.45rem;
+        .fic-panel-help-tip {
+            margin: 0.15rem 0 0;
+            font-size: 0.76rem;
+            line-height: 1.38;
+            color: rgba(26, 32, 24, 0.58);
         }
-        .fic-sat-temporal-block {
-            margin-top: 0.75rem;
-            padding-top: 0.35rem;
-            border-top: 1px solid rgba(29, 107, 74, 0.08);
-        }
-        .fic-sat-temporal-block > .fic-sbar-section-head:first-child {
-            margin-top: 0;
-        }
-        .fic-panel-help-tip.helper {
-            margin: 0.55rem 0 0;
-            font-size: 0.82rem;
-            line-height: 1.42;
-        }
-        .fic-sbar-section-heading {
+        .fic-sidebar-group__eyebrow {
+            display: block;
             font-family: 'Outfit', sans-serif;
-            font-size: 0.78rem;
+            font-size: 0.66rem;
             font-weight: 700;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.08em;
             text-transform: uppercase;
-            color: rgba(26, 32, 24, 0.62);
-            margin: 0;
+            color: rgba(26, 32, 24, 0.48);
+            margin: 0 0 0.32rem 1px;
+        }
+        .fic-sidebar-group--split {
+            padding-top: 0.45rem;
+            margin-top: 0.05rem;
+            border-top: 1px solid rgba(29, 107, 74, 0.07);
         }
         .fic-temporal-scale-band__mount {
             box-sizing: border-box;
             width: 100%;
-            padding: 0.5rem 0.44rem 0.55rem;
+            padding: 0.42rem 0.38rem 0.48rem;
             background: rgba(255, 255, 255, 0.82);
             border-radius: 14px;
             border: 1px solid rgba(29, 107, 74, 0.12);
@@ -541,7 +526,7 @@
         }
         .fic-sat-mode-pills--sidebar .fic-sat-mode-pill {
             width: 100%;
-            min-height: 38px;
+            min-height: 34px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1338,7 +1323,7 @@
 </head>
 <body class="fic-explorer">
 <div class="fic-app">
-<aside class="fic-side-panel" aria-label="Controles del mapa: ámbito, origen de imagen, capa y tiempo">
+<aside class="fic-side-panel" aria-label="Controles del mapa">
     <header class="fic-panel-brand" id="ficTopbar" role="banner">
         <div class="fic-panel-brand__pill">
             <div class="fic-brand" title="Monitoreo Agricola — TeleAmb UPLA">
@@ -1360,53 +1345,47 @@
             <p class="fic-ctx-hint" id="ficHierarchyContextHint" role="status" hidden></p>
             <p class="fic-panel-error" id="ficLoadHint" role="alert" hidden></p>
 
-            <div class="fic-sbar-section-head fic-sbar-section-head--panel-flow">
-                <h3 class="fic-sbar-section-heading" id="ficPanelScopeHeading">Ámbito</h3>
-            </div>
-            <div class="fic-sidebar-block">
-                <label class="selector-label" for="globalWetland">Predio</label>
-                <select id="globalWetland"></select>
-            </div>
-
-            <div class="fic-panel-map-source-box" id="ficSourcePillsWrap" hidden>
-                <div class="fic-panel-map-source-box__inner">
-                    <div class="fic-panel-map-source-box__text">
-                        <span class="fic-panel-map-source-box__title">Origen de la imagen</span>
-                        <span class="fic-panel-map-source-box__sub">Satélite u ortofoto del dron en el mapa</span>
-                    </div>
-                    <div class="fic-source-pills fic-source-pills--sidebar-icons" id="ficSidebarSourcePillsRow" role="group" aria-label="Elegí si el mapa muestra imágenes de satélite o de dron">
-                        <button type="button" class="fic-source-pill fic-source-pill--active" id="ficPillSatellite" aria-pressed="true" title="Ver imágenes de satélite" aria-label="Satélite: imágenes de satélite en el mapa">
-                            <img class="fic-src-img" src="assets/img/satelite.png" alt="" width="64" height="64" decoding="async" loading="lazy">
-                        </button>
-                        <button type="button" class="fic-source-pill" id="ficPillDrone" aria-pressed="false" title="Ver ortofotos del dron" aria-label="Dron: ortofotos y vuelos en el mapa">
-                            <img class="fic-src-img" src="assets/img/dron.png" alt="" width="64" height="64" decoding="async" loading="lazy">
-                        </button>
-                    </div>
+            <div class="fic-sidebar-stack">
+                <div class="fic-sidebar-block">
+                    <label class="selector-label" for="globalWetland">Predio</label>
+                    <select id="globalWetland"></select>
                 </div>
-            </div>
 
-            <div class="fic-sbar-section-head">
-                <h3 class="fic-sbar-section-heading" id="ficPanelMapViewHeading">Vista en el mapa</h3>
-            </div>
-            <div class="fic-sidebar-block">
-                <label class="selector-label" for="mapIndex">Capa (índice o vista)</label>
-                <select id="mapIndex" title="Elegir capa: RGB, NDVI, NDWI…"></select>
-            </div>
-            <p class="fic-layer-hint" id="ficLayerPillHint"></p>
-            <p class="helper fic-panel-help-tip" id="ficPredioHelper">Elegí predio y capa. Si tenés satélite y vuelos de dron, usá <strong>Origen de la imagen</strong> (arriba) para alternar. La fecha es la <strong>última imagen disponible</strong> para esa combinación.</p>
-
-            <!-- Comparativa satelital: tras capa, elegir agregación temporal (mensual / semanal) -->
-            <div class="fic-sat-temporal-block" id="ficSatTemporalBlock" hidden>
-                <div class="fic-sbar-section-head">
-                    <h3 class="fic-sbar-section-heading">Escala temporal</h3>
-                </div>
-                <div class="fic-temporal-scale-band__mount" aria-label="Modo temporal del comparador">
-                    <div class="fic-sat-mode-pills fic-sat-mode-pills--sidebar" role="group" aria-label="Modo temporal">
-                        <div class="fic-sat-mode-pill-col">
-                            <button type="button" class="fic-sat-mode-pill fic-sat-mode-pill--active" data-satmode="monthly">Mensual</button>
+                <div class="fic-panel-map-source-box" id="ficSourcePillsWrap" hidden>
+                    <div class="fic-panel-map-source-box__inner">
+                        <div class="fic-panel-map-source-box__text">
+                            <span class="fic-panel-map-source-box__title">Origen</span>
                         </div>
-                        <div class="fic-sat-mode-pill-col">
-                            <button type="button" class="fic-sat-mode-pill" data-satmode="weekly">Semanal</button>
+                        <div class="fic-source-pills fic-source-pills--sidebar-icons" id="ficSidebarSourcePillsRow" role="group" aria-label="Elegí si el mapa muestra imágenes de satélite o de dron">
+                            <button type="button" class="fic-source-pill fic-source-pill--active" id="ficPillSatellite" aria-pressed="true" title="Ver imágenes de satélite" aria-label="Satélite: imágenes de satélite en el mapa">
+                                <img class="fic-src-img" src="assets/img/satelite.png" alt="" width="64" height="64" decoding="async" loading="lazy">
+                            </button>
+                            <button type="button" class="fic-source-pill" id="ficPillDrone" aria-pressed="false" title="Ver ortofotos del dron" aria-label="Dron: ortofotos y vuelos en el mapa">
+                                <img class="fic-src-img" src="assets/img/dron.png" alt="" width="64" height="64" decoding="async" loading="lazy">
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="fic-sidebar-block">
+                        <label class="selector-label" for="mapIndex">Capa</label>
+                        <select id="mapIndex" title="Capa en el mapa: RGB, NDVI, NDWI…"></select>
+                    </div>
+                    <p class="fic-layer-hint" id="ficLayerPillHint"></p>
+                    <p class="fic-panel-help-tip" id="ficPredioHelper">Elegí predio y capa. Con satélite y dron cargados, alterná con <strong>Origen</strong>. Fecha = última imagen disponible.</p>
+                </div>
+
+                <div class="fic-sidebar-group--split" id="ficSatTemporalBlock" hidden>
+                    <span class="fic-sidebar-group__eyebrow">Comparador</span>
+                    <div class="fic-temporal-scale-band__mount" aria-label="Modo temporal del comparador">
+                        <div class="fic-sat-mode-pills fic-sat-mode-pills--sidebar" role="group" aria-label="Modo temporal">
+                            <div class="fic-sat-mode-pill-col">
+                                <button type="button" class="fic-sat-mode-pill fic-sat-mode-pill--active" data-satmode="monthly">Mensual</button>
+                            </div>
+                            <div class="fic-sat-mode-pill-col">
+                                <button type="button" class="fic-sat-mode-pill" data-satmode="weekly">Semanal</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1848,7 +1827,7 @@ function updatePredioSidebarCopy() {
     if (usesAgricultorNamesInPredioSelect()) {
         if (helper) {
             helper.innerHTML =
-                'Elegí agricultor o predio y la capa. Al pasar el cursor sobre cada nombre verás el código de predio. Con satélite publicado, <strong>Origen de la imagen</strong> (entre ámbito y capa) alterna satélite y dron si hay vuelos en tu contexto. La fecha es la última imagen disponible para esa combinación.';
+                'Agricultor o predio y capa. Código de predio en el tooltip. Con satélite y dron, alterná con <strong>Origen</strong>. Última imagen disponible por combinación.';
         }
         if (lab) lab.textContent = 'Agricultor / predio';
         if (sel) {
@@ -1858,7 +1837,7 @@ function updatePredioSidebarCopy() {
     } else {
         if (helper) {
             helper.innerHTML =
-                'Elegí predio y capa. Con satélite publicado y vuelos de dron cargados, <strong>Origen de la imagen</strong> (entre ámbito y capa) alterna satélite y dron. La fecha mostrada es la <strong>última imagen disponible</strong> para esa combinación.';
+                'Predio y capa. Con satélite y dron cargados, alterná con <strong>Origen</strong>. Fecha = última imagen disponible.';
         }
         if (lab) lab.textContent = 'Predio';
         if (sel) sel.title = 'Código de predio (G1, G2, NOG…)';
