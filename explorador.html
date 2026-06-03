@@ -63,6 +63,27 @@
             height: 100%;
             background: #0d120f;
         }
+        #las3dView {
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+            display: none;
+            background: #0d120f;
+        }
+        #las3dView:not([hidden]) { display: block; }
+        #las3dCanvas { width: 100%; height: 100%; display: block; cursor: grab; }
+        #las3dCanvas:active { cursor: grabbing; }
+        .las3d-hint {
+            position: absolute;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.75);
+            font-size: 0.85rem;
+            z-index: 3;
+            pointer-events: none;
+        }
+        body.fic-mode-lidar-3d .fic-map-hud { pointer-events: none; }
         .fic-explorer .leaflet-container { background: #0d120f; font-family: inherit; border-radius: 0; }
         /* Zoom y controles: esquina del mapa (no del panel) */
         .fic-explorer .leaflet-control-zoom { border: none !important; box-shadow: 0 6px 24px rgba(0,0,0,.14) !important; border-radius: 14px !important; overflow: hidden; }
@@ -512,11 +533,19 @@
                 <select id="mapIndex" title="Elegir capa: RGB, NDVI, NDWI…"></select>
             </div>
             <p class="fic-layer-hint" id="ficLayerPillHint"></p>
+            <div class="fic-sidebar-block" id="ficLidarAttrFields" hidden>
+                <label class="selector-label" for="ficLidarAttr">Atributo LiDAR</label>
+                <select id="ficLidarAttr" title="Colorizar nube de puntos"></select>
+            </div>
         </div>
     </div>
 </aside>
 
 <div class="fic-map-stage">
+    <div id="las3dView" hidden>
+        <canvas id="las3dCanvas" aria-label="Vista 3D LiDAR"></canvas>
+        <p class="las3d-hint">Arrastra para rotar · rueda para zoom · clic derecho para desplazar</p>
+    </div>
     <div id="mapa" role="application" aria-label="Mapa interactivo"></div>
     <div class="fic-map-hud" aria-hidden="true">
         <div class="map-note" id="mapNote">Cargando mapa…</div>
@@ -548,6 +577,9 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="assets/js/fic_lidar3d.js"></script>
 <script>
 /** Carpeta URL de esta página (p. ej. ``/`` o ``/fic_agro/``) para resolver ``data_static/`` bien con Live Server o http.server desde distintas rutas. */
 function ficPageDirPrefix() {
@@ -663,6 +695,7 @@ const state = {
     hierarchyLevel: null,
     mapLayerKind: 'rgb',
     mapPeriodKey: null,
+    lidarAttribute: 'canopy',
     ficDbByPredio: {}
 };
 
@@ -1230,6 +1263,10 @@ async function loadManifest() {
     await loadWetlandsAoiGeojson();
     await loadFicDatabaseCsv();
     await ensureDroneDatasetLoaded();
+    if (window.FicLidar3d) {
+        FicLidar3d.bind(state, BASE);
+        FicLidar3d.populateLidarAttrSelect();
+    }
 
     try {
         const keys = Object.keys(state.manifest.sources || {});
@@ -1331,6 +1368,20 @@ function refreshMapLayerState() {
         opt.textContent = indices[key].label || key.toUpperCase();
         mapIndexSel.appendChild(opt);
     });
+    var dmeta = state.metadata.drone || {};
+    if (state.selectedSource === 'drone' && dmeta.pointclouds && Object.keys(dmeta.pointclouds).length) {
+        if (idxKeys.indexOf('lidar') < 0) {
+            var lidarOpt = document.createElement('option');
+            lidarOpt.value = 'lidar';
+            lidarOpt.textContent = 'LiDAR (3D)';
+            mapIndexSel.appendChild(lidarOpt);
+        }
+    }
+    if (window.FicLidar3d) {
+        FicLidar3d.populateLidarAttrSelect();
+        var lidarWrap = document.getElementById('ficLidarAttrFields');
+        if (lidarWrap) lidarWrap.hidden = state.mapLayerKind !== 'lidar';
+    }
     if (!idxKeys.length) {
         state.mapLayerKind = 'ndvi';
         state.mapPeriodKey = null;
@@ -1349,7 +1400,23 @@ function refreshMapLayerState() {
         mapIndexSelectBound = true;
         mapIndexSel.addEventListener('change', function () {
             state.mapLayerKind = mapIndexSel.value;
-            if (state.selectedWetland) {
+            var lidarWrap = document.getElementById('ficLidarAttrFields');
+            if (lidarWrap) lidarWrap.hidden = state.mapLayerKind !== 'lidar';
+            if (state.mapLayerKind === 'lidar' && state.selectedSource === 'drone') {
+                var lasPeriods = (state.metadata.drone && state.metadata.drone.las_available_periods) || [];
+                if (lasPeriods.length && state.selectedWetland) {
+                    state.mapPeriodKey = findLatestPeriodKey(state.selectedWetland, 'rgb') || lasPeriods[lasPeriods.length - 1];
+                    var pk = state.selectedWetland + '_' + state.mapPeriodKey;
+                    if (state.metadata.drone.pointclouds && !state.metadata.drone.pointclouds[pk]) {
+                        for (var li = lasPeriods.length - 1; li >= 0; li--) {
+                            if (state.metadata.drone.pointclouds[state.selectedWetland + '_' + lasPeriods[li]]) {
+                                state.mapPeriodKey = lasPeriods[li];
+                                break;
+                            }
+                        }
+                    }
+                }
+            } else if (state.selectedWetland) {
                 state.mapPeriodKey = findLatestPeriodKey(state.selectedWetland, state.mapLayerKind);
             } else {
                 state.mapPeriodKey = null;
@@ -1446,6 +1513,11 @@ function renderAOI() {
 function updateMapOverlay() {
     if (!mapa) return;
     if (rasterOverlay) { mapa.removeLayer(rasterOverlay); rasterOverlay = null; }
+    if (window.FicLidar3d && state.mapLayerKind === 'lidar' && state.selectedSource === 'drone') {
+        FicLidar3d.updateView();
+        return;
+    }
+    if (window.FicLidar3d) FicLidar3d.showView(false);
     const note = document.getElementById('mapNote');
     const colorbar = document.getElementById('colorbarBox');
     colorbar.style.display = 'none';
@@ -1538,10 +1610,12 @@ function wetlandPredioSelectOptionTitle(wetlandId) {
 function predioCodeLabel(wetlandId) {
     const w = String(wetlandId || '').toLowerCase();
     if (w === 'nog') return 'NOG';
+    if (w === 'rci') return 'RCI';
+    if (w === 'rpa') return 'RPA';
     const gm = /^g(\d+)$/.exec(w);
     if (gm) return 'G' + gm[1];
     if (w === 'lote_demo') return 'Demo';
-    return String(wetlandId);
+    return String(wetlandId).toUpperCase();
 }
 
 /** Leaflet espera ``[[south, west], [north, east]]`` en grados. Rechaza bounds antiguos en metros (CRS proyectado). */

@@ -15,6 +15,7 @@ server.err
 dl_log.txt
 crash.txt
 download_log.txt
+export_drone_log.txt
 
 # IDE / agent
 .idea/
@@ -23,8 +24,6 @@ download_log.txt
 *.swp
 *.swo
 
-# Drone GeoTIFF (muy pesados; regenerables desde fuentes locales)
-data/drone/**/*.tif
-data/drone/**/*.tiff
-data/drone/**/*.TIF
-data/drone/**/*.TIFF
+# Locks de geodatabases en uso
+**/*.sr.lock
+**/*.gdbtable.lock

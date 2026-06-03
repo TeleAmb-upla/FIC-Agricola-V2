@@ -38,6 +38,16 @@
             "annual_summary": [],
             "trend": null
           }
+        },
+        "thermal": {
+          "points": [],
+          "metrics": {
+            "latest": null,
+            "historical_mean": null,
+            "seasonal_means": {},
+            "annual_summary": [],
+            "trend": null
+          }
         }
       }
     },
@@ -121,6 +131,16 @@
           }
         },
         "rgb": {
+          "points": [],
+          "metrics": {
+            "latest": null,
+            "historical_mean": null,
+            "seasonal_means": {},
+            "annual_summary": [],
+            "trend": null
+          }
+        },
+        "thermal": {
           "points": [],
           "metrics": {
             "latest": null,
@@ -220,6 +240,16 @@
             "annual_summary": [],
             "trend": null
           }
+        },
+        "thermal": {
+          "points": [],
+          "metrics": {
+            "latest": null,
+            "historical_mean": null,
+            "seasonal_means": {},
+            "annual_summary": [],
+            "trend": null
+          }
         }
       }
     },
@@ -303,6 +333,16 @@
           }
         },
         "rgb": {
+          "points": [],
+          "metrics": {
+            "latest": null,
+            "historical_mean": null,
+            "seasonal_means": {},
+            "annual_summary": [],
+            "trend": null
+          }
+        },
+        "thermal": {
           "points": [],
           "metrics": {
             "latest": null,
@@ -402,6 +442,16 @@
             "annual_summary": [],
             "trend": null
           }
+        },
+        "thermal": {
+          "points": [],
+          "metrics": {
+            "latest": null,
+            "historical_mean": null,
+            "seasonal_means": {},
+            "annual_summary": [],
+            "trend": null
+          }
         }
       }
     },
@@ -447,44 +497,26 @@
           }
         },
         "ndwi": {
-          "points": [
-            {
-              "date": "2026-01-21",
-              "label": "21 Jan 2026",
-              "year": 2026,
-              "season_key": "vuelo",
-              "season_label": "21 Jan 2026",
-              "period_key": "20260121",
-              "value": -0.0391
-            }
-          ],
+          "points": [],
           "metrics": {
-            "latest": {
-              "date": "2026-01-21",
-              "label": "21 Jan 2026",
-              "year": 2026,
-              "season_key": "vuelo",
-              "season_label": "21 Jan 2026",
-              "value": -0.0391,
-              "historical_mean": -0.0391,
-              "historical_anomaly_abs": 0.0,
-              "historical_anomaly_pct": 0.0,
-              "seasonal_mean": -0.0391,
-              "seasonal_anomaly_abs": 0.0,
-              "seasonal_anomaly_pct": 0.0
-            },
-            "historical_mean": -0.0391,
-            "seasonal_means": {
-              "vuelo": {
-                "label": "21 Jan 2026",
-                "mean": -0.0391
-              }
-            },
+            "latest": null,
+            "historical_mean": null,
+            "seasonal_means": {},
             "annual_summary": [],
             "trend": null
           }
         },
         "rgb": {
+          "points": [],
+          "metrics": {
+            "latest": null,
+            "historical_mean": null,
+            "seasonal_means": {},
+            "annual_summary": [],
+            "trend": null
+          }
+        },
+        "thermal": {
           "points": [],
           "metrics": {
             "latest": null,
@@ -584,6 +616,16 @@
             "annual_summary": [],
             "trend": null
           }
+        },
+        "thermal": {
+          "points": [],
+          "metrics": {
+            "latest": null,
+            "historical_mean": null,
+            "seasonal_means": {},
+            "annual_summary": [],
+            "trend": null
+          }
         }
       }
     },
@@ -667,6 +709,106 @@
           }
         },
         "rgb": {
+          "points": [],
+          "metrics": {
+            "latest": null,
+            "historical_mean": null,
+            "seasonal_means": {},
+            "annual_summary": [],
+            "trend": null
+          }
+        },
+        "thermal": {
+          "points": [],
+          "metrics": {
+            "latest": null,
+            "historical_mean": null,
+            "seasonal_means": {},
+            "annual_summary": [],
+            "trend": null
+          }
+        }
+      }
+    },
+    "rci": {
+      "name": "Predio RCI — Alejandra Brito",
+      "indices": {
+        "ndvi": {
+          "points": [],
+          "metrics": {
+            "latest": null,
+            "historical_mean": null,
+            "seasonal_means": {},
+            "annual_summary": [],
+            "trend": null
+          }
+        },
+        "ndwi": {
+          "points": [],
+          "metrics": {
+            "latest": null,
+            "historical_mean": null,
+            "seasonal_means": {},
+            "annual_summary": [],
+            "trend": null
+          }
+        },
+        "rgb": {
+          "points": [],
+          "metrics": {
+            "latest": null,
+            "historical_mean": null,
+            "seasonal_means": {},
+            "annual_summary": [],
+            "trend": null
+          }
+        },
+        "thermal": {
+          "points": [],
+          "metrics": {
+            "latest": null,
+            "historical_mean": null,
+            "seasonal_means": {},
+            "annual_summary": [],
+            "trend": null
+          }
+        }
+      }
+    },
+    "rpa": {
+      "name": "Predio RPA — Alejandra Brito",
+      "indices": {
+        "ndvi": {
+          "points": [],
+          "metrics": {
+            "latest": null,
+            "historical_mean": null,
+            "seasonal_means": {},
+            "annual_summary": [],
+            "trend": null
+          }
+        },
+        "ndwi": {
+          "points": [],
+          "metrics": {
+            "latest": null,
+            "historical_mean": null,
+            "seasonal_means": {},
+            "annual_summary": [],
+            "trend": null
+          }
+        },
+        "rgb": {
+          "points": [],
+          "metrics": {
+            "latest": null,
+            "historical_mean": null,
+            "seasonal_means": {},
+            "annual_summary": [],
+            "trend": null
+          }
+        },
+        "thermal": {
           "points": [],
           "metrics": {
             "latest": null,

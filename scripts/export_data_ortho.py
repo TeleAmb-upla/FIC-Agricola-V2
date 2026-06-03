@@ -930,10 +930,10 @@ def _flat_filename_date_to_ymd(date_token: str) -> str:
 # Separador entre código / fecha / índice: guión bajo o espacio (ej. ``G6 2026_01_21_rgb.tif``).
 # Token opcional entre fecha e índice (p. ej. ``G4_2026_01_21_G4_ndwi.tif``).
 FLAT_DRONE_NAME = re.compile(
-    r"^((?:[Gg]\d+)|(?:[Nn][Oo][Gg]))(?:[\s_]+)"
+    r"^((?:[Gg]\d+)|(?:[Nn][Oo][Gg])|(?:RCI)|(?:RPA))(?:[\s_]+)"
     r"((?:\d{8})|(?:\d{4}[_-]\d{2}[_-]\d{2}))(?:[\s_]+)"
     r"(?:([A-Za-z0-9]{1,12})_)?"
-    r"(ndvi|ndwi|rgb)\.(?:tif|tiff)$",
+    r"(ndvi|ndwi|rgb|thermal)\.(?:tif|tiff)$",
     re.I,
 )
 

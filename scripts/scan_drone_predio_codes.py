@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 # Ej.: G1, G02, G12, NOG … al inicio de segmento de ruta o en nombre de archivo
-CODE_RE = re.compile(r"\b((?:G\d+)|(?:NOG))\b", re.IGNORECASE)
+CODE_RE = re.compile(r"\b((?:G\d+)|(?:NOG)|(?:RCI)|(?:RPA))\b", re.IGNORECASE)
 
 
 def iter_paths(root: Path) -> None:

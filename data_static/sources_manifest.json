@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-30T19:44:56+00:00",
+  "generated_at": "2026-06-03T13:07:34+00:00",
   "aoi_path": "wetlands_aoi.geojson",
   "year_range": {
     "start": 2024,
@@ -17,12 +17,12 @@
       "csv_dir": "drone/csv",
       "status": "ready",
       "summary": {
-        "n_wetlands": 8,
-        "n_periods": 1,
+        "n_wetlands": 10,
+        "n_periods": 2,
         "data_points": 0,
-        "raster_count": 21,
-        "total_area_ha": 15.8,
-        "latest_period": "Vuelo 21 Jan 2026",
+        "raster_count": 29,
+        "total_area_ha": 24.0,
+        "latest_period": "Vuelo 28 May 2026",
         "available_years": [
           2026
         ]

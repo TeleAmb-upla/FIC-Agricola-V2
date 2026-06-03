@@ -45,6 +45,14 @@ wetlands:
     name: "Predio NOG (sin G numérico)"
     aoi_source: *predios_sel
     plot_id: "10"
+  rci:
+    name: "Predio RCI — Alejandra Brito"
+    aoi_source: "data/shapefiles/predios_ab/predio_RCI.gdb"
+    aoi_crs: "EPSG:4326"
+  rpa:
+    name: "Predio RPA — Alejandra Brito"
+    aoi_source: "data/shapefiles/predios_ab/predio_RPA.gdb"
+    aoi_crs: "EPSG:4326"
 
 sources:
   sentinel2:
@@ -65,7 +73,7 @@ sources:
     enabled: true
     download_enabled: false
     color: "#22c55e"
-    indices: ["ndvi", "ndwi", "rgb"]
+    indices: ["ndvi", "ndwi", "rgb", "thermal"]
     # Archivos planos: G4_YYYYMMDD_ndvi.tif o G4_YYYY_MM_DD_ndvi.tif → data_static/drone/rasters/…webp
     flat_date_filenames: true
 
@@ -129,6 +137,10 @@ indices:
   rgb:
     label: "RGB"
     description: "Ortomosaico color"
+    visual_only: true
+  thermal:
+    label: "Térmica"
+    description: "Ortomosaico térmico"
     visual_only: true
 
 stats: ["mean"]

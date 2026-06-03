@@ -208,6 +208,14 @@ def read_wetland_aoi_dataset(aoi_source: str | Path, forced_crs: str | None = No
     en geometrías con anillos casi cerrados.
     """
     path = Path(aoi_source).resolve()
+    if not path.exists():
+        raise FileNotFoundError(path)
+    if path.suffix.lower() == ".gdb" and path.is_dir():
+        gdf = gpd.read_file(path)
+        if forced_crs:
+            gdf = gdf.set_crs(forced_crs, allow_override=True) if gdf.crs is None else gdf.to_crs(forced_crs)
+        return gdf
+
     if not path.is_file():
         raise FileNotFoundError(path)
 
