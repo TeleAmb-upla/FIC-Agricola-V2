@@ -1,0 +1,1263 @@
+#!/usr/bin/env python3
+"""
+Pipeline LOCAL Sentinel-2: GeoTIFF semanales en ``data/sentinel2/`` → agregados
+mensual / semanal + chart de series temporales + WebPs por banda.
+
+Convención de entrada (un archivo por predio × año × semana ISO)::
+
+    data/sentinel2/S2_<PREDIO>_Y<YYYY>_W<WW>.tif   # float64, 29 bandas, EPSG:4326
+
+Salidas en ``data_static/sentinel2/``::
+
+    metadata.json
+    timeseries.json
+    rasters/S2_<PREDIO>_<COMPOSITE_KEY>_<BAND>.webp
+    csv/<predio>_timeseries.csv
+    csv/<predio>_timeseries_monthly.csv
+
+Composite keys generados:
+
+  monthly_hist_<MM>         Mediana sobre todas las semanas (todos los a\u00f1os hist\u00f3ricos)
+                            cuyo jueves cae en el mes ``MM``.
+  monthly_current_<MM>      Mediana sobre semanas del a\u00f1o actual en el mes ``MM``
+                            (solo se publica si hay suficiente cobertura).
+  weekly_hist_W<WW>         Mediana sobre instancias de la semana ISO ``WW`` en a\u00f1os
+                            hist\u00f3ricos. Solo se exporta la mediana como raster; los
+                            percentiles 25/75 quedan en el ``timeseries.json``/CSV.
+  weekly_current_W<WW>      Raster del a\u00f1o actual para la semana ISO ``WW``.
+
+Ejemplo de uso::
+
+    python scripts/static_site/build_sentinel2_local.py --force
+    python scripts/static_site/build_sentinel2_local.py   # incremental (default)
+
+Opción ``--no-incremental`` fuerza a releer todos los TIFs aunque no hayan cambiado.
+
+Requisitos: rasterio, numpy, Pillow, matplotlib (ver requirements.txt).
+"""
+from __future__ import annotations
+
+import argparse
+import copy
+import csv
+import json
+import math
+import re
+import sys
+import warnings
+from collections import defaultdict
+from datetime import date, datetime, timezone
+from pathlib import Path
+from typing import Iterable
+
+import numpy as np
+
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+try:
+    import rasterio
+    from rasterio.warp import transform_bounds
+except ImportError as exc:  # pragma: no cover
+    print(f"Falta rasterio: {exc}. pip install rasterio", file=sys.stderr)
+    sys.exit(1)
+
+try:
+    from PIL import Image as PILImage
+except ImportError as exc:  # pragma: no cover
+    print(f"Falta Pillow: {exc}. pip install Pillow", file=sys.stderr)
+    sys.exit(1)
+
+try:
+    from matplotlib import colormaps as _MPL_COLORMAPS
+except ImportError as exc:  # pragma: no cover
+    print(f"Falta matplotlib: {exc}. pip install matplotlib", file=sys.stderr)
+    sys.exit(1)
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+DEFAULT_TIF_DIR = REPO_ROOT / "data" / "sentinel2"
+DEFAULT_STATIC_DIR = REPO_ROOT / "data_static" / "sentinel2"
+DEFAULT_AOI_GEOJSON = REPO_ROOT / "data" / "shapefiles" / "aoi.geojson"
+DEFAULT_DB_CSV = REPO_ROOT / "data" / "fic_database.csv"
+
+_STEM_RE = re.compile(r"^S2_(?P<predio>[A-Za-z0-9]+)_Y(?P<year>\d{4})_W(?P<week>\d{2})$")
+
+MONTH_NAMES_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
+                  "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+
+# Visualización por banda (vmin, vmax, colormap matplotlib).
+# Si una banda no está acá, se usa DEFAULT_VIZ.
+BAND_VIZ: dict[str, dict] = {
+    "NDVI":              {"vmin": -1.0, "vmax": 1.0,  "colormap": "RdYlGn",     "label": "NDVI"},
+    "kNDVI":             {"vmin": -1.0, "vmax": 1.0,  "colormap": "RdYlGn",     "label": "kNDVI"},
+    "GNDVI":             {"vmin": -1.0, "vmax": 1.0,  "colormap": "YlGn",       "label": "GNDVI"},
+    "EVI":               {"vmin": -1.0, "vmax": 1.0,  "colormap": "YlGn",       "label": "EVI"},
+    "EVI2":              {"vmin": -1.0, "vmax": 1.0,  "colormap": "YlGn",       "label": "EVI2"},
+    "SAVI":              {"vmin": -1.0, "vmax": 1.0,  "colormap": "YlGn",       "label": "SAVI"},
+    "MSAVI":             {"vmin": -1.0, "vmax": 1.0,  "colormap": "YlGn",       "label": "MSAVI"},
+    "ARVI":              {"vmin": -1.0, "vmax": 1.0,  "colormap": "RdYlGn",     "label": "ARVI"},
+    "NDII":              {"vmin": -1.0, "vmax": 1.0,  "colormap": "RdYlBu",     "label": "NDII"},
+    "NDCI":              {"vmin": -1.0, "vmax": 1.0,  "colormap": "YlGn",       "label": "NDCI"},
+    "NDWI":              {"vmin": -1.0, "vmax": 1.0,  "colormap": "RdYlBu",     "label": "NDWI"},
+    "MNDWI":             {"vmin": -1.0, "vmax": 1.0,  "colormap": "Blues",      "label": "MNDWI"},
+    "NDMI":              {"vmin": -1.0, "vmax": 1.0,  "colormap": "RdYlBu_r",   "label": "NDMI"},
+    "NDMISTRESS":        {"vmin": -1.0, "vmax": 1.0,  "colormap": "RdYlBu_r",   "label": "NDMI stress"},
+    "MSI":               {"vmin":  0.0, "vmax": 3.0,  "colormap": "RdYlBu_r",   "label": "MSI"},
+    "ARI":               {"vmin":  0.0, "vmax": 2.0,  "colormap": "RdPu",       "label": "ARI"},
+    "MARI":              {"vmin":  0.0, "vmax": 4.0,  "colormap": "RdPu",       "label": "MARI"},
+    "MCARI":             {"vmin":  0.0, "vmax": 3.0,  "colormap": "YlGn",       "label": "MCARI"},
+    "CHL_REDEDGE":       {"vmin":  0.0, "vmax": 3.0,  "colormap": "YlGn",       "label": "Chl rededge"},
+    "REDEDGE_POSITION":  {"vmin": 700.0,"vmax": 750.0,"colormap": "viridis",    "label": "Red-edge pos."},
+    "PSSRB1":            {"vmin":  0.0, "vmax": 10.0, "colormap": "viridis",    "label": "PSSRB1"},
+    "SIPI1":             {"vmin":  0.0, "vmax": 2.0,  "colormap": "RdYlGn_r",   "label": "SIPI1"},
+    "PSRI":              {"vmin": -0.5, "vmax": 0.5,  "colormap": "RdYlGn_r",   "label": "PSRI"},
+    "LAI":               {"vmin":  0.0, "vmax": 8.0,  "colormap": "YlGn",       "label": "LAI"},
+    "FAPAR":             {"vmin":  0.0, "vmax": 1.0,  "colormap": "YlGn",       "label": "FAPAR"},
+    "FCOVER":            {"vmin":  0.0, "vmax": 1.0,  "colormap": "YlGn",       "label": "FCOVER"},
+    "LEAF_CHL":          {"vmin":  0.0, "vmax": 80.0, "colormap": "YlGn",       "label": "Leaf chlorophyll"},
+    "CANOPY_CHL":        {"vmin":  0.0, "vmax": 600.0,"colormap": "YlGn",       "label": "Canopy chlorophyll"},
+    "CLEAR_PIXEL_COUNT": {"vmin":  0.0, "vmax": 30.0, "colormap": "viridis",    "label": "Clear pixel count"},
+}
+DEFAULT_VIZ = {"vmin": -1.0, "vmax": 1.0, "colormap": "RdYlGn", "label": ""}
+
+# Bandas que normalmente se grafican en la series temporal (en este orden).
+DEFAULT_CHART_BAND_ORDER = ["NDVI", "NDWI", "NDMI", "EVI", "SAVI", "GNDVI", "LAI", "FAPAR", "FCOVER"]
+
+WEBP_QUALITY = 86
+WEBP_METHOD = 4  # PIL WebP: 0=rápido, 6=más compresión. 4 balance velocidad/tamaño.
+WEBP_UPSCALE_MIN_SIDE = 384  # Cada predio es chico (~13x17 px). Subimos hasta lado mín. ≥ N px.
+
+# Divisor por banda (los TIF guardan los índices como int16-en-float64 escalados ×100;
+# ``clear_pixel_count`` es entero crudo).
+DIVISOR_DEFAULT = 100.0
+BAND_DIVISOR_OVERRIDE: dict[str, float] = {
+    "CLEAR_PIXEL_COUNT": 1.0,
+}
+# Bandas que no aportan información (sentinel int16_max) y se ignoran en el pipeline.
+SKIP_BANDS: set[str] = {"REDEDGE_POSITION"}
+# Valores sentinel adicionales (vienen como int16): ±32767 / ±32768.
+SENTINEL_VALUES = (32767.0, -32767.0, 32768.0, -32768.0)
+
+
+# ---------------------------------------------------------------------------
+# Date utilities (ISO weeks)
+# ---------------------------------------------------------------------------
+
+def iso_week_thursday(iso_year: int, iso_week: int) -> date:
+    """
+    Devuelve la fecha del jueves de la semana ISO (semana de calendario ISO 8601).
+    """
+    return date.fromisocalendar(iso_year, iso_week, 4)
+
+
+def current_iso_today() -> tuple[int, int]:
+    """ ``(iso_year, iso_week)`` del lunes en curso. """
+    today = datetime.now(timezone.utc).date()
+    iy, iw, _ = today.isocalendar()
+    return iy, iw
+
+
+def last_complete_iso_week(now_year: int, now_week: int) -> tuple[int, int]:
+    """
+    Última semana ISO **completa** anterior al momento actual.
+
+    Si la semana actual está en curso (no terminó el domingo), la última completa es la previa.
+    """
+    if now_week == 1:
+        prev = date(now_year - 1, 12, 28)
+        py, pw, _ = prev.isocalendar()
+        return py, pw
+    return now_year, now_week - 1
+
+
+def last_complete_month(now_year: int, now_month: int) -> tuple[int, int]:
+    if now_month == 1:
+        return now_year - 1, 12
+    return now_year, now_month - 1
+
+
+# ---------------------------------------------------------------------------
+# Discovery & stack loading
+# ---------------------------------------------------------------------------
+
+def discover_tifs(tif_dir: Path) -> dict[str, list[dict]]:
+    """
+    Recorre ``tif_dir`` y agrupa por ``predio`` (uppercase).
+
+    Retorna ``{predio: [{path, year, week, thursday}, ...] (ordenado por fecha)}``.
+    """
+    grouped: dict[str, list[dict]] = defaultdict(list)
+    for path in sorted(tif_dir.glob("S2_*.tif")):
+        m = _STEM_RE.match(path.stem)
+        if not m:
+            continue
+        predio = m.group("predio").upper()
+        try:
+            y = int(m.group("year"))
+            w = int(m.group("week"))
+            th = iso_week_thursday(y, w)
+        except ValueError:
+            continue
+        grouped[predio].append({"path": path, "year": y, "week": w, "thursday": th})
+    for predio in grouped:
+        grouped[predio].sort(key=lambda r: r["thursday"])
+    return grouped
+
+
+def read_stack(predio_records: list[dict]) -> tuple[np.ndarray, list[str], dict]:
+    """
+    Lee todos los TIFs del predio. Devuelve:
+
+    - ``stack`` float32 con shape ``(n_dates, n_bands, H, W)`` (NaN para nodata).
+    - ``band_names`` con los nombres de banda (siempre uppercase).
+    - ``geo``: ``{"crs", "bounds_4326": (w,s,e,n), "leaflet_bounds": [[s,w],[n,e]], "H", "W"}``.
+    """
+    if not predio_records:
+        raise ValueError("Predio sin TIFs.")
+
+    with rasterio.open(predio_records[0]["path"]) as ds0:
+        ref_w, ref_h = ds0.width, ds0.height
+        ref_crs = ds0.crs
+        band_descs = list(ds0.descriptions)
+        if not band_descs or not any(band_descs):
+            band_descs = [f"band_{i+1}" for i in range(ds0.count)]
+        band_names = [(b or f"band_{i+1}").strip().upper() for i, b in enumerate(band_descs)]
+        n_bands = ds0.count
+        if ref_crs and ref_crs.to_epsg() != 4326:
+            wgs = transform_bounds(ref_crs, "EPSG:4326", *ds0.bounds)
+        else:
+            b = ds0.bounds
+            wgs = (b.left, b.bottom, b.right, b.top)
+
+    n_dates = len(predio_records)
+    stack = np.full((n_dates, n_bands, ref_h, ref_w), np.nan, dtype=np.float32)
+
+    # Divisor por banda (resuelto desde band_names para no recalcular en cada iteración).
+    div_per_band = np.array(
+        [BAND_DIVISOR_OVERRIDE.get(b, DIVISOR_DEFAULT) for b in band_names],
+        dtype=np.float32,
+    ).reshape(-1, 1, 1)
+
+    for i, rec in enumerate(predio_records):
+        with rasterio.open(rec["path"]) as ds:
+            if ds.width != ref_w or ds.height != ref_h:
+                print(
+                    f"  [aviso] {rec['path'].name}: tamaño {ds.width}x{ds.height} ≠ "
+                    f"referencia {ref_w}x{ref_h}; omitido.",
+                    file=sys.stderr,
+                )
+                continue
+            arr = ds.read().astype(np.float32, copy=False)
+            nodata = ds.nodata
+            if nodata is not None:
+                arr = np.where(arr == nodata, np.nan, arr)
+            for sentinel in SENTINEL_VALUES:
+                arr = np.where(arr == sentinel, np.nan, arr)
+            arr = np.where(np.isfinite(arr), arr, np.nan)
+        if arr.shape[0] != n_bands:
+            arr = arr[:n_bands]
+        arr = arr / div_per_band[: arr.shape[0]]
+        stack[i, : arr.shape[0]] = arr
+
+    geo = {
+        "crs": str(ref_crs) if ref_crs else None,
+        "bounds_4326": wgs,
+        "leaflet_bounds": [[wgs[1], wgs[0]], [wgs[3], wgs[2]]],
+        "H": ref_h,
+        "W": ref_w,
+    }
+    return stack, band_names, geo
+
+
+# ---------------------------------------------------------------------------
+# Aggregation
+# ---------------------------------------------------------------------------
+
+def _nan_median(stack_slice: np.ndarray) -> np.ndarray:
+    """Mediana por píxel (n_dates) ignorando NaN; vacío → NaN."""
+    if stack_slice.shape[0] == 0:
+        # (n_bands, H, W)
+        return np.full(stack_slice.shape[1:], np.nan, dtype=np.float32)
+    with np.errstate(invalid="ignore"):
+        return np.nanmedian(stack_slice, axis=0).astype(np.float32, copy=False)
+
+
+def _nan_percentile(stack_slice: np.ndarray, q: float) -> np.ndarray:
+    if stack_slice.shape[0] == 0:
+        return np.full(stack_slice.shape[1:], np.nan, dtype=np.float32)
+    with np.errstate(invalid="ignore"):
+        return np.nanpercentile(stack_slice, q, axis=0).astype(np.float32, copy=False)
+
+
+def _spatial_mean(raster_3d: np.ndarray) -> np.ndarray:
+    """Para un cubo ``(n_bands, H, W)``, retorna ``(n_bands,)`` con la media espacial NaN-aware."""
+    flat = raster_3d.reshape(raster_3d.shape[0], -1)
+    with np.errstate(invalid="ignore"):
+        return np.nanmean(flat, axis=1).astype(np.float32, copy=False)
+
+
+def compute_aggregates(
+    stack: np.ndarray,
+    records: list[dict],
+    current_year: int,
+) -> dict[str, dict]:
+    """
+    Calcula todos los rasters agregados pedidos. Retorna::
+
+        {
+          composite_key: {
+            "raster": np.ndarray shape (n_bands, H, W),
+            "view_mode": "monthly"|"weekly",
+            "role": "left"|"right",
+            "year": int|None,
+            "month": int|None,
+            "week": int|None,
+            "label": str,
+            "n_inputs": int,
+          },
+          ...
+        }
+
+    Notas:
+      - Historial NO incluye al año actual (separación limpia para comparar).
+      - ``weekly_hist_W<WW>``: solo mediana como raster (los percentiles van al chart).
+    """
+    # Indexar registros por mes y semana.
+    idx_month_hist: dict[int, np.ndarray] = {
+        m: np.array(
+            [(r["year"] < current_year) and (r["thursday"].month == m) for r in records],
+            dtype=bool,
+        )
+        for m in range(1, 13)
+    }
+    idx_month_current: dict[int, np.ndarray] = {
+        m: np.array(
+            [(r["year"] == current_year) and (r["thursday"].month == m) for r in records],
+            dtype=bool,
+        )
+        for m in range(1, 13)
+    }
+    idx_week_hist: dict[int, np.ndarray] = {
+        w: np.array(
+            [(r["year"] < current_year) and (r["week"] == w) for r in records],
+            dtype=bool,
+        )
+        for w in range(1, 54)
+    }
+    idx_week_current: dict[int, list[int]] = defaultdict(list)
+    for i, r in enumerate(records):
+        if r["year"] == current_year:
+            idx_week_current[r["week"]].append(i)
+
+    out: dict[str, dict] = {}
+
+    # ---- Monthly ----
+    for m in range(1, 13):
+        sel = stack[idx_month_hist[m]]
+        if sel.shape[0] > 0:
+            out[f"monthly_hist_{m:02d}"] = {
+                "raster": _nan_median(sel),
+                "view_mode": "monthly",
+                "role": "left",
+                "year": None,
+                "month": m,
+                "week": None,
+                "label": f"Hist. {MONTH_NAMES_ES[m-1]}",
+                "n_inputs": int(sel.shape[0]),
+            }
+        sel_cur = stack[idx_month_current[m]]
+        if sel_cur.shape[0] > 0:
+            out[f"monthly_current_{m:02d}"] = {
+                "raster": _nan_median(sel_cur),
+                "view_mode": "monthly",
+                "role": "right",
+                "year": current_year,
+                "month": m,
+                "week": None,
+                "label": f"{MONTH_NAMES_ES[m-1]} {current_year}",
+                "n_inputs": int(sel_cur.shape[0]),
+            }
+
+    # ---- Weekly ----
+    for w in range(1, 54):
+        sel = stack[idx_week_hist[w]]
+        if sel.shape[0] > 0:
+            out[f"weekly_hist_W{w:02d}"] = {
+                "raster": _nan_median(sel),
+                "view_mode": "weekly",
+                "role": "left",
+                "year": None,
+                "month": None,
+                "week": w,
+                "label": f"Hist. semana {w:02d}",
+                "n_inputs": int(sel.shape[0]),
+            }
+        cur_indices = idx_week_current.get(w, [])
+        if cur_indices:
+            cur_stack = stack[cur_indices]
+            out[f"weekly_current_W{w:02d}"] = {
+                "raster": _nan_median(cur_stack) if len(cur_indices) > 1 else cur_stack[0],
+                "view_mode": "weekly",
+                "role": "right",
+                "year": current_year,
+                "month": None,
+                "week": w,
+                "label": f"Semana {w:02d} · {current_year}",
+                "n_inputs": int(cur_stack.shape[0]),
+            }
+
+    return out
+
+
+def compute_weekly_timeseries(
+    stack: np.ndarray,
+    records: list[dict],
+    band_names: list[str],
+    current_year: int,
+) -> dict[str, dict]:
+    """
+    Para cada banda devuelve la serie semanal (1..52).
+
+    **Hist\u00f3rico** (por semana ISO ``w``):
+
+    1. Para cada a\u00f1o hist\u00f3rico con imagen en ``w``, se calcula la **media espacial**
+       de la banda (un escalar por a\u00f1o).
+    2. Sobre ese vector de medias anuales (t\u00edpicamente 2–3 valores) se calculan
+       mediana, percentil 25 y 75. As\u00ed el rango P25–P75 refleja **variabilidad
+       interanual** al nivel del predio; con pocos a\u00f1os sigue siendo interpretable
+       (antes, percentiles temporales *por p\u00edxel* y luego media espacial hac\u00eda
+       que P25=P75 en muchas semanas si en cada p\u00edxel solo hab\u00eda 1 a\u00f1o v\u00e1lido).
+
+    **A\u00f1o actual**: media espacial del raster de esa semana (``null`` si la composici\u00f3n
+    sali\u00f3 toda sin datos v\u00e1lidos para esa banda, p. ej. nubes / sin cobertura).
+
+    Estructura::
+
+        {
+          "<BAND>": {
+            "weeks": [1..52],
+            "historical_median": [...],
+            "historical_p25": [...],
+            "historical_p75": [...],
+            "current_year": {"year": YYYY, "values_by_week": [...]},
+            "years_used": [YYYY, ...],
+          },
+          ...
+        }
+    """
+    n_bands = stack.shape[1]
+    by_band: dict[str, dict] = {}
+
+    historic_years = sorted({r["year"] for r in records if r["year"] < current_year})
+
+    # Pre-armar índices.
+    week_to_hist_idx: dict[int, list[int]] = defaultdict(list)
+    week_to_curr_idx: dict[int, list[int]] = defaultdict(list)
+    for i, r in enumerate(records):
+        if r["year"] < current_year:
+            week_to_hist_idx[r["week"]].append(i)
+        elif r["year"] == current_year:
+            week_to_curr_idx[r["week"]].append(i)
+
+    for b_idx, band in enumerate(band_names):
+        if band in SKIP_BANDS:
+            continue
+        weeks = list(range(1, 53))
+        hist_med = [math.nan] * 52
+        hist_p25 = [math.nan] * 52
+        hist_p75 = [math.nan] * 52
+        cur_vals = [math.nan] * 52
+
+        for w in weeks:
+            hist_idx = week_to_hist_idx.get(w, [])
+            if hist_idx:
+                yearly_means: list[float] = []
+                for i in hist_idx:
+                    arr = stack[i, b_idx]
+                    with np.errstate(invalid="ignore"):
+                        m = float(np.nanmean(arr))
+                    if math.isfinite(m):
+                        yearly_means.append(m)
+                if yearly_means:
+                    v = np.asarray(yearly_means, dtype=np.float64)
+                    hist_med[w - 1] = float(np.median(v))
+                    if v.size >= 2:
+                        hist_p25[w - 1] = float(np.percentile(v, 25))
+                        hist_p75[w - 1] = float(np.percentile(v, 75))
+                    else:
+                        # Un solo a\u00f1o hist\u00f3rico: no hay dispersi\u00f3n interanual
+                        hist_p25[w - 1] = hist_p75[w - 1] = hist_med[w - 1]
+
+            curr_idx = week_to_curr_idx.get(w, [])
+            if curr_idx:
+                slab = stack[curr_idx, b_idx]
+                with np.errstate(invalid="ignore"):
+                    if slab.shape[0] > 1:
+                        spatial = np.nanmean(np.nanmedian(slab, axis=0))
+                    else:
+                        spatial = np.nanmean(slab[0])
+                cur_vals[w - 1] = float(spatial) if np.isfinite(spatial) else math.nan
+
+        by_band[band] = {
+            "weeks": weeks,
+            "historical_median": _sanitize_numbers(hist_med),
+            "historical_p25": _sanitize_numbers(hist_p25),
+            "historical_p75": _sanitize_numbers(hist_p75),
+            "current_year": {
+                "year": current_year,
+                "values_by_week": _sanitize_numbers(cur_vals),
+            },
+            "years_used": historic_years,
+        }
+
+    return by_band
+
+
+def _sanitize_numbers(seq: Iterable[float]) -> list[float | None]:
+    """JSON-safe: NaN/Inf → None; floats → ``round(value, 4)``."""
+    out: list[float | None] = []
+    for v in seq:
+        if v is None:
+            out.append(None)
+            continue
+        try:
+            f = float(v)
+        except (TypeError, ValueError):
+            out.append(None)
+            continue
+        if not math.isfinite(f):
+            out.append(None)
+        else:
+            out.append(round(f, 4))
+    return out
+
+
+def _calendar_month_complete_for_current_year(
+    current_year: int, month: int, lc_y: int, lc_m: int
+) -> bool:
+    """Mes calendario del año actual ya cerrado respecto al último mes completo global."""
+    if current_year < lc_y:
+        return True
+    if current_year > lc_y:
+        return False
+    return month <= lc_m
+
+
+def augment_timeseries_with_monthly(
+    ts_by_band: dict[str, dict],
+    stack: np.ndarray,
+    records: list[dict],
+    band_names: list[str],
+    current_year: int,
+    lc_y: int,
+    lc_m: int,
+) -> None:
+    month_to_hist_idx: dict[int, list[int]] = defaultdict(list)
+    month_to_curr_idx: dict[int, list[int]] = defaultdict(list)
+    for i, r in enumerate(records):
+        m = int(r["thursday"].month)
+        if r["year"] < current_year:
+            month_to_hist_idx[m].append(i)
+        elif r["year"] == current_year:
+            month_to_curr_idx[m].append(i)
+
+    for b_idx, band in enumerate(band_names):
+        if band in SKIP_BANDS:
+            continue
+        band_entry = ts_by_band.get(band)
+        if not band_entry:
+            continue
+        months = list(range(1, 13))
+        hist_med = [math.nan] * 12
+        hist_p25 = [math.nan] * 12
+        hist_p75 = [math.nan] * 12
+        cur_month = [math.nan] * 12
+
+        for m in months:
+            hist_idx = month_to_hist_idx.get(m, [])
+            if hist_idx:
+                yearly_means: list[float] = []
+                for i in hist_idx:
+                    arr = stack[i, b_idx]
+                    with np.errstate(invalid="ignore"):
+                        mm = float(np.nanmean(arr))
+                    if math.isfinite(mm):
+                        yearly_means.append(mm)
+                if yearly_means:
+                    v = np.asarray(yearly_means, dtype=np.float64)
+                    hist_med[m - 1] = float(np.median(v))
+                    if v.size >= 2:
+                        hist_p25[m - 1] = float(np.percentile(v, 25))
+                        hist_p75[m - 1] = float(np.percentile(v, 75))
+                    else:
+                        hist_p25[m - 1] = hist_p75[m - 1] = hist_med[m - 1]
+
+            if _calendar_month_complete_for_current_year(current_year, m, lc_y, lc_m):
+                curr_idx = month_to_curr_idx.get(m, [])
+                if curr_idx:
+                    slab = stack[curr_idx, b_idx]
+                    with np.errstate(invalid="ignore"):
+                        if slab.shape[0] > 1:
+                            spatial = np.nanmean(np.nanmedian(slab, axis=0))
+                        else:
+                            spatial = np.nanmean(slab[0])
+                    cur_month[m - 1] = float(spatial) if np.isfinite(spatial) else math.nan
+
+        band_entry["months"] = months
+        band_entry["historical_median_by_month"] = _sanitize_numbers(hist_med)
+        band_entry["historical_p25_by_month"] = _sanitize_numbers(hist_p25)
+        band_entry["historical_p75_by_month"] = _sanitize_numbers(hist_p75)
+        cy = band_entry["current_year"]
+        cy["values_by_month"] = _sanitize_numbers(cur_month)
+
+
+# ---------------------------------------------------------------------------
+# WebP rendering
+# ---------------------------------------------------------------------------
+
+class ColormapCache:
+    """Cache de LUTs (256 colores) por nombre de matplotlib colormap."""
+
+    def __init__(self) -> None:
+        self._luts: dict[str, np.ndarray] = {}
+
+    def get(self, name: str) -> np.ndarray:
+        if name not in self._luts:
+            try:
+                cmap = _MPL_COLORMAPS[name]
+            except KeyError:
+                cmap = _MPL_COLORMAPS["RdYlGn"]
+            lut = (cmap(np.linspace(0.0, 1.0, 256)) * 255).astype(np.uint8)
+            self._luts[name] = lut
+        return self._luts[name]
+
+
+CMAP_CACHE = ColormapCache()
+
+
+def render_band_to_webp(
+    data: np.ndarray,
+    out_path: Path,
+    *,
+    vmin: float,
+    vmax: float,
+    colormap: str,
+    upscale_min_side: int = WEBP_UPSCALE_MIN_SIDE,
+    quality: int = WEBP_QUALITY,
+    method: int = WEBP_METHOD,
+) -> tuple[int, int]:
+    """
+    Toma un array (H, W) en valores físicos y guarda un WebP coloreado.
+    NaN → transparente. Retorna (w, h) del WebP guardado.
+    """
+    arr = data.astype(np.float32, copy=False)
+    mask = ~np.isfinite(arr)
+    span = max(float(vmax) - float(vmin), 1e-9)
+    norm = np.clip((arr - vmin) / span, 0.0, 1.0)
+    norm = np.where(mask, 0.0, norm)
+    idx = (norm * 255.0).astype(np.uint8)
+
+    lut = CMAP_CACHE.get(colormap)
+    rgba = lut[idx].copy()  # (H, W, 4)
+    rgba[mask, 3] = 0
+
+    h, w = rgba.shape[:2]
+    if min(h, w) < upscale_min_side:
+        scale = upscale_min_side / max(1, min(h, w))
+        new_w = max(1, int(round(w * scale)))
+        new_h = max(1, int(round(h * scale)))
+    else:
+        new_w, new_h = w, h
+
+    img = PILImage.fromarray(rgba, mode="RGBA")
+    if (new_w, new_h) != (w, h):
+        img = img.resize((new_w, new_h), PILImage.NEAREST)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    img.save(out_path, format="WEBP", quality=quality, method=method)
+    return new_w, new_h
+
+
+# ---------------------------------------------------------------------------
+# AOI / DB helpers
+# ---------------------------------------------------------------------------
+
+def load_predios_info(aoi_geojson: Path | None, db_csv: Path | None) -> dict[str, dict]:
+    info: dict[str, dict] = {}
+    if aoi_geojson and aoi_geojson.is_file():
+        try:
+            fc = json.loads(aoi_geojson.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            fc = {"features": []}
+        for feat in fc.get("features", []):
+            props = feat.get("properties") or {}
+            wid = (props.get("wetland_id") or props.get("predio_id") or "").strip().lower()
+            if not wid:
+                continue
+            geom = feat.get("geometry") or {}
+            ring: list[list[float]] = []
+            coords = geom.get("coordinates", [])
+            if geom.get("type") == "Polygon" and coords:
+                ring = coords[0]
+            elif geom.get("type") == "MultiPolygon" and coords and coords[0]:
+                ring = coords[0][0]
+            if ring:
+                lons = [c[0] for c in ring]
+                lats = [c[1] for c in ring]
+                center = [sum(lats) / len(lats), sum(lons) / len(lons)]
+            else:
+                center = [0.0, 0.0]
+            info[wid] = {
+                "name": props.get("nombre") or wid.upper(),
+                "area_ha": props.get("area_ha"),
+                "center": center,
+                "codigo_predio": wid.upper(),
+            }
+    if db_csv and db_csv.is_file():
+        try:
+            with open(db_csv, encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    codigo = (row.get("codigo_predio") or "").strip()
+                    if not codigo:
+                        continue
+                    key = codigo.lower()
+                    if key in info:
+                        info[key].update({k: v for k, v in row.items() if v not in (None, "")})
+                        info[key]["codigo_predio"] = codigo
+        except OSError:
+            pass
+    return info
+
+
+# ---------------------------------------------------------------------------
+# CSV writer
+# ---------------------------------------------------------------------------
+
+def write_predio_csv(
+    out_dir: Path,
+    predio: str,
+    timeseries: dict[str, dict],
+    *,
+    current_year: int,
+) -> Path:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / f"{predio.lower()}_timeseries.csv"
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            "predio", "band", "iso_week",
+            "historical_median", "historical_p25", "historical_p75",
+            f"value_{current_year}",
+        ])
+        for band, info in timeseries.items():
+            weeks = info["weeks"]
+            for i, w in enumerate(weeks):
+                writer.writerow([
+                    predio.upper(),
+                    band,
+                    w,
+                    _csv_num(info["historical_median"][i]),
+                    _csv_num(info["historical_p25"][i]),
+                    _csv_num(info["historical_p75"][i]),
+                    _csv_num(info["current_year"]["values_by_week"][i]),
+                ])
+    return path
+
+
+def _csv_num(v: float | None) -> str:
+    if v is None:
+        return ""
+    return f"{v:.4f}"
+
+
+def write_predio_monthly_csv(
+    out_dir: Path,
+    predio: str,
+    timeseries: dict[str, dict],
+    *,
+    current_year: int,
+) -> Path:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / f"{predio.lower()}_timeseries_monthly.csv"
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            "predio", "band", "month",
+            "historical_median", "historical_p25", "historical_p75",
+            f"value_{current_year}",
+        ])
+        for band, info in timeseries.items():
+            if band in SKIP_BANDS:
+                continue
+            months = info.get("months") or list(range(1, 13))
+            hm = info.get("historical_median_by_month") or [None] * 12
+            hp25 = info.get("historical_p25_by_month") or [None] * 12
+            hp75 = info.get("historical_p75_by_month") or [None] * 12
+            curm = (info.get("current_year") or {}).get("values_by_month") or [None] * 12
+            for i, m in enumerate(months):
+                writer.writerow([
+                    predio.upper(),
+                    band,
+                    m,
+                    _csv_num(hm[i] if i < len(hm) else None),
+                    _csv_num(hp25[i] if i < len(hp25) else None),
+                    _csv_num(hp75[i] if i < len(hp75) else None),
+                    _csv_num(curm[i] if i < len(curm) else None),
+                ])
+    return path
+
+
+def _load_json(path: Path) -> dict | None:
+    if not path.is_file():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _timeseries_predio_has_monthly(ts_predio: dict | None) -> bool:
+    if not ts_predio:
+        return False
+    for info in ts_predio.values():
+        if isinstance(info, dict) and info.get("historical_median_by_month"):
+            return True
+    return False
+
+
+def _predio_build_fingerprint(
+    records: list[dict],
+    current_year: int,
+    lm_year: int,
+    lm_month: int,
+    lc_week_y: int,
+    lc_week_w: int,
+) -> str:
+    """Huella estable por predio: TIFs + año actual + último mes/semana completo (afecta series)."""
+    max_mtime_ns = 0
+    for r in records:
+        try:
+            max_mtime_ns = max(max_mtime_ns, int(r["path"].stat().st_mtime_ns))
+        except OSError:
+            pass
+    first = records[0]["thursday"].isoformat() if records else ""
+    last = records[-1]["thursday"].isoformat() if records else ""
+    payload = {
+        "current_year": current_year,
+        "last_complete_month": [lm_year, lm_month],
+        "last_complete_week": [lc_week_y, lc_week_w],
+        "n_tifs": len(records),
+        "max_tif_mtime_ns": max_mtime_ns,
+        "thursday_first": first,
+        "thursday_last": last,
+    }
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"))
+
+
+def _predio_fp_path(csv_dir: Path, predio_lower: str) -> Path:
+    return csv_dir / f".{predio_lower}_build_fp.txt"
+
+
+# ---------------------------------------------------------------------------
+# Build orchestrator
+# ---------------------------------------------------------------------------
+
+def build(
+    tif_dir: Path,
+    static_dir: Path,
+    aoi_geojson: Path | None,
+    db_csv: Path | None,
+    *,
+    current_year: int | None = None,
+    bands_filter: list[str] | None = None,
+    force: bool = False,
+    incremental: bool = True,
+    upscale_min_side: int = WEBP_UPSCALE_MIN_SIDE,
+    webp_quality: int = WEBP_QUALITY,
+) -> None:
+    """
+    Pipeline completo: lee TIFs → calcula agregados/series → escribe rasters y JSONs.
+
+    Con ``incremental=True`` (default), omite un predio si los GeoTIFF no cambiaron
+    (mtime / rango de fechas) y ya existen los CSV de series con bloque mensual en
+    ``timeseries.json``; o solo escribe el CSV mensual si falta ese archivo pero el
+    resto coincide.
+    """
+    rasters_dir = static_dir / "rasters"
+    csv_dir = static_dir / "csv"
+    rasters_dir.mkdir(parents=True, exist_ok=True)
+    csv_dir.mkdir(parents=True, exist_ok=True)
+
+    grouped = discover_tifs(tif_dir)
+    if not grouped:
+        print(f"No se encontraron TIFs en {tif_dir}. Nada que hacer.", file=sys.stderr)
+        return
+
+    all_years: set[int] = set()
+    for recs in grouped.values():
+        all_years.update(r["year"] for r in recs)
+    if current_year is None:
+        cy_today, _ = current_iso_today()
+        current_year = max(all_years) if all_years else cy_today
+    historic_years = sorted({y for y in all_years if y < current_year})
+    print(f"Predios: {sorted(grouped.keys())}")
+    print(f"Años detectados: {sorted(all_years)} | actual={current_year} | hist={historic_years}")
+
+    predios_info = load_predios_info(aoi_geojson, db_csv)
+    rasters_meta: dict[str, dict] = {}
+    wetlands_meta: dict[str, dict] = {}
+    timeseries_all: dict[str, dict] = {}
+    band_set: set[str] = set()
+
+    iy_meta, iw_meta = current_iso_today()
+    lc_week_y, lc_week_w = last_complete_iso_week(iy_meta, iw_meta)
+    lm_year, lm_month = last_complete_month(iy_meta, datetime.now(timezone.utc).month)
+
+    existing_ts_doc: dict | None = _load_json(static_dir / "timeseries.json") if incremental else None
+    existing_wetlands: dict = (existing_ts_doc or {}).get("wetlands") or {}
+    existing_meta: dict = _load_json(static_dir / "metadata.json") or {} if incremental else {}
+
+    for predio, records in grouped.items():
+        print(f"\n=== {predio} ({len(records)} TIFs) ===")
+        pl = predio.lower()
+        fp = _predio_build_fingerprint(
+            records, current_year, lm_year, lm_month, lc_week_y, lc_week_w
+        )
+        fp_path = _predio_fp_path(csv_dir, pl)
+        mcsv = csv_dir / f"{pl}_timeseries_monthly.csv"
+        wcsv = csv_dir / f"{pl}_timeseries.csv"
+
+        if incremental and not force:
+            prev_fp = fp_path.read_text(encoding="utf-8").strip() if fp_path.is_file() else None
+            fp_ok = prev_fp == fp
+            ts_existing = existing_wetlands.get(pl)
+            has_monthly = _timeseries_predio_has_monthly(ts_existing)
+            wl_meta = (existing_meta.get("wetlands") or {}).get(pl) if isinstance(existing_meta, dict) else None
+
+            def _merge_skipped_predio() -> None:
+                assert ts_existing is not None
+                timeseries_all[pl] = copy.deepcopy(ts_existing)
+                if wl_meta:
+                    wetlands_meta[pl] = copy.deepcopy(wl_meta)
+                for rk, rv in (existing_meta.get("rasters") or {}).items():
+                    if rk.startswith(f"{pl}_"):
+                        rasters_meta[rk] = copy.deepcopy(rv)
+                for b in ts_existing:
+                    if b not in SKIP_BANDS:
+                        band_set.add(b)
+
+            if fp_ok and ts_existing and wcsv.is_file() and has_monthly and mcsv.is_file() and wl_meta:
+                _merge_skipped_predio()
+                print(
+                    f"  [incremental] Sin cambios en TIFs ni calendario; se reutilizan series y CSV "
+                    f"({wcsv.name}, {mcsv.name})."
+                )
+                continue
+
+            if fp_ok and ts_existing and wcsv.is_file() and has_monthly and not mcsv.is_file() and wl_meta:
+                _merge_skipped_predio()
+                write_predio_monthly_csv(csv_dir, predio, timeseries_all[pl], current_year=current_year)
+                print(
+                    f"  [incremental] Solo faltaba {mcsv.name}; generado desde series en caché "
+                    f"(sin releer GeoTIFFs)."
+                )
+                continue
+
+        try:
+            stack, band_names, geo = read_stack(records)
+        except (rasterio.RasterioIOError, ValueError) as exc:
+            print(f"  [error] no se pudo leer stack: {exc}", file=sys.stderr)
+            continue
+        band_set.update(b for b in band_names if b not in SKIP_BANDS)
+
+        if bands_filter:
+            allowed_upper = {b.strip().upper() for b in bands_filter}
+            band_idx_filter = [
+                i for i, b in enumerate(band_names)
+                if b in allowed_upper and b not in SKIP_BANDS
+            ]
+        else:
+            band_idx_filter = [i for i, b in enumerate(band_names) if b not in SKIP_BANDS]
+        if not band_idx_filter:
+            print(f"  [aviso] sin bandas válidas; salto {predio}.")
+            continue
+
+        aggregates = compute_aggregates(stack, records, current_year)
+        timeseries = compute_weekly_timeseries(stack, records, band_names, current_year)
+        augment_timeseries_with_monthly(
+            timeseries, stack, records, band_names, current_year, lm_year, lm_month
+        )
+        timeseries_all[predio.lower()] = timeseries
+
+        wetlands_meta[predio.lower()] = {
+            "name": predios_info.get(predio.lower(), {}).get("name") or predio.upper(),
+            "codigo_predio": predios_info.get(predio.lower(), {}).get("codigo_predio") or predio.upper(),
+            "center": predios_info.get(predio.lower(), {}).get("center", [0.0, 0.0]),
+            "area_ha": predios_info.get(predio.lower(), {}).get("area_ha"),
+            "available_years": sorted({r["year"] for r in records}),
+            "historic_years": historic_years,
+            "current_year": current_year,
+            "n_weeks_current": sum(1 for r in records if r["year"] == current_year),
+            "n_weeks_total": len(records),
+            "leaflet_bounds": geo["leaflet_bounds"],
+        }
+
+        write_predio_csv(csv_dir, predio, timeseries, current_year=current_year)
+        write_predio_monthly_csv(csv_dir, predio, timeseries, current_year=current_year)
+        try:
+            fp_path.write_text(fp, encoding="utf-8")
+        except OSError as exc:
+            print(f"  [aviso] no se pudo escribir huella incremental {fp_path}: {exc}", file=sys.stderr)
+
+        for comp_key, agg in aggregates.items():
+            raster_3d = agg["raster"]  # (n_bands, H, W)
+            for b_idx in band_idx_filter:
+                if b_idx >= raster_3d.shape[0]:
+                    continue
+                band = band_names[b_idx]
+                viz = BAND_VIZ.get(band, DEFAULT_VIZ)
+                stem = f"S2_{predio.upper()}_{comp_key}_{band}"
+                webp_path = rasters_dir / f"{stem}.webp"
+
+                if not (webp_path.exists() and not force):
+                    try:
+                        render_band_to_webp(
+                            raster_3d[b_idx],
+                            webp_path,
+                            vmin=viz["vmin"],
+                            vmax=viz["vmax"],
+                            colormap=viz["colormap"],
+                            upscale_min_side=upscale_min_side,
+                            quality=webp_quality,
+                        )
+                    except (OSError, ValueError) as exc:
+                        print(f"  [error] {stem}: {exc}", file=sys.stderr)
+                        continue
+
+                raster_key = f"{predio.lower()}_{comp_key.lower()}_{band.lower()}"
+                # Compactamos al máximo: solo path + label + n_inputs (bounds y opciones de
+                # render se reconstruyen en el front desde ``wetlands[predio]`` + ``indices``).
+                rasters_meta[raster_key] = {
+                    "p": f"sentinel2/rasters/{stem}.webp",
+                    "l": agg["label"],
+                    "n": agg["n_inputs"],
+                }
+        print(f"  Rasters: agregados={len(aggregates)} bandas={len(band_idx_filter)}")
+
+    # Indices catalog para el frontend.
+    indices_out: dict[str, dict] = {}
+    band_order = [b for b in DEFAULT_CHART_BAND_ORDER if b in band_set]
+    band_order.extend(sorted(b for b in band_set if b not in band_order))
+    for band in band_order:
+        viz = BAND_VIZ.get(band, DEFAULT_VIZ)
+        indices_out[band] = {
+            "label": viz.get("label") or band,
+            "vmin": viz["vmin"],
+            "vmax": viz["vmax"],
+            "colormap": viz["colormap"],
+            "visual_only": False,
+        }
+
+    # Último completo (a partir de records globales).
+    metadata = {
+        "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+        "aoi_id_column": "wetland_id",
+        "current_year": current_year,
+        "historic_years": historic_years,
+        "available_years": sorted(all_years),
+        "last_complete_week": {"year": lc_week_y, "week": lc_week_w},
+        "last_complete_month": {"year": lm_year, "month": lm_month},
+        "source": {
+            "id": "sentinel2",
+            "label": "Satélite Sentinel-2",
+            "description": "Mosaicos semanales Sentinel-2 por predio (agregados locales).",
+            "color": "#1d6b4a",
+            "has_data": bool(wetlands_meta),
+        },
+        "raster_defaults": {
+            "format": "WEBP",
+            "render_mode": "smooth",
+            "opacity": 0.88,
+        },
+        "indices": indices_out,
+        "default_chart_band": next((b for b in DEFAULT_CHART_BAND_ORDER if b in band_set), None),
+        "view_modes": {
+            "monthly": {
+                "pill_by": "month",
+                "months": list(range(1, 13)),
+                "month_labels": MONTH_NAMES_ES,
+                "left_label": "Hist. del mes",
+                "right_label": f"Mes en {current_year}",
+                "left_composite_template": "monthly_hist_{month:02d}",
+                "right_composite_template": "monthly_current_{month:02d}",
+            },
+            "weekly": {
+                "pill_by": "week",
+                "weeks": list(range(1, 53)),
+                "left_label": "Hist. de la semana",
+                "right_label": f"Semana en {current_year}",
+                "left_composite_template": "weekly_hist_W{week:02d}",
+                "right_composite_template": "weekly_current_W{week:02d}",
+                "default_week": lc_week_w,
+            },
+        },
+        "wetlands": wetlands_meta,
+        "rasters": rasters_meta,
+        "summary": {
+            "n_wetlands": len(wetlands_meta),
+            "raster_count": len(rasters_meta),
+            "available_years": sorted(all_years),
+        },
+    }
+
+    meta_path = static_dir / "metadata.json"
+    meta_path.write_text(
+        json.dumps(metadata, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    print(f"\nMetadata escrita: {meta_path.relative_to(REPO_ROOT)} "
+          f"({meta_path.stat().st_size / 1024:.1f} KB)")
+
+    timeseries_path = static_dir / "timeseries.json"
+    timeseries_payload = {
+        "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+        "current_year": current_year,
+        "default_band": metadata["default_chart_band"],
+        "wetlands": timeseries_all,
+    }
+    timeseries_path.write_text(
+        json.dumps(timeseries_payload, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    print(f"Serie temporal escrita: {timeseries_path.relative_to(REPO_ROOT)} "
+          f"({timeseries_path.stat().st_size / 1024:.1f} KB)")
+
+    update_sources_manifest(static_dir.parent, metadata)
+    print(
+        f"Listo. Predios: {len(wetlands_meta)} | Rasters WebP: {len(rasters_meta)} | "
+        f"Bandas: {len(indices_out)}"
+    )
+
+
+def update_sources_manifest(data_static_dir: Path, sentinel_meta: dict) -> None:
+    """Actualiza ``data_static/sources_manifest.json`` con el estado de Sentinel-2."""
+    manifest_path = data_static_dir / "sources_manifest.json"
+    try:
+        manifest = (
+            json.loads(manifest_path.read_text(encoding="utf-8"))
+            if manifest_path.is_file()
+            else {}
+        )
+    except (OSError, json.JSONDecodeError):
+        manifest = {}
+    manifest.setdefault("sources", {})
+    manifest["sources"]["sentinel2"] = {
+        "id": "sentinel2",
+        "label": sentinel_meta["source"]["label"],
+        "description": sentinel_meta["source"]["description"],
+        "color": sentinel_meta["source"]["color"],
+        "has_data": sentinel_meta["source"]["has_data"],
+        "timeseries_path": "sentinel2/timeseries.json",
+        "metadata_path": "sentinel2/metadata.json",
+        "csv_dir": "sentinel2/csv",
+        "status": "ready" if sentinel_meta["source"]["has_data"] else "pending",
+        "summary": sentinel_meta["summary"],
+    }
+    manifest["generated_at"] = sentinel_meta["generated_at"]
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    print(f"Manifest actualizado: {manifest_path.relative_to(REPO_ROOT)}")
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description="Pipeline LOCAL: agrega Sentinel-2 semanal a mensual/semanal con WebPs y series.",
+    )
+    parser.add_argument(
+        "--tif-dir",
+        type=Path,
+        default=DEFAULT_TIF_DIR,
+        help=f"Carpeta con TIFs semanales (default: {DEFAULT_TIF_DIR.relative_to(REPO_ROOT)}).",
+    )
+    parser.add_argument(
+        "--static-dir",
+        type=Path,
+        default=DEFAULT_STATIC_DIR,
+        help=f"Salida para data_static/sentinel2 (default: {DEFAULT_STATIC_DIR.relative_to(REPO_ROOT)}).",
+    )
+    parser.add_argument(
+        "--aoi-geojson",
+        type=Path,
+        default=DEFAULT_AOI_GEOJSON,
+        help="GeoJSON con metadatos por predio (opcional).",
+    )
+    parser.add_argument(
+        "--db-csv",
+        type=Path,
+        default=DEFAULT_DB_CSV,
+        help="CSV con datos auxiliares por predio (opcional).",
+    )
+    parser.add_argument(
+        "--current-year",
+        type=int,
+        default=None,
+        help="Año considerado «actual». Por defecto, el último presente en los TIFs.",
+    )
+    parser.add_argument(
+        "--bands",
+        default=None,
+        metavar="LIST",
+        help="Lista separada por comas para limitar bandas (ej. NDVI,NDWI). Default: todas.",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Regenerar WebPs aunque ya existan.",
+    )
+    parser.add_argument(
+        "--no-incremental",
+        action="store_true",
+        help="Reprocesar todos los predios (releer TIFs) aunque no hayan cambiado; "
+        "por defecto el build es incremental.",
+    )
+    parser.add_argument(
+        "--upscale-min-side",
+        type=int,
+        default=WEBP_UPSCALE_MIN_SIDE,
+        help=f"Aumentar el WebP hasta que su lado menor sea ≥ N px (default: {WEBP_UPSCALE_MIN_SIDE}).",
+    )
+    parser.add_argument(
+        "--webp-quality",
+        type=int,
+        default=WEBP_QUALITY,
+        help=f"Calidad WebP 1-100 (default: {WEBP_QUALITY}).",
+    )
+    args = parser.parse_args(argv)
+
+    bands_filter = (
+        [s.strip() for s in args.bands.split(",") if s.strip()] if args.bands else None
+    )
+
+    build(
+        tif_dir=Path(args.tif_dir),
+        static_dir=Path(args.static_dir),
+        aoi_geojson=Path(args.aoi_geojson) if args.aoi_geojson else None,
+        db_csv=Path(args.db_csv) if args.db_csv else None,
+        current_year=args.current_year,
+        bands_filter=bands_filter,
+        force=args.force,
+        incremental=not args.no_incremental,
+        upscale_min_side=args.upscale_min_side,
+        webp_quality=args.webp_quality,
+    )
+
+
+if __name__ == "__main__":
+    main()

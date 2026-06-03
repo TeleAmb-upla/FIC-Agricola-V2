@@ -1,0 +1,1 @@
+{"current_year":2026,"last_complete_month":[2026,4],"last_complete_week":[2026,19],"max_tif_mtime_ns":1778699252844050553,"n_tifs":123,"thursday_first":"2024-01-04","thursday_last":"2026-05-07"}
