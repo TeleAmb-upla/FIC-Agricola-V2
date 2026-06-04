@@ -27,3 +27,11 @@ export_drone_log.txt
 # Locks de geodatabases en uso
 **/*.sr.lock
 **/*.gdbtable.lock
+
+# Dron crudo (local): en el repo solo va la vista web en data_static/drone/
+data/drone/**/*.las
+data/drone/**/*.LAS
+data/drone/**/*.tif
+data/drone/**/*.tiff
+data/drone/**/*.TIF
+data/drone/**/*.TIFF

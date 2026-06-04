@@ -2,5 +2,3 @@
 *.tiff filter=lfs diff=lfs merge=lfs -text
 *.TIF filter=lfs diff=lfs merge=lfs -text
 *.TIFF filter=lfs diff=lfs merge=lfs -text
-*.las filter=lfs diff=lfs merge=lfs -text
-*.LAS filter=lfs diff=lfs merge=lfs -text
