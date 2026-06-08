@@ -1898,12 +1898,16 @@ function ficApplyLidarLegends() {
         return;
     }
     var lim = (typeof FicLidar3d !== 'undefined') ? FicLidar3d.stretchForAttr(attrId) : {};
-    var vn = Number(lim.vmin != null ? lim.vmin : (im && im.vmin));
-    var vx = Number(lim.vmax != null ? lim.vmax : (im && im.vmax));
-    if (!isFinite(vn) || !isFinite(vx)) {
+    var vn = Number(lim.vmin);
+    var vx = Number(lim.vmax);
+    if (!isFinite(vn) || !isFinite(vx) || vx <= vn) {
         return;
     }
-    gEl.style.background = ficColormapToGradient(im && im.colormap ? im.colormap : 'viridis');
+    if (typeof FicLidar3d.scalarLegendGradientCss === 'function') {
+        gEl.style.background = FicLidar3d.scalarLegendGradientCss();
+    } else {
+        gEl.style.background = ficColormapToGradient(im && im.colormap ? im.colormap : 'viridis');
+    }
     tEl.textContent = (im && im.label) || attrId;
     minEl.textContent = ficFormatLegendScalar(vn);
     maxEl.textContent = ficFormatLegendScalar(vx);

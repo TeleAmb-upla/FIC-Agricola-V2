@@ -81,18 +81,39 @@
       return attrs[attrId] || null;
     },
 
-    stretchForAttr: function (attrId) {
+    stretchForAttr: function (attrId, pcdData) {
+      const data = pcdData || (api.las3d.pcdCache && api.las3d.pcdCache.data);
+      const fromPcd = data && data.attributes && data.attributes[attrId];
+      if (fromPcd && fromPcd.type === 'scalar' &&
+          fromPcd.vmin != null && fromPcd.vmax != null &&
+          isFinite(Number(fromPcd.vmin)) && isFinite(Number(fromPcd.vmax))) {
+        return { vmin: Number(fromPcd.vmin), vmax: Number(fromPcd.vmax), source: 'pointcloud' };
+      }
       const meta = api.droneMeta();
       const stretch = meta.lidar_stretch || {};
       const glim = stretch[attrId];
-      if (glim && glim.vmin != null) return { vmin: glim.vmin, vmax: glim.vmax };
-      const cached = api.las3d.pcdCache && api.las3d.pcdCache.data;
-      const fromPcd = cached && cached.attributes && cached.attributes[attrId];
-      if (fromPcd && fromPcd.vmin != null && fromPcd.vmax != null) {
-        return { vmin: fromPcd.vmin, vmax: fromPcd.vmax };
+      if (glim && glim.vmin != null && glim.vmax != null) {
+        return { vmin: glim.vmin, vmax: glim.vmax, source: 'metadata' };
       }
       const a = api.lidarAttrMeta(attrId) || {};
-      return { vmin: a.fallback_vmin != null ? a.fallback_vmin : a.vmin, vmax: a.fallback_vmax != null ? a.fallback_vmax : a.vmax };
+      return {
+        vmin: a.fallback_vmin != null ? a.fallback_vmin : a.vmin,
+        vmax: a.fallback_vmax != null ? a.fallback_vmax : a.vmax,
+        source: 'catalog'
+      };
+    },
+
+    /** Gradiente CSS alineado con ``elevationToRgb`` (coloreado escalar LiDAR). */
+    scalarLegendGradientCss: function () {
+      const stops = [0, 0.25, 0.5, 0.75, 1];
+      const parts = stops.map(function (t) {
+        const rgb = elevationToRgb(t);
+        const r = Math.round(rgb[0] * 255);
+        const g = Math.round(rgb[1] * 255);
+        const b = Math.round(rgb[2] * 255);
+        return 'rgb(' + r + ',' + g + ',' + b + ') ' + (t * 100).toFixed(1) + '%';
+      });
+      return 'linear-gradient(to top, ' + parts.join(', ') + ')';
     },
 
     viewKey: function (wid, pk) {
@@ -275,7 +296,7 @@
       if (!data.count || !data.positions || !data.positions.length) return null;
       const attrId = api.state.lidarAttribute || 'canopy';
       const attr = (data.attributes && data.attributes[attrId]) || null;
-      const lim = api.stretchForAttr(attrId);
+      const lim = api.stretchForAttr(attrId, data);
       const pos = data.positions;
       let n = pos.length / 3;
       const maxRender = 450000;

@@ -56,7 +56,7 @@ OUTPUT_DIR = Path("data_static")
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Subir cuando cambien máscaras / recorte RGB en ``build_preview_rgb`` (invalida WebP cacheados con reuse).
-RGB_PREVIEW_MASK_REVISION = 6
+RGB_PREVIEW_MASK_REVISION = 8
 
 SEASON_MID_DATES = {
     "verano": "-02-15",
@@ -175,7 +175,18 @@ def reuse_existing_preview(
         return None
     if not preview_path.exists():
         return None
-    return existing_entry.get("visual")
+    visual = existing_entry.get("visual")
+    if not isinstance(visual, dict):
+        return None
+    cached_size = visual.get("display_size")
+    if isinstance(cached_size, (list, tuple)) and len(cached_size) == 2:
+        try:
+            with Image.open(preview_path) as img:
+                if [int(img.width), int(img.height)] != [int(cached_size[0]), int(cached_size[1])]:
+                    return None
+        except OSError:
+            return None
+    return visual
 
 
 def _reuse_previews_allowed(cfg: dict) -> bool:
@@ -313,14 +324,38 @@ def _rgb_read_band_indexes(src) -> tuple[list[int], int | None]:
     return idx, mask_band
 
 
+def _rgb_mask_plane_reliable(stretch_ok: np.ndarray, mask_plane: np.ndarray | None) -> np.ndarray | None:
+    """
+    Ortos 8-band: la banda 8 a veces viene incompleta (0/65535) aunque el RGB dentro del AOI sea válido.
+    Si descartaría demasiados píxeles ya marcados como válidos, se ignora la banda auxiliar.
+    """
+    if mask_plane is None:
+        return None
+    base = stretch_ok.astype(bool, copy=False)
+    inner = int(base.sum())
+    if inner <= 0:
+        return mask_plane
+    mf = np.asarray(mask_plane, dtype=np.float32)
+    if np.nanmax(mf) > 256:
+        band_ok = np.isfinite(mf) & (mf > 32768)
+    else:
+        band_ok = np.isfinite(mf) & (mf > 0)
+    kept = int((band_ok & base).sum())
+    if kept / inner < 0.92:
+        return None
+    return mask_plane
+
+
 def _rgb_apply_validity_mask(
     stretch_ok: np.ndarray,
     raw_for_filters: np.ndarray,
     mask_plane: np.ndarray | None,
+    *,
+    skip_rgb_zero: bool = False,
 ) -> np.ndarray:
     """Quita píxeles nodata (RGB=0 o máscara=0) que quedarían negros opacos en el WebP."""
     ok = stretch_ok.astype(bool, copy=True)
-    if raw_for_filters.shape[0] >= 3:
+    if not skip_rgb_zero and raw_for_filters.shape[0] >= 3:
         zero = (
             (raw_for_filters[0] <= 0)
             & (raw_for_filters[1] <= 0)
@@ -635,7 +670,11 @@ def build_preview_rgb(
             stretch_ok = _valid_reflectance_pixels(raw_for_filters, src, inside_mask, 3)
             if not clipped_ok:
                 stretch_ok &= _rgb_keep_non_border_fill(raw_for_filters, visualization_cfg)
-            stretch_ok = _rgb_apply_validity_mask(stretch_ok, raw_for_filters, mask_plane_rs)
+            mask_for_ok = _rgb_mask_plane_reliable(stretch_ok, mask_plane_rs)
+            skip_rgb_zero = bool(clipped_ok and mask_for_ok is None)
+            stretch_ok = _rgb_apply_validity_mask(
+                stretch_ok, raw_for_filters, mask_for_ok, skip_rgb_zero=skip_rgb_zero
+            )
             r = _stretch_to_uint8(stretch_arr_f[0], stretch_ok, stretch_percentiles)
             g = _stretch_to_uint8(stretch_arr_f[1], stretch_ok, stretch_percentiles)
             b = _stretch_to_uint8(stretch_arr_f[2], stretch_ok, stretch_percentiles)
@@ -655,7 +694,7 @@ def build_preview_rgb(
                 has_color = stretch_ok & ((r_u8 > 0) | (g_u8 > 0) | (b_u8 > 0))
                 alpha_u8 = np.where(has_color, np.uint8(255), np.uint8(0)).astype(np.uint8)
             rgba = np.stack([r_u8, g_u8, b_u8, alpha_u8], axis=-1)
-            if geo_transform is not None:
+            if geo_transform is not None and not clipped_ok:
                 rgba, stretch_ok, geo_transform, tight_bbox = _crop_rgba_to_valid_extent(
                     rgba, stretch_ok, geo_transform, src.crs
                 )
