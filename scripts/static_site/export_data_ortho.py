@@ -57,7 +57,23 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Subir cuando cambien máscaras / recorte RGB en ``build_preview_rgb`` (invalida WebP cacheados con reuse).
 RGB_PREVIEW_MASK_REVISION = 11
-THERMAL_PREVIEW_REVISION = 3
+THERMAL_PREVIEW_REVISION = 4
+
+
+def _thermal_stretch_percentiles(index_cfg: dict, wetland_id: str | None) -> tuple[float, float]:
+    """P0–P95 sólo en predios con picos térmicos espurios (RIV); el resto usa P0–P100."""
+    default = tuple(index_cfg.get("stretch_percentiles") or [0, 100])
+    if len(default) != 2:
+        default = (0.0, 100.0)
+    riv_ids = {
+        str(w).strip().lower()
+        for w in (index_cfg.get("legend_p95_wetland_ids") or ["riv"])
+    }
+    if wetland_id and str(wetland_id).strip().lower() in riv_ids:
+        custom = tuple(index_cfg.get("stretch_percentiles_p95_legend") or [0, 95])
+        if len(custom) == 2:
+            return custom
+    return default
 
 SEASON_MID_DATES = {
     "verano": "-02-15",
@@ -589,13 +605,12 @@ def build_preview_thermal(
     visualization_cfg: dict,
     geom_wgs84: dict | None,
     index_cfg: dict,
+    wetland_id: str | None = None,
 ) -> dict | None:
-    """WebP térmico con colormap y rango P0–P95 dentro del AOI (picos >P95 se descartan)."""
+    """WebP térmico con colormap; la leyenda usa P0–P95 sólo en predios configurados (RIV)."""
     clip_to_aoi = visualization_cfg.get("clip_to_aoi", False) and geom_wgs84 is not None
     max_dim_cfg = visualization_cfg.get("index_preview_max_size") or visualization_cfg.get("rgb_max_size")
-    stretch_percentiles = tuple(index_cfg.get("stretch_percentiles") or [0, 95])
-    if len(stretch_percentiles) != 2:
-        stretch_percentiles = (0, 95)
+    stretch_percentiles = _thermal_stretch_percentiles(index_cfg, wetland_id)
     cmap_name = str(index_cfg.get("colormap", "Turbo"))
 
     leaflet_bbox = None
@@ -670,8 +685,6 @@ def build_preview_thermal(
         vmax = float(np.nanmax(valid))
     if vmax <= vmin:
         vmax = vmin + 1.0
-
-    nodata_mask |= np.isfinite(data) & (data > vmax)
 
     rgba = apply_colormap(data, nodata_mask, vmin, vmax, cmap_name)
 
@@ -1216,7 +1229,7 @@ def ingest_flat_drone_date_assets(
             if preview_meta is None:
                 if index_key == "thermal":
                     preview_meta = build_preview_thermal(
-                        tiff_path, preview_path, viz_flat, preview_geom_flat, index_cfg
+                        tiff_path, preview_path, viz_flat, preview_geom_flat, index_cfg, code_wid
                     )
                 else:
                     preview_meta = build_preview_rgb(tiff_path, preview_path, viz_flat, preview_geom_flat)
@@ -1531,7 +1544,7 @@ def export_source(
                         if preview_meta is None:
                             if index_key == "thermal":
                                 preview_meta = build_preview_thermal(
-                                    tiff_path, preview_path, visualization_cfg, preview_geom_union, index_cfg
+                                    tiff_path, preview_path, visualization_cfg, preview_geom_union, index_cfg, wetland_id
                                 )
                             else:
                                 preview_meta = build_preview_rgb(

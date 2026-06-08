@@ -144,6 +144,8 @@ indices:
     description: "Ortomosaico térmico"
     visual_only: true
     colormap: "Turbo"
-    stretch_percentiles: [0, 95]
+    stretch_percentiles: [0, 100]
+    stretch_percentiles_p95_legend: [0, 95]
+    legend_p95_wetland_ids: ["riv"]
 
 stats: ["mean"]
