@@ -57,11 +57,11 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Subir cuando cambien máscaras / recorte RGB en ``build_preview_rgb`` (invalida WebP cacheados con reuse).
 RGB_PREVIEW_MASK_REVISION = 11
-THERMAL_PREVIEW_REVISION = 4
+THERMAL_PREVIEW_REVISION = 5
 
 
 def _thermal_stretch_percentiles(index_cfg: dict, wetland_id: str | None) -> tuple[float, float]:
-    """P0–P95 sólo en predios con picos térmicos espurios (RIV); el resto usa P0–P100."""
+    """P0–P98 en predios con picos térmicos espurios (RIV); el resto usa P0–P100."""
     default = tuple(index_cfg.get("stretch_percentiles") or [0, 100])
     if len(default) != 2:
         default = (0.0, 100.0)
@@ -607,7 +607,7 @@ def build_preview_thermal(
     index_cfg: dict,
     wetland_id: str | None = None,
 ) -> dict | None:
-    """WebP térmico con colormap; la leyenda usa P0–P95 sólo en predios configurados (RIV)."""
+    """WebP térmico con colormap; la leyenda usa P0–P98 sólo en predios configurados (RIV)."""
     clip_to_aoi = visualization_cfg.get("clip_to_aoi", False) and geom_wgs84 is not None
     max_dim_cfg = visualization_cfg.get("index_preview_max_size") or visualization_cfg.get("rgb_max_size")
     stretch_percentiles = _thermal_stretch_percentiles(index_cfg, wetland_id)

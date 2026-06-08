@@ -44,7 +44,7 @@ LAS_NAME = re.compile(
     r"^((?:G\d+)|(?:NOG)|(?:RCI)|(?:RPA)|(?:RIV))_((?:\d{8})|(?:\d{4}[_-]\d{2}[_-]\d{2})).*\.las$",
     re.I,
 )
-MAX_POINTCLOUD_POINTS = 450_000
+MAX_POINTCLOUD_POINTS = 750_000
 GROUND_PERCENTILE = 5.0
 LIDAR_DEFAULT_ATTR = "canopy"
 DRONE_PROJECTED_CRS = "EPSG:32719"

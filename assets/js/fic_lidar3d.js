@@ -299,7 +299,7 @@
       const lim = api.stretchForAttr(attrId, data);
       const pos = data.positions;
       let n = pos.length / 3;
-      const maxRender = 450000;
+      const maxRender = 750000;
       const step = n > maxRender ? Math.ceil(n / maxRender) : 1;
       const nOut = Math.ceil(n / step);
       const verts = new Float32Array(nOut * 3);
@@ -345,7 +345,7 @@
       geom.setAttribute('position', new THREE.BufferAttribute(verts.subarray(0, oi * 3), 3));
       geom.setAttribute('color', new THREE.BufferAttribute(cols.subarray(0, oi * 3), 3));
       geom.computeBoundingSphere();
-      const pointSize = Math.max(0.055, Math.min(0.14, 520 / Math.sqrt(oi)));
+      const pointSize = Math.max(0.06, Math.min(0.17, 620 / Math.sqrt(oi)));
       const mat = new THREE.PointsMaterial({
         size: pointSize,
         vertexColors: true,
