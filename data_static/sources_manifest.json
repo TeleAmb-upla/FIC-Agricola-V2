@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-03T13:07:34+00:00",
+  "generated_at": "2026-06-08T00:12:52.913782+00:00",
   "aoi_path": "wetlands_aoi.geojson",
   "year_range": {
     "start": 2024,
@@ -17,13 +17,33 @@
       "csv_dir": "drone/csv",
       "status": "ready",
       "summary": {
-        "n_wetlands": 10,
-        "n_periods": 2,
+        "n_wetlands": 11,
+        "n_periods": 3,
         "data_points": 0,
-        "raster_count": 29,
-        "total_area_ha": 24.0,
-        "latest_period": "Vuelo 28 May 2026",
+        "raster_count": 33,
+        "total_area_ha": 28.0,
+        "latest_period": "Vuelo 29 May 2026",
         "available_years": [
+          2026
+        ]
+      }
+    },
+    "sentinel2": {
+      "id": "sentinel2",
+      "label": "Satélite Sentinel-2",
+      "description": "Mosaicos semanales Sentinel-2 por predio (agregados locales).",
+      "color": "#1d6b4a",
+      "has_data": true,
+      "timeseries_path": "sentinel2/timeseries.json",
+      "metadata_path": "sentinel2/metadata.json",
+      "csv_dir": "sentinel2/csv",
+      "status": "ready",
+      "summary": {
+        "n_wetlands": 10,
+        "raster_count": 24640,
+        "available_years": [
+          2024,
+          2025,
           2026
         ]
       }

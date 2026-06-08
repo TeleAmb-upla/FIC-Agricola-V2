@@ -1,34 +1,34 @@
 /**
- * Visualización LiDAR 3D (Three.js) — adaptado desde fondecyt_puc/explorador.html
+ * Visualización LiDAR 3D (Three.js) — portado desde fondecyt_puc/explorador.html
  */
 (function (global) {
   'use strict';
 
-  const TERRAIN_CMAP = [
-    [0.0, [0.2, 0.2, 0.5]],
-    [0.25, [0.1, 0.5, 0.3]],
-    [0.5, [0.4, 0.75, 0.2]],
-    [0.75, [0.85, 0.7, 0.15]],
-    [1.0, [0.95, 0.95, 0.9]]
-  ];
+  const LIDAR_CLASS_LEGEND_DEFAULT = {
+    '2': { label: 'Suelo', color: '#8B4513' },
+    '1': { label: 'No suelo', color: '#808080' }
+  };
 
+  /** Colormap escalar (misma paleta que fondecyt_puc). */
   function elevationToRgb(t) {
     const x = Math.max(0, Math.min(1, t));
-    for (let i = 1; i < TERRAIN_CMAP.length; i++) {
-      if (x <= TERRAIN_CMAP[i][0]) {
-        const t0 = TERRAIN_CMAP[i - 1][0];
-        const t1 = TERRAIN_CMAP[i][0];
-        const c0 = TERRAIN_CMAP[i - 1][1];
-        const c1 = TERRAIN_CMAP[i][1];
-        const u = (x - t0) / (t1 - t0 + 1e-9);
+    const stops = [
+      [0, [51, 51, 153]], [0.25, [42, 122, 176]], [0.5, [143, 216, 211]],
+      [0.75, [200, 232, 142]], [1, [220, 140, 51]]
+    ];
+    for (let i = 0; i < stops.length - 1; i++) {
+      const [p0, c0] = stops[i];
+      const [p1, c1] = stops[i + 1];
+      if (x >= p0 && x <= p1) {
+        const f = (x - p0) / (p1 - p0 + 1e-9);
         return [
-          c0[0] + (c1[0] - c0[0]) * u,
-          c0[1] + (c1[1] - c0[1]) * u,
-          c0[2] + (c1[2] - c0[2]) * u
+          (c0[0] + (c1[0] - c0[0]) * f) / 255,
+          (c0[1] + (c1[1] - c0[1]) * f) / 255,
+          (c0[2] + (c1[2] - c0[2]) * f) / 255
         ];
       }
     }
-    return TERRAIN_CMAP[TERRAIN_CMAP.length - 1][1];
+    return [0.86, 0.55, 0.2];
   }
 
   function hexColorTo01(hex) {
@@ -44,7 +44,12 @@
   const api = {
     state: null,
     baseUrl: '',
-    las3d: { inited: false, scene: null, camera: null, controls: null, points: [], animId: null, lastViewKey: null, cameraReady: false, pcdCache: null, _resize: null },
+    lidarClassColors: null,
+    las3d: {
+      inited: false, scene: null, camera: null, controls: null, renderer: null,
+      points: [], boundary: null, animId: null, lastViewKey: null,
+      cameraReady: false, pcdCache: null, _resize: null
+    },
     loadGen: 0,
 
     bind: function (appState, dataStaticBase) {
@@ -53,24 +58,45 @@
     },
 
     isLidarLayer: function () {
-      return api.state && api.state.mapLayerKind === 'lidar';
+      return api.state && String(api.state.mapLayerKind || '').toLowerCase() === 'lidar';
+    },
+
+    droneMeta: function () {
+      return (api.state && api.state.metadata && api.state.metadata.drone) || api.state.metadata || {};
     },
 
     findPointcloudEntry: function (wid, periodKey) {
-      const meta = (api.state && api.state.metadata && api.state.metadata.drone) || api.state.metadata || {};
-      const pcs = meta.pointclouds || {};
-      const stem = String(wid).toLowerCase() + '_' + String(periodKey || '');
-      return pcs[stem] || null;
+      const pcs = api.droneMeta().pointclouds || {};
+      const prefix = String(wid).toLowerCase() + '_';
+      const stem = prefix + String(periodKey || '');
+      if (pcs[stem]) return pcs[stem];
+      var keys = Object.keys(pcs).filter(function (k) { return k.indexOf(prefix) === 0; });
+      if (!keys.length) return null;
+      keys.sort(function (a, b) { return String(b).localeCompare(String(a)); });
+      return pcs[keys[0]] || null;
+    },
+
+    lidarAttrMeta: function (attrId) {
+      const attrs = api.droneMeta().lidar_attributes || {};
+      return attrs[attrId] || null;
     },
 
     stretchForAttr: function (attrId) {
-      const meta = api.state.metadata.drone || api.state.metadata || {};
+      const meta = api.droneMeta();
       const stretch = meta.lidar_stretch || {};
       const glim = stretch[attrId];
       if (glim && glim.vmin != null) return { vmin: glim.vmin, vmax: glim.vmax };
-      const attrs = meta.lidar_attributes || {};
-      const a = attrs[attrId] || {};
-      return { vmin: a.fallback_vmin, vmax: a.fallback_vmax };
+      const cached = api.las3d.pcdCache && api.las3d.pcdCache.data;
+      const fromPcd = cached && cached.attributes && cached.attributes[attrId];
+      if (fromPcd && fromPcd.vmin != null && fromPcd.vmax != null) {
+        return { vmin: fromPcd.vmin, vmax: fromPcd.vmax };
+      }
+      const a = api.lidarAttrMeta(attrId) || {};
+      return { vmin: a.fallback_vmin != null ? a.fallback_vmin : a.vmin, vmax: a.fallback_vmax != null ? a.fallback_vmax : a.vmax };
+    },
+
+    viewKey: function (wid, pk) {
+      return String(wid || '') + '|' + String(pk || '');
     },
 
     clearPoints: function () {
@@ -94,14 +120,17 @@
       if (api.las3d.inited || typeof THREE === 'undefined') return;
       const canvas = document.getElementById('las3dCanvas');
       if (!canvas) return;
+      const prev = api.las3d || {};
       const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+      renderer.setClearColor(0x0c1210, 1);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x0d120f);
+      scene.background = new THREE.Color(0x0c1210);
       const camera = new THREE.PerspectiveCamera(52, 1, 0.05, 8000);
       const controls = new THREE.OrbitControls(camera, canvas);
       controls.enableDamping = true;
       controls.dampingFactor = 0.08;
+      controls.screenSpacePanning = true;
       api.las3d = {
         inited: true,
         scene: scene,
@@ -110,9 +139,9 @@
         renderer: renderer,
         points: [],
         animId: null,
-        lastViewKey: null,
-        cameraReady: false,
-        pcdCache: null,
+        lastViewKey: prev.lastViewKey || null,
+        cameraReady: prev.cameraReady || false,
+        pcdCache: prev.pcdCache || null,
         boundary: null,
         _resize: null
       };
@@ -121,6 +150,7 @@
         if (!box || box.hidden) return;
         const w = box.clientWidth || 1;
         const h = box.clientHeight || 1;
+        if (w < 1 || h < 1) return;
         renderer.setSize(w, h, false);
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
@@ -139,31 +169,86 @@
     showView: function (show) {
       const view = document.getElementById('las3dView');
       const mapEl = document.getElementById('mapa');
-      const hud = document.querySelector('.fic-map-hud');
       if (view) view.hidden = !show;
-      if (mapEl) mapEl.style.visibility = show ? 'hidden' : 'visible';
-      if (hud) hud.style.visibility = show ? 'hidden' : 'visible';
+      if (mapEl) {
+        mapEl.style.visibility = show ? 'hidden' : 'visible';
+        mapEl.style.opacity = show ? '0' : '1';
+        mapEl.style.pointerEvents = show ? 'none' : '';
+      }
       document.body.classList.toggle('fic-mode-lidar-3d', !!show);
       if (!show) {
         api.loadGen++;
         api.clearPoints();
+        api.applyClassLegend(false);
       } else if (api.las3d._resize) {
         requestAnimationFrame(api.las3d._resize);
       }
     },
 
-    populateLidarAttrSelect: function () {
-      const sel = document.getElementById('ficLidarAttr');
-      const wrap = document.getElementById('ficLidarAttrFields');
-      if (!sel || !wrap) return;
-      const meta = api.state.metadata.drone || api.state.metadata || {};
-      const attrs = meta.lidar_attributes || {};
-      const ids = Object.keys(attrs);
-      if (!ids.length) {
-        wrap.hidden = true;
+    classificationLegendItems: function () {
+      const colors = api.lidarClassColors || {};
+      const keys = Object.keys(colors).length
+        ? Object.keys(colors)
+        : Object.keys(LIDAR_CLASS_LEGEND_DEFAULT);
+      return keys.sort(function (a, b) { return String(b).localeCompare(String(a)); }).map(function (key) {
+        const def = LIDAR_CLASS_LEGEND_DEFAULT[key] || { label: 'Clase ' + key, color: '#888888' };
+        return { label: def.label, color: colors[key] || def.color };
+      });
+    },
+
+    applyClassLegend: function (show) {
+      const box = document.getElementById('lidarClassLegend');
+      const list = document.getElementById('lidarClassLegendItems');
+      if (!box || !list) return;
+      const visible = show !== false && api.isLidarLayer() &&
+        api.state.selectedSource === 'drone' &&
+        String(api.state.lidarAttribute || '') === 'classification';
+      if (!visible) {
+        box.hidden = true;
+        box.style.display = 'none';
+        box.setAttribute('aria-hidden', 'true');
         return;
       }
-      wrap.hidden = !api.isLidarLayer();
+      list.innerHTML = api.classificationLegendItems().map(function (it) {
+        return '<div class="lidar-class-legend-item">' +
+          '<span class="lidar-class-legend-swatch" style="background:' + it.color + '"></span>' +
+          '<span>' + it.label + '</span></div>';
+      }).join('');
+      box.hidden = false;
+      box.style.display = 'flex';
+      box.setAttribute('aria-hidden', 'false');
+    },
+
+    addBoundary: function (data, colorHex) {
+      if (!data || !data.boundary || data.boundary.length < 2 || !api.las3d.scene) return;
+      const flat = [];
+      data.boundary.forEach(function (p) {
+        flat.push(p[0], p[1], p[2] != null ? p[2] : 0);
+      });
+      const geom = new THREE.BufferGeometry();
+      geom.setAttribute('position', new THREE.Float32BufferAttribute(flat, 3));
+      const mat = new THREE.LineBasicMaterial({
+        color: new THREE.Color(colorHex || '#ffffff'),
+        transparent: true,
+        opacity: 0.95
+      });
+      const line = new THREE.LineLoop(geom, mat);
+      api.las3d.scene.add(line);
+      api.las3d.boundary = line;
+    },
+
+    populateLidarAttrSelect: function () {
+      const sel = document.getElementById('ficLidarAttr');
+      if (!sel) return;
+      if (!api.isLidarLayer() || api.state.selectedSource !== 'drone') {
+        return;
+      }
+      if (typeof global.ficIsLidarAttrPanelActive === 'function' && !global.ficIsLidarAttrPanelActive()) {
+        return;
+      }
+      const attrs = api.droneMeta().lidar_attributes || {};
+      const ids = Object.keys(attrs);
+      if (!ids.length) return;
       sel.innerHTML = '';
       ids.forEach(function (id) {
         const opt = document.createElement('option');
@@ -171,51 +256,55 @@
         opt.textContent = (attrs[id] && attrs[id].label) || id;
         sel.appendChild(opt);
       });
-      const def = meta.lidar_default_attribute || 'canopy';
+      const def = api.droneMeta().lidar_default_attribute || 'canopy';
       if (ids.indexOf(api.state.lidarAttribute) < 0) api.state.lidarAttribute = def;
       sel.value = api.state.lidarAttribute || def;
       if (!sel.dataset.ficBound) {
         sel.dataset.ficBound = '1';
         sel.addEventListener('change', function () {
           api.state.lidarAttribute = sel.value;
-          api.updateView();
+          api.updateView({ preserveCamera: true });
+          if (typeof global.ficApplyLidarLegends === 'function') global.ficApplyLidarLegends();
         });
       }
     },
 
-    loadPointcloud: async function (wid, periodKey, colorHex, cachedData) {
+    loadPointcloud: function (wid, periodKey, colorHex, cachedData) {
       let data = cachedData;
-      if (!data) {
-        const entry = api.findPointcloudEntry(wid, periodKey);
-        if (!entry || !entry.p) return null;
-        const url = api.baseUrl + '/' + entry.p;
-        const r = await fetch(url);
-        if (!r.ok) return null;
-        data = await r.json();
-      }
-      if (!data || !data.count || !data.positions || !data.positions.length) return null;
+      if (!data) return null;
+      if (!data.count || !data.positions || !data.positions.length) return null;
       const attrId = api.state.lidarAttribute || 'canopy';
       const attr = (data.attributes && data.attributes[attrId]) || null;
       const lim = api.stretchForAttr(attrId);
       const pos = data.positions;
       let n = pos.length / 3;
-      const maxRender = 120000;
+      const maxRender = 450000;
       const step = n > maxRender ? Math.ceil(n / maxRender) : 1;
       const nOut = Math.ceil(n / step);
       const verts = new Float32Array(nOut * 3);
       const cols = new Float32Array(nOut * 3);
       let oi = 0;
       for (let i = 0; i < n; i += step) {
-        verts[oi * 3] = pos[i * 3];
-        verts[oi * 3 + 1] = pos[i * 3 + 1];
-        verts[oi * 3 + 2] = pos[i * 3 + 2];
+        const pi = i * 3;
+        verts[oi * 3] = pos[pi];
+        verts[oi * 3 + 1] = pos[pi + 1];
+        verts[oi * 3 + 2] = pos[pi + 2];
         let r, g, b;
-        if (attr && attr.type === 'categorical') {
+        if (attr && attr.type === 'rgb') {
+          const rv = Number(attr.red[i] || 0);
+          const scale = rv > 255 ? (1 / 65535) : (1 / 255);
+          r = rv * scale;
+          g = Number(attr.green[i] || 0) * scale;
+          b = Number(attr.blue[i] || 0) * scale;
+        } else if (attr && attr.type === 'categorical') {
           const cls = String(attr.values[i]);
+          if (attrId === 'classification' && attr.colors) {
+            api.lidarClassColors = attr.colors;
+          }
           const rgb = hexColorTo01((attr.colors && attr.colors[cls]) || '#888888');
           r = rgb[0]; g = rgb[1]; b = rgb[2];
         } else {
-          let val = pos[i * 3 + 2];
+          let val = pos[pi + 2];
           if (attr && attr.type === 'scalar' && attr.values && attr.values.length) {
             val = Number(attr.values[i]);
           }
@@ -232,27 +321,60 @@
         oi++;
       }
       const geom = new THREE.BufferGeometry();
-      geom.setAttribute('position', new THREE.BufferAttribute(verts.slice(0, oi * 3), 3));
-      geom.setAttribute('color', new THREE.BufferAttribute(cols.slice(0, oi * 3), 3));
-      const pointSize = Math.max(0.03, Math.min(0.08, 380 / Math.sqrt(oi)));
+      geom.setAttribute('position', new THREE.BufferAttribute(verts.subarray(0, oi * 3), 3));
+      geom.setAttribute('color', new THREE.BufferAttribute(cols.subarray(0, oi * 3), 3));
+      geom.computeBoundingSphere();
+      const pointSize = Math.max(0.055, Math.min(0.14, 520 / Math.sqrt(oi)));
       const mat = new THREE.PointsMaterial({
         size: pointSize,
         vertexColors: true,
         sizeAttenuation: true,
         transparent: true,
-        opacity: 0.88
+        opacity: 0.92
       });
       return new THREE.Points(geom, mat);
     },
 
-    updateView: async function () {
+    fitCamera: function (box3, preserveCamera, viewKey) {
+      const L3 = api.las3d;
+      if (preserveCamera) {
+        L3.lastViewKey = viewKey;
+        L3.cameraReady = true;
+        return;
+      }
+      if (box3.isEmpty()) return;
+      const center = box3.getCenter(new THREE.Vector3());
+      const size = box3.getSize(new THREE.Vector3());
+      const spanXY = Math.max(size.x, size.y, 1);
+      const spanZ = Math.max(size.z, 0.5);
+      const dist = spanXY * 1.05;
+      L3.camera.position.set(
+        center.x,
+        center.y - dist,
+        center.z + spanZ * 0.45 + spanXY * 0.12
+      );
+      L3.controls.target.copy(center);
+      L3.controls.minDistance = spanXY * 0.25;
+      L3.controls.maxDistance = spanXY * 6;
+      L3.controls.update();
+      L3.lastViewKey = viewKey;
+      L3.cameraReady = true;
+    },
+
+    updateView: async function (opts) {
       if (!api.isLidarLayer() || api.state.selectedSource !== 'drone') {
         api.showView(false);
         return;
       }
       const wid = api.state.selectedWetland;
-      const pk = api.state.mapPeriodKey;
-      if (!wid || !pk) {
+      let pk = api.state.mapPeriodKey;
+      if (!wid) {
+        api.showView(false);
+        return;
+      }
+      const entry = api.findPointcloudEntry(wid, pk);
+      if (entry && entry.period_key) pk = entry.period_key;
+      if (!pk) {
         api.showView(false);
         return;
       }
@@ -262,14 +384,16 @@
       if (api.las3d._resize) api.las3d._resize();
       const loadGen = ++api.loadGen;
       api.clearPoints();
-      const viewKey = wid + '|' + pk;
-      const entry = api.findPointcloudEntry(wid, pk);
+      const viewKey = api.viewKey(wid, pk);
+      const preserveCamera = !!(opts && opts.preserveCamera) ||
+        (api.las3d.cameraReady && api.las3d.lastViewKey === viewKey);
       if (!entry) {
         const note = document.getElementById('mapNote');
         if (note) note.textContent = 'No hay nube LiDAR para este predio y fecha.';
+        api.applyClassLegend(false);
         return;
       }
-      const col = (api.state.metadata.drone && api.state.metadata.drone.wetlands && api.state.metadata.drone.wetlands[wid] && api.state.metadata.drone.wetlands[wid].color) || '#1d6b4a';
+      const col = (api.droneMeta().wetlands && api.droneMeta().wetlands[wid] && api.droneMeta().wetlands[wid].color) || '#1d6b4a';
       try {
         let pcdData = api.las3d.pcdCache && api.las3d.pcdCache.key === viewKey ? api.las3d.pcdCache.data : null;
         if (!pcdData) {
@@ -280,31 +404,23 @@
           if (loadGen !== api.loadGen) return;
           api.las3d.pcdCache = { key: viewKey, data: pcdData };
         }
-        const pts = await api.loadPointcloud(wid, pk, col, pcdData);
+        const pts = api.loadPointcloud(wid, pk, col, pcdData);
         if (loadGen !== api.loadGen) return;
+        const box3 = new THREE.Box3();
         if (pts) {
           api.las3d.scene.add(pts);
           api.las3d.points.push(pts);
-          const box3 = new THREE.Box3().setFromObject(pts);
-          if (!box3.isEmpty()) {
-            const center = box3.getCenter(new THREE.Vector3());
-            const size = box3.getSize(new THREE.Vector3());
-            const spanXY = Math.max(size.x, size.y, 1);
-            const spanZ = Math.max(size.z, 0.5);
-            const dist = spanXY * 1.05;
-            api.las3d.camera.position.set(center.x, center.y - dist, center.z + spanZ * 0.45 + spanXY * 0.12);
-            api.las3d.controls.target.copy(center);
-            api.las3d.controls.minDistance = spanXY * 0.25;
-            api.las3d.controls.maxDistance = spanXY * 6;
-            api.las3d.controls.update();
-          }
-          api.las3d.lastViewKey = viewKey;
-          api.las3d.cameraReady = true;
+          box3.expandByObject(pts);
         }
+        if (pcdData) api.addBoundary(pcdData, col);
+        api.fitCamera(box3, preserveCamera && pts, viewKey);
+        if (typeof global.ficApplyLidarLegends === 'function') global.ficApplyLidarLegends();
         const note = document.getElementById('mapNote');
-        if (note) note.textContent = 'LiDAR 3D · arrastra para rotar · rueda para zoom';
+        if (note) note.textContent = 'LiDAR 3D · arrastra para rotar · usa la rueda para zoom · clic derecho para desplazar';
       } catch (e) {
         console.warn('LiDAR 3D:', e);
+        const note = document.getElementById('mapNote');
+        if (note) note.textContent = 'No se pudo cargar la nube LiDAR.';
       }
     }
   };

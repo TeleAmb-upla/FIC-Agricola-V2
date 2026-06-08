@@ -22,3 +22,24 @@ DRIVE_S2_EXPORT_FOLDER = (
     os.environ.get("FIC_DRIVE_S2_EXPORT_FOLDER", "").strip()
     or "FIC_RASTER_S2_semanales_por_predio"
 )
+
+# Earth Engine — proyecto Google Cloud para ``ee.Initialize(project=...)`` (API / facturación).
+# Debe ser el ID del proyecto GCP registrado en Earth Engine (consola EE → Configuration).
+# No confundir con el nombre del repo ``fic_agro`` ni con el esquema JSON ``fic-agro/...``.
+# Sobrescribir: ``EE_CLOUD_PROJECT`` o ``GOOGLE_CLOUD_PROJECT``.
+DEFAULT_EE_CLOUD_PROJECT = "teleambagr"
+
+# ImageCollection semanal con assets ``Y{year}_W{week}`` (índices compuestos por semana ISO).
+# Sobrescribir: ``GEE_STATS_COLLECTION``.
+DEFAULT_S2_WEEKLY_COLLECTION = "projects/teleambagr/assets/S2_weekly_valpo"
+
+
+def resolve_ee_cloud_project(cli: str | None = None) -> str:
+    """Proyecto GCP para ``ee.Initialize``: CLI > env > default FIC."""
+    if cli and str(cli).strip():
+        return str(cli).strip()
+    for key in ("EE_CLOUD_PROJECT", "GOOGLE_CLOUD_PROJECT"):
+        v = os.environ.get(key, "").strip()
+        if v:
+            return v
+    return DEFAULT_EE_CLOUD_PROJECT

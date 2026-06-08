@@ -56,7 +56,7 @@ OUTPUT_DIR = Path("data_static")
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Subir cuando cambien máscaras / recorte RGB en ``build_preview_rgb`` (invalida WebP cacheados con reuse).
-RGB_PREVIEW_MASK_REVISION = 3
+RGB_PREVIEW_MASK_REVISION = 6
 
 SEASON_MID_DATES = {
     "verano": "-02-15",
@@ -303,6 +303,63 @@ def _rgb_keep_non_border_fill(raster: np.ndarray, visualization_cfg: dict) -> np
     return finite & ~bad
 
 
+def _rgb_read_band_indexes(src) -> tuple[list[int], int | None]:
+    """Bandas RGB y, si aplica, banda de validez (ortos 8-band: máscara en banda 8)."""
+    n = int(src.count)
+    idx = [1, 2, 3] if n >= 3 else [1]
+    mask_band: int | None = 8 if n >= 8 else None
+    if mask_band is not None:
+        idx.append(mask_band)
+    return idx, mask_band
+
+
+def _rgb_apply_validity_mask(
+    stretch_ok: np.ndarray,
+    raw_for_filters: np.ndarray,
+    mask_plane: np.ndarray | None,
+) -> np.ndarray:
+    """Quita píxeles nodata (RGB=0 o máscara=0) que quedarían negros opacos en el WebP."""
+    ok = stretch_ok.astype(bool, copy=True)
+    if raw_for_filters.shape[0] >= 3:
+        zero = (
+            (raw_for_filters[0] <= 0)
+            & (raw_for_filters[1] <= 0)
+            & (raw_for_filters[2] <= 0)
+        )
+        ok &= ~zero
+    if mask_plane is not None:
+        mf = np.asarray(mask_plane, dtype=np.float32)
+        if np.nanmax(mf) > 256:
+            ok &= np.isfinite(mf) & (mf > 32768)
+        else:
+            ok &= np.isfinite(mf) & (mf > 0)
+    return ok
+
+
+def _crop_rgba_to_valid_extent(
+    rgba: np.ndarray,
+    stretch_ok: np.ndarray,
+    transform: Affine,
+    src_crs,
+) -> tuple[np.ndarray, np.ndarray, Affine, list | None]:
+    """Recorta al bbox de píxeles válidos y recalcula esquinas Leaflet (evita marco transparente/negro)."""
+    rows = np.where(np.any(stretch_ok, axis=1))[0]
+    cols = np.where(np.any(stretch_ok, axis=0))[0]
+    if rows.size == 0 or cols.size == 0:
+        return rgba, stretch_ok, transform, None
+    r0, r1 = int(rows[0]), int(rows[-1]) + 1
+    c0, c1 = int(cols[0]), int(cols[-1]) + 1
+    if r0 == 0 and c0 == 0 and r1 == rgba.shape[0] and c1 == rgba.shape[1]:
+        left, bottom, right, top = array_bounds(rgba.shape[0], rgba.shape[1], transform)
+        return rgba, stretch_ok, transform, leaflet_corners_from_affine_bounds(left, bottom, right, top, src_crs)
+    cropped = rgba[r0:r1, c0:c1]
+    cropped_ok = stretch_ok[r0:r1, c0:c1]
+    crop_tr = transform * Affine.translation(c0, r0)
+    left, bottom, right, top = array_bounds(cropped.shape[0], cropped.shape[1], crop_tr)
+    bbox = leaflet_corners_from_affine_bounds(left, bottom, right, top, src_crs)
+    return cropped, cropped_ok, crop_tr, bbox
+
+
 def _clip_geom_to_crs(geom_wgs84: dict, src_crs: rasterio.crs.CRS) -> dict:
     if not geom_wgs84 or str(src_crs) == "EPSG:4326":
         return geom_wgs84
@@ -395,13 +452,16 @@ def build_preview_rgb(
 
     with rasterio.open(raster_path) as src:
         count = int(src.count)
+        bands_to_read, mask_band_idx = _rgb_read_band_indexes(src)
         alpha_band = 4 if count >= 4 else None
-        bands_to_read = [1, 2, 3] if count >= 3 else [1]
+        rgb_band_count = 3 if count >= 3 else 1
 
         clipped_ok = False
         stretch_arr_f = None
         raw_for_filters = None
         inside_mask = None
+        mask_plane_rs: np.ndarray | None = None
+        geo_transform: Affine | None = None
 
         if clip_to_aoi:
             geom_crs_clip = _clip_geom_to_crs(geom_wgs84, src.crs)
@@ -415,6 +475,13 @@ def build_preview_rgb(
                     filled=False,
                 )
                 rgb_ma = np.ma.asarray(clipped_ma)
+                if mask_band_idx is not None and rgb_ma.shape[0] > rgb_band_count:
+                    mask_plane_native = np.ma.filled(
+                        rgb_ma[rgb_band_count].astype(np.float32, copy=False), 0.0
+                    )
+                    rgb_ma = rgb_ma[:rgb_band_count]
+                else:
+                    mask_plane_native = None
                 nh_raw, nw_raw = int(rgb_ma.shape[1]), int(rgb_ma.shape[2])
                 native_h, native_w = nh_raw, nw_raw
 
@@ -437,6 +504,7 @@ def build_preview_rgb(
                     raw_for_filters = np.stack(planes_raw, axis=0)
                     work_tr = clip_tr
                     poly_ok_rs = poly_ok_native
+                    mask_plane_rs = mask_plane_native
                 else:
                     l, b, r, tt = array_bounds(nh_raw, nw_raw, clip_tr)
                     dst_tr = from_bounds(l, b, r, tt, out_w, out_h)
@@ -476,10 +544,24 @@ def build_preview_rgb(
                         planes_raw.append(dest_raw)
                     stretch_arr_f = np.stack(planes_f, axis=0)
                     raw_for_filters = np.stack(planes_raw, axis=0)
+                    if mask_plane_native is not None:
+                        mask_plane_rs = np.empty((out_h, out_w), dtype=np.float32)
+                        reproject(
+                            source=mask_plane_native,
+                            destination=mask_plane_rs,
+                            src_transform=clip_tr,
+                            src_crs=src.crs,
+                            dst_transform=dst_tr,
+                            dst_crs=src.crs,
+                            resampling=Resampling.nearest,
+                        )
+                    else:
+                        mask_plane_rs = None
 
                 nh2, nw2 = stretch_arr_f.shape[1], stretch_arr_f.shape[2]
                 inside_mask = np.isfinite(stretch_arr_f).all(axis=0) & (poly_ok_rs > 0.5)
 
+                geo_transform = work_tr
                 left, bottom, right, top = array_bounds(nh2, nw2, work_tr)
                 leaflet_bbox = leaflet_corners_from_affine_bounds(left, bottom, right, top, src.crs)
                 clipped_ok = True
@@ -518,6 +600,9 @@ def build_preview_rgb(
             if window is not None:
                 read_kwargs["window"] = window
             ras = src.read(**read_kwargs)
+            if count >= 8 and mask_band_idx is not None and ras.shape[0] > rgb_band_count:
+                mask_plane_rs = ras[mask_band_idx - 1].astype(np.float32, copy=False)
+                ras = ras[:rgb_band_count]
             stretch_arr_f = ras.astype(np.float32, copy=False)
             raw_for_filters = ras
             nh, nw = int(ras.shape[1]), int(ras.shape[2])
@@ -538,6 +623,7 @@ def build_preview_rgb(
                 if isinstance(bounds, (tuple, list)) and len(bounds) >= 4
                 else (bounds.left, bounds.bottom, bounds.right, bounds.top)
             )
+            geo_transform = output_transform
             leaflet_bbox = leaflet_corners_from_affine_bounds(left, bottom, right, top, src.crs)
 
         if leaflet_bbox is None:
@@ -547,7 +633,9 @@ def build_preview_rgb(
 
         if count >= 3:
             stretch_ok = _valid_reflectance_pixels(raw_for_filters, src, inside_mask, 3)
-            stretch_ok &= _rgb_keep_non_border_fill(raw_for_filters, visualization_cfg)
+            if not clipped_ok:
+                stretch_ok &= _rgb_keep_non_border_fill(raw_for_filters, visualization_cfg)
+            stretch_ok = _rgb_apply_validity_mask(stretch_ok, raw_for_filters, mask_plane_rs)
             r = _stretch_to_uint8(stretch_arr_f[0], stretch_ok, stretch_percentiles)
             g = _stretch_to_uint8(stretch_arr_f[1], stretch_ok, stretch_percentiles)
             b = _stretch_to_uint8(stretch_arr_f[2], stretch_ok, stretch_percentiles)
@@ -564,8 +652,15 @@ def build_preview_rgb(
                 alpha_u8 = np.clip(ab_f, 0.0, 255.0).astype(np.uint8)
                 alpha_u8 = np.where(stretch_ok, alpha_u8, np.uint8(0)).astype(np.uint8)
             else:
-                alpha_u8 = np.where(stretch_ok, np.uint8(255), np.uint8(0)).astype(np.uint8)
+                has_color = stretch_ok & ((r_u8 > 0) | (g_u8 > 0) | (b_u8 > 0))
+                alpha_u8 = np.where(has_color, np.uint8(255), np.uint8(0)).astype(np.uint8)
             rgba = np.stack([r_u8, g_u8, b_u8, alpha_u8], axis=-1)
+            if geo_transform is not None:
+                rgba, stretch_ok, geo_transform, tight_bbox = _crop_rgba_to_valid_extent(
+                    rgba, stretch_ok, geo_transform, src.crs
+                )
+                if tight_bbox is not None:
+                    leaflet_bbox = tight_bbox
         else:
             stretch_ok = _valid_reflectance_pixels(raw_for_filters, src, inside_mask, 1)
             data = _stretch_to_uint8(stretch_arr_f[0], stretch_ok, stretch_percentiles)
@@ -932,7 +1027,7 @@ def _flat_filename_date_to_ymd(date_token: str) -> str:
 # Separador entre código / fecha / índice: guión bajo o espacio (ej. ``G6 2026_01_21_rgb.tif``).
 # Token opcional entre fecha e índice (p. ej. ``G4_2026_01_21_G4_ndwi.tif``).
 FLAT_DRONE_NAME = re.compile(
-    r"^((?:[Gg]\d+)|(?:[Nn][Oo][Gg])|(?:RCI)|(?:RPA))(?:[\s_]+)"
+    r"^((?:[Gg]\d+)|(?:[Nn][Oo][Gg])|(?:RCI)|(?:RPA)|(?:RIV))(?:[\s_]+)"
     r"((?:\d{8})|(?:\d{4}[_-]\d{2}[_-]\d{2}))(?:[\s_]+)"
     r"(?:([A-Za-z0-9]{1,12})_)?"
     r"(ndvi|ndwi|rgb|thermal)\.(?:tif|tiff)$",
@@ -1617,6 +1712,15 @@ def export_source(
         "periods": sorted_periods,
         "summary": summary,
     }
+    for _lidar_key in (
+        "pointclouds",
+        "lidar_attributes",
+        "lidar_default_attribute",
+        "lidar_stretch",
+        "las_available_periods",
+    ):
+        if _lidar_key in existing_metadata:
+            source_metadata[_lidar_key] = existing_metadata[_lidar_key]
 
     json_dump(source_output_dir / "timeseries.json", source_timeseries)
     json_dump(source_output_dir / "metadata.json", source_metadata)
@@ -1662,7 +1766,7 @@ def export_static_data(selected_sources: list[str] | None = None) -> None:
 
     existing_manifest = {}
     manifest_path = OUTPUT_DIR / "sources_manifest.json"
-    if selected_sources and manifest_path.exists():
+    if manifest_path.exists():
         with open(manifest_path, "r", encoding="utf-8") as handle:
             existing_manifest = json.load(handle)
 
@@ -1670,7 +1774,7 @@ def export_static_data(selected_sources: list[str] | None = None) -> None:
         "generated_at": iso_now(),
         "aoi_path": aoi_output_path.relative_to(OUTPUT_DIR).as_posix(),
         "year_range": {"start": years[0], "end": years[-1]},
-        "sources": existing_manifest.get("sources", {}).copy() if selected_sources else {},
+        "sources": existing_manifest.get("sources", {}).copy(),
     }
 
     available_sources = {
@@ -1686,6 +1790,11 @@ def export_static_data(selected_sources: list[str] | None = None) -> None:
     for source_key in requested_sources:
         source_cfg = available_sources[source_key]
         manifest["sources"][source_key] = export_source(config, source_key, source_cfg, gdf_aoi, years)
+
+    # Preservar Sentinel-2 en el manifiesto aunque no se re-exporte en esta corrida.
+    existing_sources = existing_manifest.get("sources", {})
+    if existing_sources.get("sentinel2") and "sentinel2" not in manifest["sources"]:
+        manifest["sources"]["sentinel2"] = existing_sources["sentinel2"]
 
     json_dump(manifest_path, manifest)
     print(f"\nManifest -> {manifest_path.as_posix()}")

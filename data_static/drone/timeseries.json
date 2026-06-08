@@ -819,6 +819,51 @@
           }
         }
       }
+    },
+    "riv": {
+      "name": "Predio RIV — Bruno Devoto",
+      "indices": {
+        "ndvi": {
+          "points": [],
+          "metrics": {
+            "latest": null,
+            "historical_mean": null,
+            "seasonal_means": {},
+            "annual_summary": [],
+            "trend": null
+          }
+        },
+        "ndwi": {
+          "points": [],
+          "metrics": {
+            "latest": null,
+            "historical_mean": null,
+            "seasonal_means": {},
+            "annual_summary": [],
+            "trend": null
+          }
+        },
+        "rgb": {
+          "points": [],
+          "metrics": {
+            "latest": null,
+            "historical_mean": null,
+            "seasonal_means": {},
+            "annual_summary": [],
+            "trend": null
+          }
+        },
+        "thermal": {
+          "points": [],
+          "metrics": {
+            "latest": null,
+            "historical_mean": null,
+            "seasonal_means": {},
+            "annual_summary": [],
+            "trend": null
+          }
+        }
+      }
     }
   }
 }

@@ -47,12 +47,13 @@ wetlands:
     plot_id: "10"
   rci:
     name: "Predio RCI — Alejandra Brito"
-    aoi_source: "data/shapefiles/predios_ab/predio_RCI.gdb"
-    aoi_crs: "EPSG:4326"
+    aoi_source: "data/shapefiles/predios_ab/predio_RCI.geojson"
   rpa:
     name: "Predio RPA — Alejandra Brito"
-    aoi_source: "data/shapefiles/predios_ab/predio_RPA.gdb"
-    aoi_crs: "EPSG:4326"
+    aoi_source: "data/shapefiles/predios_ab/predio_RPA.geojson"
+  riv:
+    name: "Predio RIV — Bruno Devoto"
+    aoi_source: "data/shapefiles/predios_bd/predio_RIV.geojson"
 
 sources:
   sentinel2:

@@ -57,7 +57,8 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 try:
     import rasterio
-    from rasterio.warp import transform_bounds
+    from rasterio.features import geometry_mask
+    from rasterio.warp import transform_bounds, transform_geom
 except ImportError as exc:  # pragma: no cover
     print(f"Falta rasterio: {exc}. pip install rasterio", file=sys.stderr)
     sys.exit(1)
@@ -178,6 +179,43 @@ def last_complete_month(now_year: int, now_month: int) -> tuple[int, int]:
     return now_year, now_month - 1
 
 
+def clamp_last_complete_week_to_data(
+    lc_y: int,
+    lc_w: int,
+    grouped: dict[str, list[dict]],
+    current_year: int,
+) -> tuple[int, int]:
+    """No publicar semana/mes «actual» más allá del último GeoTIFF semanal disponible."""
+    max_w = 0
+    for recs in grouped.values():
+        for r in recs:
+            if r["year"] == current_year:
+                max_w = max(max_w, int(r["week"]))
+    if max_w <= 0:
+        return lc_y, lc_w
+    if lc_y > current_year or (lc_y == current_year and lc_w > max_w):
+        return current_year, max_w
+    return lc_y, lc_w
+
+
+def clamp_last_complete_month_to_data(
+    lm_y: int,
+    lm_m: int,
+    grouped: dict[str, list[dict]],
+    current_year: int,
+) -> tuple[int, int]:
+    max_m = 0
+    for recs in grouped.values():
+        for r in recs:
+            if r["year"] == current_year:
+                max_m = max(max_m, int(r["thursday"].month))
+    if max_m <= 0:
+        return lm_y, lm_m
+    if lm_y > current_year or (lm_y == current_year and lm_m > max_m):
+        return current_year, max_m
+    return lm_y, lm_m
+
+
 # ---------------------------------------------------------------------------
 # Discovery & stack loading
 # ---------------------------------------------------------------------------
@@ -220,6 +258,7 @@ def read_stack(predio_records: list[dict]) -> tuple[np.ndarray, list[str], dict]
     with rasterio.open(predio_records[0]["path"]) as ds0:
         ref_w, ref_h = ds0.width, ds0.height
         ref_crs = ds0.crs
+        ref_transform = ds0.transform
         band_descs = list(ds0.descriptions)
         if not band_descs or not any(band_descs):
             band_descs = [f"band_{i+1}" for i in range(ds0.count)]
@@ -267,8 +306,61 @@ def read_stack(predio_records: list[dict]) -> tuple[np.ndarray, list[str], dict]
         "leaflet_bounds": [[wgs[1], wgs[0]], [wgs[3], wgs[2]]],
         "H": ref_h,
         "W": ref_w,
+        "transform": ref_transform,
     }
     return stack, band_names, geo
+
+
+def load_predio_geometries(aoi_geojson: Path | None) -> dict[str, dict]:
+    """Geometrías AOI por ``wetland_id`` (GeoJSON geometry en EPSG:4326)."""
+    out: dict[str, dict] = {}
+    if not aoi_geojson or not aoi_geojson.is_file():
+        return out
+    try:
+        fc = json.loads(aoi_geojson.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return out
+    for feat in fc.get("features", []):
+        props = feat.get("properties") or {}
+        wid = (props.get("wetland_id") or props.get("predio_id") or "").strip().lower()
+        geom = feat.get("geometry")
+        if wid and isinstance(geom, dict) and geom.get("type"):
+            out[wid] = geom
+    return out
+
+
+def mask_stack_to_geometry(
+    stack: np.ndarray,
+    geometry_wgs84: dict | None,
+    transform,
+    crs,
+) -> np.ndarray:
+    """Pone NaN fuera del polígono del predio (recorte real, no solo bbox)."""
+    if geometry_wgs84 is None or transform is None:
+        return stack
+    h, w = stack.shape[2], stack.shape[3]
+    geom = geometry_wgs84
+    crs_str = str(crs) if crs else "EPSG:4326"
+    if crs_str.upper() not in ("EPSG:4326", "OGC:CRS84", "CRS84"):
+        try:
+            geom = transform_geom("EPSG:4326", crs, geometry_wgs84)
+        except Exception:
+            return stack
+    try:
+        outside = geometry_mask(
+            [geom],
+            out_shape=(h, w),
+            transform=transform,
+            invert=False,
+        )
+    except (ValueError, TypeError):
+        return stack
+    if not np.any(outside):
+        return stack
+    for i in range(stack.shape[0]):
+        for b in range(stack.shape[1]):
+            stack[i, b, outside] = np.nan
+    return stack
 
 
 # ---------------------------------------------------------------------------
@@ -834,6 +926,8 @@ def _predio_build_fingerprint(
     lm_month: int,
     lc_week_y: int,
     lc_week_w: int,
+    *,
+    aoi_mtime_ns: int = 0,
 ) -> str:
     """Huella estable por predio: TIFs + año actual + último mes/semana completo (afecta series)."""
     max_mtime_ns = 0
@@ -852,6 +946,8 @@ def _predio_build_fingerprint(
         "max_tif_mtime_ns": max_mtime_ns,
         "thursday_first": first,
         "thursday_last": last,
+        "aoi_mtime_ns": aoi_mtime_ns,
+        "geom_mask_v": 1,
     }
     return json.dumps(payload, sort_keys=True, separators=(",", ":"))
 
@@ -906,6 +1002,13 @@ def build(
     print(f"Años detectados: {sorted(all_years)} | actual={current_year} | hist={historic_years}")
 
     predios_info = load_predios_info(aoi_geojson, db_csv)
+    predio_geoms = load_predio_geometries(aoi_geojson)
+    aoi_mtime_ns = 0
+    if aoi_geojson and aoi_geojson.is_file():
+        try:
+            aoi_mtime_ns = int(aoi_geojson.stat().st_mtime_ns)
+        except OSError:
+            pass
     rasters_meta: dict[str, dict] = {}
     wetlands_meta: dict[str, dict] = {}
     timeseries_all: dict[str, dict] = {}
@@ -914,6 +1017,12 @@ def build(
     iy_meta, iw_meta = current_iso_today()
     lc_week_y, lc_week_w = last_complete_iso_week(iy_meta, iw_meta)
     lm_year, lm_month = last_complete_month(iy_meta, datetime.now(timezone.utc).month)
+    lc_week_y, lc_week_w = clamp_last_complete_week_to_data(
+        lc_week_y, lc_week_w, grouped, current_year
+    )
+    lm_year, lm_month = clamp_last_complete_month_to_data(
+        lm_year, lm_month, grouped, current_year
+    )
 
     existing_ts_doc: dict | None = _load_json(static_dir / "timeseries.json") if incremental else None
     existing_wetlands: dict = (existing_ts_doc or {}).get("wetlands") or {}
@@ -923,7 +1032,8 @@ def build(
         print(f"\n=== {predio} ({len(records)} TIFs) ===")
         pl = predio.lower()
         fp = _predio_build_fingerprint(
-            records, current_year, lm_year, lm_month, lc_week_y, lc_week_w
+            records, current_year, lm_year, lm_month, lc_week_y, lc_week_w,
+            aoi_mtime_ns=aoi_mtime_ns,
         )
         fp_path = _predio_fp_path(csv_dir, pl)
         mcsv = csv_dir / f"{pl}_timeseries_monthly.csv"
@@ -970,6 +1080,12 @@ def build(
         except (rasterio.RasterioIOError, ValueError) as exc:
             print(f"  [error] no se pudo leer stack: {exc}", file=sys.stderr)
             continue
+        pl_geom = predio_geoms.get(pl)
+        if pl_geom is not None:
+            stack = mask_stack_to_geometry(
+                stack, pl_geom, geo.get("transform"), geo.get("crs")
+            )
+            print(f"  Máscara AOI aplicada ({pl.upper()}).")
         band_set.update(b for b in band_names if b not in SKIP_BANDS)
 
         if bands_filter:

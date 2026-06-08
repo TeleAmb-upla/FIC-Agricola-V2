@@ -23,7 +23,8 @@ import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = REPO_ROOT / "scripts"
-for p in (str(REPO_ROOT), str(SCRIPTS_DIR)):
+STATIC_SITE_DIR = REPO_ROOT / "scripts" / "static_site"
+for p in (str(REPO_ROOT), str(SCRIPTS_DIR), str(STATIC_SITE_DIR)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
@@ -40,10 +41,10 @@ except ImportError as exc:
 from shapely.geometry import mapping
 
 LAS_NAME = re.compile(
-    r"^((?:G\d+)|(?:NOG)|(?:RCI)|(?:RPA))_((?:\d{8})|(?:\d{4}[_-]\d{2}[_-]\d{2})).*\.las$",
+    r"^((?:G\d+)|(?:NOG)|(?:RCI)|(?:RPA)|(?:RIV))_((?:\d{8})|(?:\d{4}[_-]\d{2}[_-]\d{2})).*\.las$",
     re.I,
 )
-MAX_POINTCLOUD_POINTS = 100_000
+MAX_POINTCLOUD_POINTS = 450_000
 GROUND_PERCENTILE = 5.0
 LIDAR_DEFAULT_ATTR = "canopy"
 DRONE_PROJECTED_CRS = "EPSG:32719"
@@ -202,6 +203,8 @@ def build_lidar_attribute_catalog(dimensions: list[str]) -> list[dict]:
     catalog: list[dict] = [
         {"id": "canopy", "label": "Altura dosel", "unit": "m", "colormap": "terrain", "derived": "canopy"},
     ]
+    if {"red", "green", "blue"}.issubset(dims):
+        catalog.append({"id": "rgb", "label": "RGB", "type": "rgb", "dims": ["red", "green", "blue"]})
     known: dict[str, dict] = {
         "intensity": {"id": "intensity", "label": "Intensidad", "colormap": "viridis", "dim": "intensity"},
         "classification": {
@@ -289,12 +292,12 @@ def _scalar_attr_payload(values: np.ndarray, spec: dict) -> dict:
             "classes": {str(c): ASPRS_CLASS_LABELS.get(c, f"Clase {c}") for c in classes},
             "colors": {str(c): ASPRS_CLASS_COLORS.get(c, "#888888") for c in classes},
         }
-    p0, p100 = np.percentile(finite, [2, 98])
+    p0, p95 = np.percentile(finite, [2, 95])
     return {
         "type": "scalar",
         "values": [round(float(v), 4) for v in values.tolist()],
         "vmin": round(float(p0), 4),
-        "vmax": round(float(p100), 4),
+        "vmax": round(float(p95), 4),
     }
 
 
@@ -345,6 +348,18 @@ def export_lidar_pointcloud_json(
         if spec.get("derived") == "canopy":
             attributes[aid] = _scalar_attr_payload(mz, spec)
             continue
+        if spec.get("type") == "rgb":
+            r = fields.get("red", np.array([]))
+            g = fields.get("green", np.array([]))
+            b = fields.get("blue", np.array([]))
+            if r.size and g.size and b.size:
+                attributes[aid] = {
+                    "type": "rgb",
+                    "red": [int(v) for v in r[idx].tolist()],
+                    "green": [int(v) for v in g[idx].tolist()],
+                    "blue": [int(v) for v in b[idx].tolist()],
+                }
+            continue
         dim = spec.get("dim")
         if dim and dim in fields:
             attributes[aid] = _scalar_attr_payload(fields[dim][idx], spec)
@@ -367,6 +382,52 @@ def export_lidar_pointcloud_json(
     return payload
 
 
+def _scalar_stretch_from_values(values: list | np.ndarray) -> tuple[float, float] | None:
+    finite = np.asarray(values, dtype=np.float64)
+    finite = finite[np.isfinite(finite)]
+    if finite.size == 0:
+        return None
+    p0, p95 = np.percentile(finite, [2, 95])
+    return round(float(p0), 4), round(float(p95), 4)
+
+
+def _lidar_stretch_from_pointclouds(static_dir: Path, pointclouds: dict) -> dict[str, dict]:
+    """Agrega vmin/vmax globales por atributo escalar (P2–P95) desde los JSON exportados."""
+    stretch: dict[str, dict[str, float]] = {}
+    for entry in pointclouds.values():
+        rel = entry.get("p")
+        if not rel:
+            continue
+        path = (static_dir.parent / rel).resolve()
+        if not path.is_file():
+            path = (static_dir / "pointclouds" / Path(str(rel)).name).resolve()
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        for aid, attr in (data.get("attributes") or {}).items():
+            if not isinstance(attr, dict) or attr.get("type") != "scalar":
+                continue
+            lim = None
+            if attr.get("values"):
+                lim = _scalar_stretch_from_values(attr["values"])
+            if lim is None:
+                vmin, vmax = attr.get("vmin"), attr.get("vmax")
+                if vmin is None or vmax is None:
+                    continue
+                lim = (float(vmin), float(vmax))
+            vmin, vmax = lim
+            cur = stretch.get(aid)
+            if not cur:
+                stretch[aid] = {"vmin": vmin, "vmax": vmax}
+            else:
+                cur["vmin"] = min(cur["vmin"], vmin)
+                cur["vmax"] = max(cur["vmax"], vmax)
+    return stretch
+
+
 def patch_drone_metadata(static_dir: Path, pointclouds: dict, catalog: list[dict], period_keys: list[str]) -> None:
     meta_path = static_dir / "metadata.json"
     if not meta_path.is_file():
@@ -384,9 +445,12 @@ def patch_drone_metadata(static_dir: Path, pointclouds: dict, catalog: list[dict
         }
         if spec.get("type") == "categorical":
             lidar_attrs[aid]["type"] = "categorical"
+        elif spec.get("type") == "rgb":
+            lidar_attrs[aid]["type"] = "rgb"
     meta["pointclouds"] = {**meta.get("pointclouds", {}), **pointclouds}
     meta["lidar_attributes"] = lidar_attrs
     meta["lidar_default_attribute"] = LIDAR_DEFAULT_ATTR
+    meta["lidar_stretch"] = _lidar_stretch_from_pointclouds(static_dir, meta["pointclouds"])
     meta["las_available_periods"] = sorted(set(meta.get("las_available_periods", []) + period_keys))
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Metadata actualizado: {meta_path}")
