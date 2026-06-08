@@ -56,7 +56,8 @@ OUTPUT_DIR = Path("data_static")
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Subir cuando cambien máscaras / recorte RGB en ``build_preview_rgb`` (invalida WebP cacheados con reuse).
-RGB_PREVIEW_MASK_REVISION = 8
+RGB_PREVIEW_MASK_REVISION = 11
+THERMAL_PREVIEW_REVISION = 3
 
 SEASON_MID_DATES = {
     "verano": "-02-15",
@@ -91,6 +92,21 @@ COLORMAPS = {
         (116, 173, 209),
         (69, 117, 180),
         (49, 54, 149),
+    ],
+    "Turbo": [
+        (48, 18, 59),
+        (70, 40, 120),
+        (54, 92, 141),
+        (39, 127, 142),
+        (31, 161, 135),
+        (53, 183, 121),
+        (110, 206, 88),
+        (181, 222, 43),
+        (253, 231, 37),
+        (254, 172, 26),
+        (236, 112, 20),
+        (209, 55, 78),
+        (122, 4, 3),
     ],
 }
 
@@ -314,61 +330,10 @@ def _rgb_keep_non_border_fill(raster: np.ndarray, visualization_cfg: dict) -> np
     return finite & ~bad
 
 
-def _rgb_read_band_indexes(src) -> tuple[list[int], int | None]:
-    """Bandas RGB y, si aplica, banda de validez (ortos 8-band: máscara en banda 8)."""
+def _rgb_read_band_indexes(src) -> list[int]:
+    """Solo bandas RGB (1–3); ortos 8-band incluyen máscaras auxiliares que no se usan."""
     n = int(src.count)
-    idx = [1, 2, 3] if n >= 3 else [1]
-    mask_band: int | None = 8 if n >= 8 else None
-    if mask_band is not None:
-        idx.append(mask_band)
-    return idx, mask_band
-
-
-def _rgb_mask_plane_reliable(stretch_ok: np.ndarray, mask_plane: np.ndarray | None) -> np.ndarray | None:
-    """
-    Ortos 8-band: la banda 8 a veces viene incompleta (0/65535) aunque el RGB dentro del AOI sea válido.
-    Si descartaría demasiados píxeles ya marcados como válidos, se ignora la banda auxiliar.
-    """
-    if mask_plane is None:
-        return None
-    base = stretch_ok.astype(bool, copy=False)
-    inner = int(base.sum())
-    if inner <= 0:
-        return mask_plane
-    mf = np.asarray(mask_plane, dtype=np.float32)
-    if np.nanmax(mf) > 256:
-        band_ok = np.isfinite(mf) & (mf > 32768)
-    else:
-        band_ok = np.isfinite(mf) & (mf > 0)
-    kept = int((band_ok & base).sum())
-    if kept / inner < 0.92:
-        return None
-    return mask_plane
-
-
-def _rgb_apply_validity_mask(
-    stretch_ok: np.ndarray,
-    raw_for_filters: np.ndarray,
-    mask_plane: np.ndarray | None,
-    *,
-    skip_rgb_zero: bool = False,
-) -> np.ndarray:
-    """Quita píxeles nodata (RGB=0 o máscara=0) que quedarían negros opacos en el WebP."""
-    ok = stretch_ok.astype(bool, copy=True)
-    if not skip_rgb_zero and raw_for_filters.shape[0] >= 3:
-        zero = (
-            (raw_for_filters[0] <= 0)
-            & (raw_for_filters[1] <= 0)
-            & (raw_for_filters[2] <= 0)
-        )
-        ok &= ~zero
-    if mask_plane is not None:
-        mf = np.asarray(mask_plane, dtype=np.float32)
-        if np.nanmax(mf) > 256:
-            ok &= np.isfinite(mf) & (mf > 32768)
-        else:
-            ok &= np.isfinite(mf) & (mf > 0)
-    return ok
+    return [1, 2, 3] if n >= 3 else [1]
 
 
 def _crop_rgba_to_valid_extent(
@@ -470,9 +435,8 @@ def build_preview_rgb(
     geom_wgs84: dict | None = None,
 ) -> dict:
     """
-    Ortomosaico WebP recortado al polígono AOI (Gx UTM en WGS84).
-    Usa primero ``rasterio.mask.mask(..., crop=True)`` para recortar por la forma del predio —
-    evita mostrar todo el ráster cuando ``geometry_window`` equivale prácticamente al TIFF completo.
+    Ortomosaico WebP desde bandas 1–3 (R,G,B) del GeoTIFF.
+    Con ``clip_to_aoi`` lee la ventana del predio y recorta la transparencia al polígono del shape.
     """
     clip_to_aoi = visualization_cfg.get("clip_to_aoi", False) and geom_wgs84 is not None
     rgb_quality = int(visualization_cfg.get("rgb_webp_quality", 55))
@@ -486,225 +450,109 @@ def build_preview_rgb(
     native_h = native_w = None
 
     with rasterio.open(raster_path) as src:
-        count = int(src.count)
-        bands_to_read, mask_band_idx = _rgb_read_band_indexes(src)
-        alpha_band = 4 if count >= 4 else None
-        rgb_band_count = 3 if count >= 3 else 1
+        bands_to_read = _rgb_read_band_indexes(src)
+        n_rgb = len(bands_to_read)
+        alpha_band = 4 if int(src.count) >= 4 else None
 
-        clipped_ok = False
-        stretch_arr_f = None
-        raw_for_filters = None
-        inside_mask = None
-        mask_plane_rs: np.ndarray | None = None
-        geo_transform: Affine | None = None
+        window = None
+        geom_crs = None
+        bounds_for_corners = src.bounds
+        output_transform = src.transform
+        native_w, native_h = int(src.width), int(src.height)
 
         if clip_to_aoi:
-            geom_crs_clip = _clip_geom_to_crs(geom_wgs84, src.crs)
+            geom_crs = _clip_geom_to_crs(geom_wgs84, src.crs)
             try:
-                clipped_ma, clip_tr = mask(
-                    src,
-                    [geom_crs_clip],
-                    crop=True,
-                    indexes=bands_to_read,
-                    all_touched=False,
-                    filled=False,
-                )
-                rgb_ma = np.ma.asarray(clipped_ma)
-                if mask_band_idx is not None and rgb_ma.shape[0] > rgb_band_count:
-                    mask_plane_native = np.ma.filled(
-                        rgb_ma[rgb_band_count].astype(np.float32, copy=False), 0.0
-                    )
-                    rgb_ma = rgb_ma[:rgb_band_count]
-                else:
-                    mask_plane_native = None
-                nh_raw, nw_raw = int(rgb_ma.shape[1]), int(rgb_ma.shape[2])
-                native_h, native_w = nh_raw, nw_raw
-
-                # Máscara real del polígono según rasterio (evita desalineación respecto a geometry_mask al remuestrear).
-                poly_ok_native = (~np.ma.getmaskarray(rgb_ma).any(axis=0)).astype(np.float32)
-
-                planes_f: list[np.ndarray] = []
-                planes_raw: list[np.ndarray] = []
-                out_h, out_w = _resolve_preview_shape(nw_raw, nh_raw, rgb_max_size)
-                same = out_h == nh_raw and out_w == nw_raw
-                if same:
-                    for bi in range(rgb_ma.shape[0]):
-                        planes_f.append(
-                            np.ma.filled(rgb_ma[bi].astype(np.float32, copy=False), np.nan)
-                        )
-                        planes_raw.append(
-                            np.ma.filled(rgb_ma[bi].astype(np.float32, copy=False), np.nan)
-                        )
-                    stretch_arr_f = np.stack(planes_f, axis=0)
-                    raw_for_filters = np.stack(planes_raw, axis=0)
-                    work_tr = clip_tr
-                    poly_ok_rs = poly_ok_native
-                    mask_plane_rs = mask_plane_native
-                else:
-                    l, b, r, tt = array_bounds(nh_raw, nw_raw, clip_tr)
-                    dst_tr = from_bounds(l, b, r, tt, out_w, out_h)
-                    work_tr = dst_tr
-                    poly_ok_rs = np.empty((out_h, out_w), dtype=np.float32)
-                    reproject(
-                        source=poly_ok_native,
-                        destination=poly_ok_rs,
-                        src_transform=clip_tr,
-                        src_crs=src.crs,
-                        dst_transform=dst_tr,
-                        dst_crs=src.crs,
-                        resampling=Resampling.nearest,
-                    )
-                    for bi in range(rgb_ma.shape[0]):
-                        dest_f = np.empty((out_h, out_w), dtype=np.float32)
-                        reproject(
-                            source=np.ma.filled(rgb_ma[bi].astype(np.float32), np.nan),
-                            destination=dest_f,
-                            src_transform=clip_tr,
-                            src_crs=src.crs,
-                            dst_transform=dst_tr,
-                            dst_crs=src.crs,
-                            resampling=Resampling.bilinear,
-                        )
-                        dest_raw = np.empty((out_h, out_w), dtype=np.float32)
-                        reproject(
-                            source=np.ma.filled(rgb_ma[bi].astype(np.float32, copy=False), np.nan),
-                            destination=dest_raw,
-                            src_transform=clip_tr,
-                            src_crs=src.crs,
-                            dst_transform=dst_tr,
-                            dst_crs=src.crs,
-                            resampling=Resampling.nearest,
-                        )
-                        planes_f.append(dest_f)
-                        planes_raw.append(dest_raw)
-                    stretch_arr_f = np.stack(planes_f, axis=0)
-                    raw_for_filters = np.stack(planes_raw, axis=0)
-                    if mask_plane_native is not None:
-                        mask_plane_rs = np.empty((out_h, out_w), dtype=np.float32)
-                        reproject(
-                            source=mask_plane_native,
-                            destination=mask_plane_rs,
-                            src_transform=clip_tr,
-                            src_crs=src.crs,
-                            dst_transform=dst_tr,
-                            dst_crs=src.crs,
-                            resampling=Resampling.nearest,
-                        )
-                    else:
-                        mask_plane_rs = None
-
-                nh2, nw2 = stretch_arr_f.shape[1], stretch_arr_f.shape[2]
-                inside_mask = np.isfinite(stretch_arr_f).all(axis=0) & (poly_ok_rs > 0.5)
-
-                geo_transform = work_tr
-                left, bottom, right, top = array_bounds(nh2, nw2, work_tr)
-                leaflet_bbox = leaflet_corners_from_affine_bounds(left, bottom, right, top, src.crs)
-                clipped_ok = True
+                window = geometry_window(src, [geom_crs], pad_x=0, pad_y=0)
+                bounds_for_corners = window_bounds(window, src.transform)
+                output_transform = src.window_transform(window)
+                native_w = int(window.width)
+                native_h = int(window.height)
             except Exception as exc:
-                print(f"    [rgb] rasterio.mask (clip AOI) falló ({raster_path}): {exc}")
+                print(f"    [rgb] geometry_window falló ({raster_path}): {exc}")
+                window = None
+                geom_crs = None
 
-        if not clipped_ok:
-            geom_crs2 = None
-            window = None
-            native_window_w = int(src.width)
-            native_window_h = int(src.height)
-            bounds = src.bounds
-            output_transform = src.transform
-            native_h, native_w = native_window_h, native_window_w
-            clip_on = clip_to_aoi
-            if clip_on:
-                geom_crs2 = _clip_geom_to_crs(geom_wgs84, src.crs)
-                try:
-                    window = geometry_window(src, [geom_crs2], pad_x=0, pad_y=0)
-                    native_window_w = int(window.width)
-                    native_window_h = int(window.height)
-                    bounds = window_bounds(window, src.transform)
-                    output_transform = src.window_transform(window)
-                    native_h, native_w = native_window_h, native_window_w
-                except Exception:
-                    geom_crs2 = None
-                    window = None
-                    clip_on = False
-                    bounds = src.bounds
+        out_h, out_w = _resolve_preview_shape(native_w, native_h, rgb_max_size)
+        read_kwargs: dict = {
+            "indexes": bands_to_read,
+            "out_shape": (n_rgb, out_h, out_w),
+            "resampling": Resampling.bilinear if n_rgb >= 3 else Resampling.nearest,
+        }
+        if window is not None:
+            read_kwargs["window"] = window
+        ras = src.read(**read_kwargs)
+        stretch_arr_f = ras.astype(np.float32, copy=False)
+        raw_for_filters = ras
 
-            out_h, out_w = _resolve_preview_shape(native_window_w, native_window_h, rgb_max_size)
-            read_kwargs = {
-                "out_shape": (count, out_h, out_w),
-                "resampling": Resampling.bilinear if count >= 3 else Resampling.nearest,
-            }
-            if window is not None:
-                read_kwargs["window"] = window
-            ras = src.read(**read_kwargs)
-            if count >= 8 and mask_band_idx is not None and ras.shape[0] > rgb_band_count:
-                mask_plane_rs = ras[mask_band_idx - 1].astype(np.float32, copy=False)
-                ras = ras[:rgb_band_count]
-            stretch_arr_f = ras.astype(np.float32, copy=False)
-            raw_for_filters = ras
-            nh, nw = int(ras.shape[1]), int(ras.shape[2])
-            if out_w != native_window_w or out_h != native_window_h:
-                output_transform = output_transform * Affine.scale(native_window_w / out_w, native_window_h / out_h)
+        if out_w != native_w or out_h != native_h:
+            output_transform = output_transform * Affine.scale(native_w / out_w, native_h / out_h)
 
-            inside_mask = np.ones((nh, nw), dtype=bool)
-            if clip_on and geom_crs2 is not None:
-                try:
-                    inside_mask = geometry_mask(
-                        [geom_crs2], out_shape=(nh, nw), transform=output_transform, invert=True
-                    )
-                except Exception:
-                    inside_mask = np.ones((nh, nw), dtype=bool)
-
-            left, bottom, right, top = (
-                (bounds[0], bounds[1], bounds[2], bounds[3])
-                if isinstance(bounds, (tuple, list)) and len(bounds) >= 4
-                else (bounds.left, bounds.bottom, bounds.right, bounds.top)
-            )
-            geo_transform = output_transform
-            leaflet_bbox = leaflet_corners_from_affine_bounds(left, bottom, right, top, src.crs)
+        wb = bounds_for_corners
+        left, bottom, right, top = (
+            (wb[0], wb[1], wb[2], wb[3])
+            if isinstance(wb, (tuple, list)) and len(wb) >= 4
+            else (wb.left, wb.bottom, wb.right, wb.top)
+        )
+        geo_transform = output_transform
+        leaflet_bbox = leaflet_corners_from_affine_bounds(left, bottom, right, top, src.crs)
 
         if leaflet_bbox is None:
             leaflet_bbox = tiff_footprint_leaflet_corners(raster_path)
         if leaflet_bbox is None:
             return None
 
-        if count >= 3:
-            stretch_ok = _valid_reflectance_pixels(raw_for_filters, src, inside_mask, 3)
-            if not clipped_ok:
-                stretch_ok &= _rgb_keep_non_border_fill(raw_for_filters, visualization_cfg)
-            mask_for_ok = _rgb_mask_plane_reliable(stretch_ok, mask_plane_rs)
-            skip_rgb_zero = bool(clipped_ok and mask_for_ok is None)
-            stretch_ok = _rgb_apply_validity_mask(
-                stretch_ok, raw_for_filters, mask_for_ok, skip_rgb_zero=skip_rgb_zero
+        if n_rgb >= 3:
+            display_ok = (
+                (raw_for_filters[0] > 0)
+                | (raw_for_filters[1] > 0)
+                | (raw_for_filters[2] > 0)
             )
-            r = _stretch_to_uint8(stretch_arr_f[0], stretch_ok, stretch_percentiles)
-            g = _stretch_to_uint8(stretch_arr_f[1], stretch_ok, stretch_percentiles)
-            b = _stretch_to_uint8(stretch_arr_f[2], stretch_ok, stretch_percentiles)
-            r_u8 = np.where(stretch_ok, r, 0).astype(np.uint8)
-            g_u8 = np.where(stretch_ok, g, 0).astype(np.uint8)
-            b_u8 = np.where(stretch_ok, b, 0).astype(np.uint8)
+            if clip_to_aoi and geom_crs is not None:
+                try:
+                    poly_inside = geometry_mask(
+                        [geom_crs], out_shape=(out_h, out_w), transform=output_transform, invert=True
+                    )
+                    display_ok &= poly_inside
+                except Exception:
+                    pass
+            if not clip_to_aoi:
+                display_ok &= _rgb_keep_non_border_fill(raw_for_filters, visualization_cfg)
+            stretch_sample = display_ok
+            r = _stretch_to_uint8(stretch_arr_f[0], stretch_sample, stretch_percentiles)
+            g = _stretch_to_uint8(stretch_arr_f[1], stretch_sample, stretch_percentiles)
+            b = _stretch_to_uint8(stretch_arr_f[2], stretch_sample, stretch_percentiles)
+            r_u8 = np.where(display_ok, r, 0).astype(np.uint8)
+            g_u8 = np.where(display_ok, g, 0).astype(np.uint8)
+            b_u8 = np.where(display_ok, b, 0).astype(np.uint8)
             use_src_alpha = bool(visualization_cfg.get("rgb_use_source_alpha_band", False))
-            if use_src_alpha and alpha_band is not None and stretch_arr_f.shape[0] >= alpha_band:
-                ab_raw = raw_for_filters[alpha_band - 1]
+            if use_src_alpha and alpha_band is not None:
+                ab_raw = src.read(
+                    alpha_band,
+                    window=window,
+                    out_shape=(out_h, out_w),
+                    resampling=Resampling.bilinear,
+                ).astype(np.float32)
                 if np.issubdtype(ab_raw.dtype, np.integer) and np.iinfo(ab_raw.dtype).max > 255:
                     ab_f = ab_raw.astype(np.float64) / float(np.iinfo(ab_raw.dtype).max) * 255.0
                 else:
-                    ab_f = ab_raw.astype(np.float32)
+                    ab_f = ab_raw
                 alpha_u8 = np.clip(ab_f, 0.0, 255.0).astype(np.uint8)
-                alpha_u8 = np.where(stretch_ok, alpha_u8, np.uint8(0)).astype(np.uint8)
+                alpha_u8 = np.where(display_ok, alpha_u8, np.uint8(0)).astype(np.uint8)
             else:
-                has_color = stretch_ok & ((r_u8 > 0) | (g_u8 > 0) | (b_u8 > 0))
-                alpha_u8 = np.where(has_color, np.uint8(255), np.uint8(0)).astype(np.uint8)
+                alpha_u8 = np.where(display_ok, np.uint8(255), np.uint8(0)).astype(np.uint8)
             rgba = np.stack([r_u8, g_u8, b_u8, alpha_u8], axis=-1)
-            if geo_transform is not None and not clipped_ok:
-                rgba, stretch_ok, geo_transform, tight_bbox = _crop_rgba_to_valid_extent(
-                    rgba, stretch_ok, geo_transform, src.crs
+            if geo_transform is not None and not clip_to_aoi:
+                rgba, display_ok, geo_transform, tight_bbox = _crop_rgba_to_valid_extent(
+                    rgba, display_ok, geo_transform, src.crs
                 )
                 if tight_bbox is not None:
                     leaflet_bbox = tight_bbox
         else:
-            stretch_ok = _valid_reflectance_pixels(raw_for_filters, src, inside_mask, 1)
-            data = _stretch_to_uint8(stretch_arr_f[0], stretch_ok, stretch_percentiles)
-            data_u8 = np.where(stretch_ok, data, 0).astype(np.uint8)
-            alpha = np.where(stretch_ok, 255, 0).astype(np.uint8)
+            display_ok = raw_for_filters[0] > 0
+            data = _stretch_to_uint8(stretch_arr_f[0], display_ok, stretch_percentiles)
+            data_u8 = np.where(display_ok, data, 0).astype(np.uint8)
+            alpha = np.where(display_ok, 255, 0).astype(np.uint8)
             rgba = np.stack([data_u8, data_u8, data_u8, alpha], axis=-1)
 
     image = Image.fromarray(rgba, "RGBA")
@@ -732,6 +580,134 @@ def build_preview_rgb(
         "display_size": [int(image.width), int(image.height)],
         "render_mode": "smooth",
         "opacity": float(visualization_cfg.get("rgb_leaflet_opacity", 1.0)),
+    }
+
+
+def build_preview_thermal(
+    tiff_path: str | Path,
+    preview_path: str | Path,
+    visualization_cfg: dict,
+    geom_wgs84: dict | None,
+    index_cfg: dict,
+) -> dict | None:
+    """WebP térmico con colormap y rango P0–P95 dentro del AOI (picos >P95 se descartan)."""
+    clip_to_aoi = visualization_cfg.get("clip_to_aoi", False) and geom_wgs84 is not None
+    max_dim_cfg = visualization_cfg.get("index_preview_max_size") or visualization_cfg.get("rgb_max_size")
+    stretch_percentiles = tuple(index_cfg.get("stretch_percentiles") or [0, 95])
+    if len(stretch_percentiles) != 2:
+        stretch_percentiles = (0, 95)
+    cmap_name = str(index_cfg.get("colormap", "Turbo"))
+
+    leaflet_bbox = None
+    native_w = native_h = None
+
+    with rasterio.open(tiff_path) as src:
+        window = None
+        geom_crs = None
+        bounds_for_corners = src.bounds
+
+        if clip_to_aoi:
+            geom_crs = _clip_geom_to_crs(geom_wgs84, src.crs)
+            try:
+                window = geometry_window(src, [geom_crs], pad_x=0, pad_y=0)
+                bounds_for_corners = window_bounds(window, src.transform)
+            except Exception:
+                clip_to_aoi = False
+                window = None
+                geom_crs = None
+                bounds_for_corners = src.bounds
+
+        nw = int(window.width) if window is not None else int(src.width)
+        nh = int(window.height) if window is not None else int(src.height)
+        native_w, native_h = nw, nh
+        out_h, out_w = _resolve_preview_shape(nw, nh, max_dim_cfg)
+
+        if window is not None:
+            ma = src.read(
+                1,
+                masked=True,
+                window=window,
+                out_shape=(out_h, out_w),
+                resampling=Resampling.bilinear,
+            )
+        else:
+            ma = src.read(1, masked=True, out_shape=(out_h, out_w), resampling=Resampling.bilinear)
+        ma = np.ma.squeeze(ma)
+        nodata_mask = np.ma.getmaskarray(ma).astype(bool)
+        raw_for_norm = np.ma.filled(ma.astype(np.float64), np.nan)
+        data = _read_thermal_band_physical(
+            np.where(np.isfinite(raw_for_norm), raw_for_norm, 0.0), src, 1
+        ).astype(np.float32)
+        data[~np.isfinite(raw_for_norm)] = np.nan
+        nodata_mask |= ~np.isfinite(data)
+
+        wb = bounds_for_corners
+        left, bottom, right, top = (
+            (wb[0], wb[1], wb[2], wb[3])
+            if isinstance(wb, (tuple, list)) and len(wb) >= 4
+            else (wb.left, wb.bottom, wb.right, wb.top)
+        )
+
+        if clip_to_aoi and geom_crs is not None:
+            out_transform = from_bounds(left, bottom, right, top, out_w, out_h)
+            outside = ~geometry_mask([geom_crs], out_shape=(out_h, out_w), transform=out_transform, invert=True)
+            nodata_mask |= outside
+
+        leaflet_bbox = leaflet_corners_from_affine_bounds(left, bottom, right, top, src.crs)
+
+    if leaflet_bbox is None:
+        leaflet_bbox = tiff_footprint_leaflet_corners(tiff_path)
+    if leaflet_bbox is None:
+        return None
+
+    valid = data[~nodata_mask & np.isfinite(data)]
+    if valid.size == 0:
+        return None
+    vmin = float(np.percentile(valid, stretch_percentiles[0]))
+    vmax = float(np.percentile(valid, stretch_percentiles[1]))
+    if not np.isfinite(vmin) or not np.isfinite(vmax) or vmax <= vmin:
+        vmin = float(np.nanmin(valid))
+        vmax = float(np.nanmax(valid))
+    if vmax <= vmin:
+        vmax = vmin + 1.0
+
+    nodata_mask |= np.isfinite(data) & (data > vmax)
+
+    rgba = apply_colormap(data, nodata_mask, vmin, vmax, cmap_name)
+
+    image = Image.fromarray(rgba, "RGBA")
+    upscale_factor = max(
+        1, int(visualization_cfg.get("rgb_upscale_factor", visualization_cfg.get("upscale_factor", 1)))
+    )
+    if upscale_factor > 1:
+        image = image.resize(
+            (image.width * upscale_factor, image.height * upscale_factor),
+            resample=Image.Resampling.LANCZOS,
+        )
+
+    preview_path = Path(preview_path)
+    preview_path.parent.mkdir(parents=True, exist_ok=True)
+    preview_format = str(visualization_cfg.get("preview_format", "WEBP")).upper()
+    if preview_format == "WEBP":
+        q = int(visualization_cfg.get("webp_quality_analytic", 86))
+        save_kwargs = {"quality": max(30, min(q, 100)), "method": 6}
+    else:
+        save_kwargs = {"optimize": True}
+    _unlink_preview_output(preview_path, visualization_cfg)
+    image.save(preview_path, format=preview_format, **save_kwargs)
+    return {
+        "path": preview_path.relative_to(OUTPUT_DIR).as_posix(),
+        "bounds": leaflet_bbox,
+        "format": preview_format,
+        "native_size": [native_w, native_h],
+        "display_size": [int(image.width), int(image.height)],
+        "render_mode": "smooth",
+        "opacity": float(visualization_cfg.get("rgb_leaflet_opacity", 1.0)),
+        "colormap": cmap_name,
+        "stretch_p0": round(vmin, 2),
+        "stretch_p100": round(vmax, 2),
+        "legend_label": index_cfg.get("label", "Térmica"),
+        "legend_unit": "°C",
     }
 
 
@@ -863,6 +839,25 @@ def _aoi_intersects_raster_extent_wgs84(src, geom_wgs84: dict) -> bool:
         return bool(aoi.intersects(footprint))
     except Exception:
         return True
+
+
+def _read_thermal_band_physical(data: np.ndarray, src, band_idx: int = 1) -> np.ndarray:
+    """Valores físicos del TIFF térmico (p. ej. °C): sólo escala/offset GDAL, sin normalización NDVI."""
+    arr = np.asarray(data, dtype=np.float64)
+    out = arr.copy()
+    sc, off = 1.0, 0.0
+    try:
+        scales = getattr(src, "scales", None)
+        offsets = getattr(src, "offsets", None)
+        if scales and band_idx <= len(scales) and scales[band_idx - 1] is not None:
+            sc = float(scales[band_idx - 1])
+        if offsets and band_idx <= len(offsets) and offsets[band_idx - 1] is not None:
+            off = float(offsets[band_idx - 1])
+    except (TypeError, IndexError, ValueError):
+        sc, off = 1.0, 0.0
+    if sc != 1.0 or off != 0.0:
+        out = out * sc + off
+    return out.astype(np.float32)
 
 
 def normalize_drone_index_band_values(
@@ -1194,14 +1189,20 @@ def ingest_flat_drone_date_assets(
         source_fingerprint = build_file_fingerprint(tiff_path)
 
         if visual_only:
+            preview_mode = "thermal_visual_flat" if index_key == "thermal" else "rgb_visual_flat"
             export_signature = build_export_signature(
                 {
                     "visualization": viz_flat,
                     "index": index_key,
                     "buffer_m": clip_aoi_buffer_m,
                     "preview_geom_sha": preview_clip_geom_digest(geom_union),
-                    "mode": "rgb_visual_flat",
+                    "mode": preview_mode,
                     "rgb_preview_mask_revision": RGB_PREVIEW_MASK_REVISION,
+                    **(
+                        {"thermal_preview_revision": THERMAL_PREVIEW_REVISION}
+                        if index_key == "thermal"
+                        else {}
+                    ),
                 }
             )
             preview_meta = reuse_existing_preview(
@@ -1213,7 +1214,12 @@ def ingest_flat_drone_date_assets(
                 reuse_if_unchanged=_reuse_previews_allowed(viz_flat),
             )
             if preview_meta is None:
-                preview_meta = build_preview_rgb(tiff_path, preview_path, viz_flat, preview_geom_flat)
+                if index_key == "thermal":
+                    preview_meta = build_preview_thermal(
+                        tiff_path, preview_path, viz_flat, preview_geom_flat, index_cfg
+                    )
+                else:
+                    preview_meta = build_preview_rgb(tiff_path, preview_path, viz_flat, preview_geom_flat)
         else:
             export_signature = build_export_signature(
                 {
@@ -1498,14 +1504,20 @@ def export_source(
                         preview_name = f"{wetland_id}_{year}_{season_key}_{index_key}.{preview_ext}"
                         preview_path = rasters_dir / preview_name
                         source_fingerprint = build_file_fingerprint(tiff_path)
+                        preview_mode = "thermal_visual" if index_key == "thermal" else "rgb_visual"
                         export_signature = build_export_signature(
                             {
                                 "visualization": visualization_cfg,
                                 "index": index_key,
                                 "buffer_m": clip_aoi_buffer_m,
                                 "preview_geom_sha": preview_clip_geom_digest(geom_union),
-                                "mode": "rgb_visual",
+                                "mode": preview_mode,
                                 "rgb_preview_mask_revision": RGB_PREVIEW_MASK_REVISION,
+                                **(
+                                    {"thermal_preview_revision": THERMAL_PREVIEW_REVISION}
+                                    if index_key == "thermal"
+                                    else {}
+                                ),
                             }
                         )
                         preview_meta = reuse_existing_preview(
@@ -1517,7 +1529,14 @@ def export_source(
                             reuse_if_unchanged=_reuse_previews_allowed(visualization_cfg),
                         )
                         if preview_meta is None:
-                            preview_meta = build_preview_rgb(tiff_path, preview_path, visualization_cfg, preview_geom_union)
+                            if index_key == "thermal":
+                                preview_meta = build_preview_thermal(
+                                    tiff_path, preview_path, visualization_cfg, preview_geom_union, index_cfg
+                                )
+                            else:
+                                preview_meta = build_preview_rgb(
+                                    tiff_path, preview_path, visualization_cfg, preview_geom_union
+                                )
                         rasters_index[raster_key] = {
                             "source": source_key,
                             "wetland_id": wetland_id,

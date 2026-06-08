@@ -143,5 +143,7 @@ indices:
     label: "Térmica"
     description: "Ortomosaico térmico"
     visual_only: true
+    colormap: "Turbo"
+    stretch_percentiles: [0, 95]
 
 stats: ["mean"]

@@ -281,88 +281,68 @@
             gap: 0.5rem;
             margin-top: 0.4rem;
         }
-        .fic-sidebar-block + .fic-panel-map-source-box {
+        .fic-sidebar-block + .fic-sidebar-block {
             margin-top: 0;
         }
-        .fic-panel-map-source-box {
-            margin: 0;
-        }
-        .fic-panel-map-source-box[hidden] { display: none !important; }
-        .fic-panel-map-source-box__inner {
+        #ficSourcePillsWrap[hidden] { display: none !important; }
+        .fic-origin-picker {
             display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 7px 9px 7px 10px;
-            border-radius: 14px;
-            background: rgba(255, 255, 255, 0.94);
-            border: 1px solid rgba(29, 107, 74, 0.11);
-            box-shadow: 0 1px 10px rgba(18, 42, 28, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+            gap: 8px;
+            width: 100%;
         }
-        .fic-panel-map-source-box__text {
+        .fic-origin-picker__opt {
             flex: 1;
             min-width: 0;
-        }
-        .fic-panel-map-source-box__title {
-            font-family: 'Outfit', sans-serif;
-            font-size: 0.72rem;
-            font-weight: 700;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-            color: rgba(26, 32, 24, 0.52);
-            line-height: 1.25;
-        }
-        .fic-source-pills--sidebar-icons {
             display: flex;
-            flex-wrap: nowrap;
-            align-items: center;
-            gap: 12px;
-            margin: 0;
-            padding: 0;
-            border: none;
-            border-radius: 0;
-            background: transparent;
-        }
-        .fic-source-pills--sidebar-icons > .fic-source-pill {
-            flex: 0 0 auto;
-            width: 48px;
-            height: 48px;
-            min-width: 48px;
-            padding: 0;
-            border-radius: 50%;
-            display: inline-flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            border: 2px solid rgba(29, 107, 74, 0.16);
-            background: rgba(248, 252, 249, 0.98);
+            gap: 6px;
+            padding: 10px 8px 8px;
+            border-radius: 11px;
+            border: none;
+            background: rgba(255, 255, 255, 0.9);
             color: var(--fic-ag-muted);
-            box-shadow: 0 1px 6px rgba(18, 42, 28, 0.05);
-            font-size: 0;
-            line-height: 0;
+            box-shadow: 0 2px 12px rgba(18, 42, 28, 0.06);
+            cursor: pointer;
+            font-family: inherit;
+            transition: box-shadow 0.18s ease, color 0.18s ease;
         }
-        .fic-source-pills--sidebar-icons > .fic-source-pill:hover {
+        .fic-origin-picker__opt:hover {
             color: var(--fic-ag-dark);
-            border-color: rgba(29, 107, 74, 0.28);
-            background: #fff;
+            box-shadow: 0 4px 16px rgba(29, 107, 74, 0.12);
         }
-        .fic-source-pills--sidebar-icons > .fic-source-pill.fic-source-pill--active {
-            background: #fff;
+        .fic-origin-picker__opt:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(45, 157, 110, 0.28), 0 2px 12px rgba(18, 42, 28, 0.08);
+        }
+        .fic-origin-picker__opt--active {
             color: var(--fic-ag-mid);
-            border-color: var(--fic-ag-mid);
-            box-shadow: 0 2px 14px rgba(29, 107, 74, 0.16);
+            box-shadow: 0 0 0 2px rgba(29, 107, 74, 0.22), 0 4px 16px rgba(29, 107, 74, 0.14);
         }
-        .fic-source-pills--sidebar-icons > .fic-source-pill:not(.fic-source-pill--active) .fic-src-img {
-            opacity: 0.82;
-        }
-        .fic-source-pills--sidebar-icons > .fic-source-pill.fic-source-pill--active .fic-src-img {
-            opacity: 1;
-        }
-        .fic-source-pills--sidebar-icons .fic-src-img {
+        .fic-origin-picker__icon {
             display: block;
-            width: 28px;
-            height: 28px;
+            width: 48px;
+            height: 48px;
             object-fit: contain;
             pointer-events: none;
             user-select: none;
+            opacity: 0.88;
+        }
+        .fic-origin-picker__opt--active .fic-origin-picker__icon {
+            opacity: 1;
+        }
+        .fic-origin-picker__label {
+            font-size: 0.74rem;
+            font-weight: 700;
+            line-height: 1.1;
+            letter-spacing: 0.01em;
+        }
+        .fic-origin-picker__opt--active .fic-origin-picker__label {
+            color: var(--fic-ag-mid);
+        }
+        .fic-origin-picker--single .fic-origin-picker__opt {
+            flex: 1 1 auto;
         }
         .fic-source-pills-wrap {
             margin: 0.4rem 0 0.85rem;
@@ -1485,19 +1465,17 @@
                     <select id="globalWetland"></select>
                 </div>
 
-                <div class="fic-panel-map-source-box" id="ficSourcePillsWrap" hidden>
-                    <div class="fic-panel-map-source-box__inner">
-                        <div class="fic-panel-map-source-box__text">
-                            <span class="fic-panel-map-source-box__title">Origen</span>
-                        </div>
-                        <div class="fic-source-pills fic-source-pills--sidebar-icons" id="ficSidebarSourcePillsRow" role="group" aria-label="Elige si el mapa muestra imágenes de satélite o de dron">
-                            <button type="button" class="fic-source-pill fic-source-pill--active" id="ficPillSatellite" aria-pressed="true" title="Ver imágenes de satélite" aria-label="Satélite: imágenes de satélite en el mapa">
-                                <img class="fic-src-img" src="assets/img/satelite.png" alt="" width="64" height="64" decoding="async" loading="lazy">
-                            </button>
-                            <button type="button" class="fic-source-pill" id="ficPillDrone" aria-pressed="false" title="Ver ortofotos del dron" aria-label="Dron: ortofotos y vuelos en el mapa">
-                                <img class="fic-src-img" src="assets/img/dron.png" alt="" width="64" height="64" decoding="async" loading="lazy">
-                            </button>
-                        </div>
+                <div class="fic-sidebar-block" id="ficSourcePillsWrap" hidden>
+                    <span class="selector-label" id="ficOriginSelectLabel">Origen</span>
+                    <div class="fic-origin-picker" id="ficSidebarSourcePillsRow" role="group" aria-labelledby="ficOriginSelectLabel">
+                        <button type="button" class="fic-origin-picker__opt fic-origin-picker__opt--active" id="ficPillSatellite" aria-pressed="true" title="Ver imágenes de satélite" aria-label="Satélite: imágenes de satélite en el mapa">
+                            <img class="fic-origin-picker__icon" src="assets/img/satelite.png" alt="" width="64" height="64" decoding="async" loading="lazy">
+                            <span class="fic-origin-picker__label">Satélite</span>
+                        </button>
+                        <button type="button" class="fic-origin-picker__opt" id="ficPillDrone" aria-pressed="false" title="Ver ortofotos del dron" aria-label="Dron: ortofotos y vuelos en el mapa">
+                            <img class="fic-origin-picker__icon" src="assets/img/dron.png" alt="" width="64" height="64" decoding="async" loading="lazy">
+                            <span class="fic-origin-picker__label">Dron</span>
+                        </button>
                     </div>
                 </div>
 
@@ -1759,6 +1737,7 @@ const FIC_CMAP = {
     Blues: 'linear-gradient(to top,#f7fbff,#deebf7,#c6dbef,#9ecae1,#6baed6,#3182bd,#08519c,#08306b)',
     RdPu: 'linear-gradient(to top,#fff7f3,#fde0dd,#fcc5c0,#fa9fb5,#f768a1,#dd3497,#ae017e,#7a0177,#49006a)',
     viridis: 'linear-gradient(to top,#440154,#482575,#414487,#355f8d,#2a788e,#21908d,#22a884,#44bf70,#7ad151,#bdd26c,#fde725)',
+    Turbo: 'linear-gradient(to top,#300b3b,#462a7a,#365b8f,#277f8e,#1fa187,#4ac16d,#aadc32,#fde725,#fca636,#d4522a,#7a0403)',
 };
 const FIC_CMAP_DEFAULT = FIC_CMAP.RdYlGn;
 
@@ -1845,6 +1824,43 @@ function ficApplyColorbar(meta, idxKey) {
     minEl.textContent = ficFormatLegendScalar(vmin);
     maxEl.textContent = ficFormatLegendScalar(vmax);
     colorbar.style.display = 'flex';
+}
+
+/** Leyenda térmica dron: rango P0–P100 guardado en metadata del raster activo. */
+function ficApplyDroneThermalLegend(raster) {
+    var colorbar = document.getElementById('colorbarBox');
+    var gEl = document.getElementById('cbGradient');
+    var tEl = document.getElementById('cbTitle');
+    var minEl = document.getElementById('cbMin');
+    var maxEl = document.getElementById('cbMax');
+    if (!colorbar || !gEl || !tEl || !minEl || !maxEl) return;
+    var visual = raster && raster.visual ? raster.visual : null;
+    if (!visual || visual.stretch_p0 == null || visual.stretch_p100 == null) {
+        colorbar.style.display = 'none';
+        return;
+    }
+    var vn = Number(visual.stretch_p0);
+    var vx = Number(visual.stretch_p100);
+    if (!isFinite(vn) || !isFinite(vx)) {
+        colorbar.style.display = 'none';
+        return;
+    }
+    gEl.style.background = ficColormapToGradient(visual.colormap || 'Turbo');
+    tEl.textContent = visual.legend_label || 'Térmica';
+    var unit = visual.legend_unit ? (' ' + String(visual.legend_unit)) : '';
+    minEl.textContent = ficFormatThermalLegendScalar(vn) + unit;
+    maxEl.textContent = ficFormatThermalLegendScalar(vx) + unit;
+    colorbar.style.display = 'flex';
+}
+
+function ficFormatThermalLegendScalar(v) {
+    if (v == null || v === '') return '';
+    var n = Number(v);
+    if (!isFinite(n)) return String(v);
+    var a = Math.abs(n);
+    if (a >= 100) return (Math.round(n * 10) / 10).toString();
+    if (a >= 10) return (Math.round(n * 10) / 10).toString();
+    return (Math.round(n * 100) / 100).toString();
 }
 
 /** Leyenda escalar LiDAR (canopy, intensidad…) — misma lógica que fondecyt_puc. */
@@ -2513,8 +2529,8 @@ function syncSourcePillsDom() {
         if (!satBtn || !droneBtn) return;
         satBtn.setAttribute('aria-pressed', onSat ? 'true' : 'false');
         droneBtn.setAttribute('aria-pressed', onSat ? 'false' : 'true');
-        satBtn.classList.toggle('fic-source-pill--active', onSat);
-        droneBtn.classList.toggle('fic-source-pill--active', !onSat);
+        satBtn.classList.toggle('fic-origin-picker__opt--active', onSat);
+        droneBtn.classList.toggle('fic-origin-picker__opt--active', !onSat);
     }
 
     var onSat = state.selectedSource !== 'drone';
@@ -2526,7 +2542,7 @@ function syncSourcePillsDom() {
         } else {
             wrap.hidden = false;
             if (bDrone) bDrone.hidden = !showDroneOpt;
-            if (rowSidebar) rowSidebar.classList.toggle('fic-source-pills--single', !showDroneOpt);
+            if (rowSidebar) rowSidebar.classList.toggle('fic-origin-picker--single', !showDroneOpt);
         }
         if (bSat && bDrone) applyPressed(onSat, bSat, bDrone);
     }
@@ -4804,6 +4820,8 @@ function updateMapOverlay() {
 
     if (isDrone && (ixKind === 'ndvi' || ixKind === 'ndwi')) {
         ficApplyColorbar(meta, ixKind);
+    } else if (isDrone && ixKind === 'thermal') {
+        ficApplyDroneThermalLegend(raster);
     } else {
         ficApplyColorbar(meta, selectedIndex());
     }
