@@ -1460,6 +1460,10 @@
             <p class="fic-panel-error" id="ficLoadHint" role="alert" hidden></p>
 
             <div class="fic-sidebar-stack">
+                <div class="fic-sidebar-block" id="ficAgricultorPickBlock" hidden>
+                    <label class="selector-label" for="ficAgricultorSelect">Agricultor</label>
+                    <select id="ficAgricultorSelect" title="Agricultores de tu cartera"></select>
+                </div>
                 <div class="fic-sidebar-block" id="ficPredioPickBlock">
                     <label class="selector-label" for="globalWetland" id="ficPredioSelectLabel">Predio</label>
                     <select id="globalWetland"></select>
@@ -2061,9 +2065,39 @@ function usesAgricultorNamesInPredioSelect() {
     return (h === 'sat' || h === 'asesor') && !usesSplitAgricultorPredioSelect();
 }
 
-/** Nivel agricultor: nombre una vez + selector de código de predio (RCI, RPA…). */
+/** Agricultor fijo o asesor: selector de código de predio (RCI, RPA…). */
 function usesSplitAgricultorPredioSelect() {
-    return state.hierarchyLevel === 'agricultor';
+    var h = state.hierarchyLevel;
+    return h === 'agricultor' || h === 'asesor' || h === 'sat';
+}
+
+/** Asesor/SAT: desplegable de agricultores de la cartera antes del predio. */
+function needsAgricultorSelector() {
+    var auth = state.authSession;
+    return !!(auth && (auth.rol === 'asesor' || auth.rol === 'sat'));
+}
+
+function syncAgricultorPickBlockVisibility() {
+    var block = document.getElementById('ficAgricultorPickBlock');
+    if (!block) return;
+    block.hidden = !needsAgricultorSelector();
+}
+
+function agricultorNamesInAdvisorPortfolio() {
+    var seen = {};
+    var names = [];
+    wetlandsListedForSelect().forEach(function (wid) {
+        var n = agricultorNameForWetland(wid);
+        if (!n) return;
+        var key = n.toLocaleLowerCase('es');
+        if (seen[key]) return;
+        seen[key] = true;
+        names.push(n);
+    });
+    names.sort(function (a, b) {
+        return a.localeCompare(b, 'es', { sensitivity: 'base' });
+    });
+    return names;
 }
 
 function agricultorNameForWetland(wid) {
@@ -2086,7 +2120,12 @@ function updatePredioSidebarCopy() {
     var lab = document.getElementById('ficPredioSelectLabel');
     var sel = document.getElementById('globalWetland');
     if (usesSplitAgricultorPredioSelect()) {
-        if (helper) {
+        if (needsAgricultorSelector()) {
+            if (helper) {
+                helper.innerHTML =
+                    'Elige un agricultor de tu cartera y luego el código de predio (G1, RCI…). Con satélite y dron, alterna con <strong>Origen</strong>.';
+            }
+        } else if (helper) {
             helper.innerHTML =
                 'Elige el código de predio (RCI, RPA, G1…). Con satélite y dron, alterna con <strong>Origen</strong>.';
         }
@@ -2673,7 +2712,9 @@ function updateWelcomeBanner() {
         var na = row && ficTrim(row.nombre_agricultor) !== '' ? ficTrim(row.nombre_agricultor) : '';
         el.textContent = na ? 'Hola, ' + na + '.' : 'Hola.';
     } else {
-        var asz = row && ficTrim(row.nombre_sat_asesor) !== '' ? ficTrim(row.nombre_sat_asesor) : firstAsesorNameFromDb();
+        var asz = (state.authSession && ficTrim(state.authSession.nombre)) ||
+            (row && ficTrim(row.nombre_sat_asesor) !== '' ? ficTrim(row.nombre_sat_asesor) : '') ||
+            firstAsesorNameFromDb();
         el.textContent = asz ? 'Hola, ' + asz + '.' : 'Hola.';
     }
 }
@@ -2709,7 +2750,8 @@ function initFromQuery() {
         window.location.replace('index.html');
         return;
     }
-    if (state.authSession.rol !== 'agricultor') {
+    var allowedRoles = { agricultor: 1, asesor: 1, sat: 1 };
+    if (!allowedRoles[state.authSession.rol]) {
         clearAuthSession();
         window.location.replace('index.html');
         return;
@@ -4532,8 +4574,36 @@ function buildSelectors() {
     const wetlands = wetlandsListedForSelect();
     updatePredioSidebarCopy();
     applyAuthSessionToUi();
+    syncAgricultorPickBlockVisibility();
 
-    if (state.authSession && state.authSession.rol === 'agricultor') {
+    if (needsAgricultorSelector()) {
+        var agSel = document.getElementById('ficAgricultorSelect');
+        var agNames = agricultorNamesInAdvisorPortfolio();
+        if (agSel) {
+            agSel.innerHTML = '';
+            agNames.forEach(function (n) {
+                var opt = document.createElement('option');
+                opt.value = n;
+                opt.textContent = n;
+                agSel.appendChild(opt);
+            });
+            if (!state.selectedAgricultorName || agNames.indexOf(state.selectedAgricultorName) < 0) {
+                state.selectedAgricultorName = agNames[0] || null;
+            }
+            agSel.value = state.selectedAgricultorName || '';
+            if (!agSel.dataset.ficBound) {
+                agSel.dataset.ficBound = '1';
+                agSel.addEventListener('change', function () {
+                    state.selectedAgricultorName = agSel.value || null;
+                    buildPredioSelectForAgricultor(wetlandSel, wetlandsListedForSelect());
+                    void applyWetlandSelection(state.selectedWetland);
+                    updateWelcomeBanner();
+                    updateAsesorPortfolioChart();
+                });
+            }
+        }
+        buildPredioSelectForAgricultor(wetlandSel, wetlands);
+    } else if (state.authSession && state.authSession.rol === 'agricultor') {
         state.selectedAgricultorName = state.authSession.nombre;
         buildPredioSelectForAgricultor(wetlandSel, wetlands);
     } else if (usesSplitAgricultorPredioSelect()) {

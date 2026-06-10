@@ -151,7 +151,7 @@
             </div>
         </div>
         <p class="fic-login-eyebrow">Acceso</p>
-        <p class="fic-login-lead">Ingresa tus credenciales de agricultor para acceder al mapa.</p>
+        <p class="fic-login-lead">Ingresa tus credenciales de agricultor o asesor para acceder al mapa.</p>
         <form id="ficLoginForm" autocomplete="on">
             <div class="fic-field">
                 <label for="ficLoginUser">Nombre de usuario</label>
@@ -164,7 +164,7 @@
             <button type="submit" class="fic-btn" id="ficLoginSubmit">Entrar al mapa</button>
         </form>
         <div class="fic-error" id="ficLoginError" role="alert" aria-hidden="true"></div>
-        <p class="fic-hint">Si no recuerdas tus datos, contacta al equipo FIC.</p>
+        <p class="fic-hint">Usuario: nombre completo · contraseña: apellido (mismo formato para agricultores y asesores).</p>
     </div>
 </div>
 <script>
@@ -205,11 +205,14 @@
 
     function buildAuthIndex(rows) {
         var ag = {};
+        var ases = {};
         rows.forEach(function (r) {
             var na = trim(r.nombre_agricultor);
             if (na) ag[norm(na)] = na;
+            var ns = trim(r.nombre_sat_asesor);
+            if (ns) ases[norm(ns)] = ns;
         });
-        return { agricultores: ag };
+        return { agricultores: ag, asesores: ases };
     }
 
     function validateCredentials(usuario, password, index) {
@@ -222,6 +225,13 @@
             return {
                 ok: true,
                 session: { rol: 'agricultor', nivel: 'agricultor', nombre: matchAg }
+            };
+        }
+        var matchAsesor = index.asesores[u];
+        if (matchAsesor && norm(apellidoFromNombre(matchAsesor)) === p) {
+            return {
+                ok: true,
+                session: { rol: 'asesor', nivel: 'asesor', nombre: matchAsesor }
             };
         }
         return { ok: false };
