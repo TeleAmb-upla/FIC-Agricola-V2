@@ -1990,13 +1990,6 @@ function wetlandMatchesAdvisorFilter(wid, advisorName) {
     return a.localeCompare(advisorName, 'es', { sensitivity: 'base' }) === 0;
 }
 
-function wetlandsInAdvisorPortfolio() {
-    var adv = advisorNameForPortfolioFilter();
-    return wetlandsListedForSelect().filter(function (wid) {
-        return wetlandMatchesAdvisorFilter(wid, adv);
-    });
-}
-
 async function applyWetlandSelection(wid) {
     state.selectedWetland = wid || null;
     state._lastMapFitContextKey = null;
