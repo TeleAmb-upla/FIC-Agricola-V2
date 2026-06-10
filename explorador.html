@@ -400,6 +400,7 @@
         .helper { font-size: 0.9rem; color: var(--fic-ag-muted); line-height: 1.45; margin-bottom: 0.65rem; }
         .fic-sidebar-block { display: flex; flex-direction: column; gap: 0.28rem; margin-top: 0; }
         #ficLidarAttrFields[hidden] { display: none !important; }
+        #ficAgricultorPickBlock[hidden] { display: none !important; }
         .selector-label {
             font-size: 0.68rem;
             font-weight: 700;
@@ -2071,10 +2072,12 @@ function usesSplitAgricultorPredioSelect() {
     return h === 'agricultor' || h === 'asesor' || h === 'sat';
 }
 
-/** Asesor/SAT: desplegable de agricultores de la cartera antes del predio. */
+/** Asesor/SAT: desplegable de agricultores de la cartera (nunca en nivel agricultor). */
 function needsAgricultorSelector() {
     var auth = state.authSession;
-    return !!(auth && (auth.rol === 'asesor' || auth.rol === 'sat'));
+    var h = state.hierarchyLevel;
+    if (h === 'agricultor') return false;
+    return !!(auth && (auth.rol === 'asesor' || auth.rol === 'sat') && (h === 'asesor' || h === 'sat'));
 }
 
 function syncAgricultorPickBlockVisibility() {
@@ -4605,6 +4608,8 @@ function buildSelectors() {
         buildPredioSelectForAgricultor(wetlandSel, wetlands);
     } else if (state.authSession && state.authSession.rol === 'agricultor') {
         state.selectedAgricultorName = state.authSession.nombre;
+        var agBlockAg = document.getElementById('ficAgricultorPickBlock');
+        if (agBlockAg) agBlockAg.hidden = true;
         buildPredioSelectForAgricultor(wetlandSel, wetlands);
     } else if (usesSplitAgricultorPredioSelect()) {
         buildPredioSelectForAgricultor(wetlandSel, wetlands);
@@ -4633,6 +4638,7 @@ function buildSelectors() {
         };
     }
 
+    syncAgricultorPickBlockVisibility();
     refreshMapLayerState();
     updateWelcomeBanner();
 }
