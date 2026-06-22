@@ -1,0 +1,5 @@
+source,wetland_id,wetland_name,index,date,year,season,period_key,mean
+drone,e_sazo,Parcela 24 — Emilio Sazo,NDVI,2026-01-21,2026,21 Jan 2026,20260121,0.2999
+drone,e_sazo,Parcela 24 — Emilio Sazo,NDVI,2026-06-12,2026,12 Jun 2026,20260612,0.254
+drone,e_sazo,Parcela 24 — Emilio Sazo,NDWI,2026-01-21,2026,21 Jan 2026,20260121,-0.0678
+drone,e_sazo,Parcela 24 — Emilio Sazo,NDWI,2026-06-12,2026,12 Jun 2026,20260612,-0.0572

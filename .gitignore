@@ -28,10 +28,13 @@ export_drone_log.txt
 **/*.sr.lock
 **/*.gdbtable.lock
 
-# Dron crudo (local): en el repo solo va la vista web en data_static/drone/
-data/drone/**/*.las
-data/drone/**/*.LAS
-data/drone/**/*.tif
-data/drone/**/*.tiff
-data/drone/**/*.TIF
-data/drone/**/*.TIFF
+# Datos crudos locales — no publicar (GitHub Pages usa solo data_static/ + HTML)
+data/sentinel2/
+data/drone/
+data/shapefiles/
+
+# Copias / auxiliares de CSV
+data/fic_database_fixed.csv
+
+# Temp / diagnóstico
+_tmp_check.js
