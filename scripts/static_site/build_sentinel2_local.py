@@ -58,7 +58,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 try:
     import rasterio
     from rasterio.features import geometry_mask
-    from rasterio.warp import transform_bounds, transform_geom
+    from rasterio.warp import reproject, Resampling, transform_bounds, transform_geom
 except ImportError as exc:  # pragma: no cover
     print(f"Falta rasterio: {exc}. pip install rasterio", file=sys.stderr)
     sys.exit(1)
@@ -77,13 +77,18 @@ except ImportError as exc:  # pragma: no cover
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+STATIC_SITE_DIR = REPO_ROOT / "scripts" / "static_site"
+if str(STATIC_SITE_DIR) not in sys.path:
+    sys.path.insert(0, str(STATIC_SITE_DIR))
+
+from pipeline_utils import build_s2_file_to_wetland_map, load_config, load_wetland_clip_geometries
 
 DEFAULT_TIF_DIR = REPO_ROOT / "data" / "sentinel2"
 DEFAULT_STATIC_DIR = REPO_ROOT / "data_static" / "sentinel2"
-DEFAULT_AOI_GEOJSON = REPO_ROOT / "data" / "shapefiles" / "aoi.geojson"
+DEFAULT_AOI_GEOJSON = REPO_ROOT / "data" / "shapefiles" / "wetlands_export_aoi.geojson"
 DEFAULT_DB_CSV = REPO_ROOT / "data" / "fic_database.csv"
 
-_STEM_RE = re.compile(r"^S2_(?P<predio>[A-Za-z0-9]+)_Y(?P<year>\d{4})_W(?P<week>\d{2})$")
+_STEM_RE = re.compile(r"^S2_(?P<predio>[A-Za-z0-9_]+)_Y(?P<year>\d{4})_W(?P<week>\d{2})$")
 
 MONTH_NAMES_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
                   "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
@@ -130,9 +135,9 @@ WEBP_QUALITY = 86
 WEBP_METHOD = 4  # PIL WebP: 0=rápido, 6=más compresión. 4 balance velocidad/tamaño.
 WEBP_UPSCALE_MIN_SIDE = 384  # Cada predio es chico (~13x17 px). Subimos hasta lado mín. ≥ N px.
 
-# Divisor por banda (los TIF guardan los índices como int16-en-float64 escalados ×100;
+# Divisor por banda (los TIF guardan los índices como int16-en-float64 escalados ×1000;
 # ``clear_pixel_count`` es entero crudo).
-DIVISOR_DEFAULT = 100.0
+DIVISOR_DEFAULT = 1000.0
 BAND_DIVISOR_OVERRIDE: dict[str, float] = {
     "CLEAR_PIXEL_COUNT": 1.0,
 }
@@ -220,28 +225,31 @@ def clamp_last_complete_month_to_data(
 # Discovery & stack loading
 # ---------------------------------------------------------------------------
 
-def discover_tifs(tif_dir: Path) -> dict[str, list[dict]]:
+def discover_tifs(tif_dir: Path, s2_to_wetland: dict[str, str] | None = None) -> dict[str, list[dict]]:
     """
-    Recorre ``tif_dir`` y agrupa por ``predio`` (uppercase).
+    Recorre ``tif_dir`` y agrupa por wetland_id (clave en config.yaml).
 
-    Retorna ``{predio: [{path, year, week, thursday}, ...] (ordenado por fecha)}``.
+    Los archivos ``S2_G5_…`` se renombran lógicamente a ``l_martinez`` si ``s2_to_wetland`` lo indica.
     """
     grouped: dict[str, list[dict]] = defaultdict(list)
     for path in sorted(tif_dir.glob("S2_*.tif")):
         m = _STEM_RE.match(path.stem)
         if not m:
             continue
-        predio = m.group("predio").upper()
+        file_predio = m.group("predio").upper()
+        wetland_key = file_predio.lower()
+        if s2_to_wetland and file_predio in s2_to_wetland:
+            wetland_key = s2_to_wetland[file_predio]
         try:
             y = int(m.group("year"))
             w = int(m.group("week"))
             th = iso_week_thursday(y, w)
         except ValueError:
             continue
-        grouped[predio].append({"path": path, "year": y, "week": w, "thursday": th})
+        grouped[wetland_key].append({"path": path, "year": y, "week": w, "thursday": th})
     for predio in grouped:
         grouped[predio].sort(key=lambda r: r["thursday"])
-    return grouped
+    return dict(grouped)
 
 
 def read_stack(predio_records: list[dict]) -> tuple[np.ndarray, list[str], dict]:
@@ -284,17 +292,37 @@ def read_stack(predio_records: list[dict]) -> tuple[np.ndarray, list[str], dict]
             if ds.width != ref_w or ds.height != ref_h:
                 print(
                     f"  [aviso] {rec['path'].name}: tamaño {ds.width}x{ds.height} ≠ "
-                    f"referencia {ref_w}x{ref_h}; omitido.",
+                    f"referencia {ref_w}x{ref_h}; remuestreo a grilla de referencia.",
                     file=sys.stderr,
                 )
-                continue
-            arr = ds.read().astype(np.float32, copy=False)
-            nodata = ds.nodata
-            if nodata is not None:
-                arr = np.where(arr == nodata, np.nan, arr)
-            for sentinel in SENTINEL_VALUES:
-                arr = np.where(arr == sentinel, np.nan, arr)
-            arr = np.where(np.isfinite(arr), arr, np.nan)
+                arr = np.full((n_bands, ref_h, ref_w), np.nan, dtype=np.float32)
+                nb = min(n_bands, ds.count)
+                for bi in range(nb):
+                    src = ds.read(bi + 1).astype(np.float32, copy=False)
+                    nd = ds.nodata
+                    if nd is not None and np.isfinite(float(nd)):
+                        src = np.where(np.isclose(src, float(nd)), np.nan, src)
+                    for sentinel in SENTINEL_VALUES:
+                        src = np.where(src == sentinel, np.nan, src)
+                    reproject(
+                        source=src,
+                        destination=arr[bi],
+                        src_transform=ds.transform,
+                        src_crs=ds.crs,
+                        dst_transform=ref_transform,
+                        dst_crs=ref_crs,
+                        resampling=Resampling.bilinear,
+                        src_nodata=np.nan,
+                        dst_nodata=np.nan,
+                    )
+            else:
+                arr = ds.read().astype(np.float32, copy=False)
+                nodata = ds.nodata
+                if nodata is not None:
+                    arr = np.where(arr == nodata, np.nan, arr)
+                for sentinel in SENTINEL_VALUES:
+                    arr = np.where(arr == sentinel, np.nan, arr)
+                arr = np.where(np.isfinite(arr), arr, np.nan)
         if arr.shape[0] != n_bands:
             arr = arr[:n_bands]
         arr = arr / div_per_band[: arr.shape[0]]
@@ -356,6 +384,11 @@ def mask_stack_to_geometry(
     except (ValueError, TypeError):
         return stack
     if not np.any(outside):
+        return stack
+    if outside.all():
+        # El polígono no cubre ningún píxel del ráster (deriva de georreferencia entre el
+        # recorte exportado y el predio actual). Como cada TIFF Sentinel-2 ya es un recorte
+        # por predio, se usa el ráster completo en lugar de descartar todos los datos.
         return stack
     for i in range(stack.shape[0]):
         for b in range(stack.shape[1]):
@@ -808,16 +841,47 @@ def load_predios_info(aoi_geojson: Path | None, db_csv: Path | None) -> dict[str
             }
     if db_csv and db_csv.is_file():
         try:
-            with open(db_csv, encoding="utf-8") as f:
+            cfg = load_config()
+            poligono_wetlands: dict[str, list[str]] = defaultdict(list)
+            for wid, wcfg in cfg.get("wetlands", {}).items():
+                pv = str(wcfg.get("aoi_filter_val") or "").strip().upper()
+                if pv:
+                    poligono_wetlands[pv].append(wid)
+            with open(db_csv, encoding="utf-8-sig", newline="") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    codigo = (row.get("codigo_predio") or "").strip()
-                    if not codigo:
-                        continue
-                    key = codigo.lower()
-                    if key in info:
-                        info[key].update({k: v for k, v in row.items() if v not in (None, "")})
-                        info[key]["codigo_predio"] = codigo
+                    pv = str(row.get("poligono_vuelo") or "").strip().upper()
+                    prop = str(row.get("propietario") or "").strip()
+                    asesor = str(row.get("asesor") or "").strip()
+                    nom_predio = str(row.get("nom_predio") or "").strip()
+                    for wid in poligono_wetlands.get(pv, []):
+                        wcfg = cfg["wetlands"].get(wid, {})
+                        if wid not in info:
+                            info[wid] = {
+                                "name": wcfg.get("name") or nom_predio or wid,
+                                "codigo_predio": str(wcfg.get("drone_code") or wid).upper(),
+                            }
+                        info[wid].update(
+                            {
+                                k: v
+                                for k, v in row.items()
+                                if v not in (None, "")
+                            }
+                        )
+                        info[wid]["nombre_agricultor"] = prop
+                        info[wid]["nombre_sat_asesor"] = asesor
+            # Esquema legacy
+            with open(db_csv, encoding="utf-8-sig", newline="") as f:
+                reader = csv.DictReader(f)
+                if reader.fieldnames and "codigo_predio" in reader.fieldnames:
+                    for row in reader:
+                        codigo = (row.get("codigo_predio") or "").strip()
+                        if not codigo:
+                            continue
+                        key = codigo.lower()
+                        if key in info:
+                            info[key].update({k: v for k, v in row.items() if v not in (None, "")})
+                            info[key]["codigo_predio"] = codigo
         except OSError:
             pass
     return info
@@ -986,7 +1050,8 @@ def build(
     rasters_dir.mkdir(parents=True, exist_ok=True)
     csv_dir.mkdir(parents=True, exist_ok=True)
 
-    grouped = discover_tifs(tif_dir)
+    s2_map = build_s2_file_to_wetland_map(load_config())
+    grouped = discover_tifs(tif_dir, s2_map)
     if not grouped:
         print(f"No se encontraron TIFs en {tif_dir}. Nada que hacer.", file=sys.stderr)
         return
@@ -1002,7 +1067,7 @@ def build(
     print(f"Años detectados: {sorted(all_years)} | actual={current_year} | hist={historic_years}")
 
     predios_info = load_predios_info(aoi_geojson, db_csv)
-    predio_geoms = load_predio_geometries(aoi_geojson)
+    predio_geoms = load_wetland_clip_geometries(load_config())
     aoi_mtime_ns = 0
     if aoi_geojson and aoi_geojson.is_file():
         try:

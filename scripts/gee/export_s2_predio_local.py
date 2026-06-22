@@ -38,9 +38,9 @@ from export_s2 import COMPOSED_INDEX_BANDS
 from paths import DEFAULT_S2_WEEKLY_COLLECTION, resolve_ee_cloud_project
 
 DEFAULT_COLLECTION = DEFAULT_S2_WEEKLY_COLLECTION
-LOCAL_STEM_RE = re.compile(r"^S2_([A-Za-z0-9]+)_Y(\d{4})_W(\d{2})$", re.I)
+LOCAL_STEM_RE = re.compile(r"^S2_([A-Za-z0-9_]+)_Y(\d{4})_W(\d{2})$", re.I)
 EE_WEEK_BASENAME_RE = re.compile(r"^Y(\d{4})_W(\d{2})$", re.I)
-# Mismas bandas que G1…NOG (int16 ×100 + clear_pixel_count crudo).
+# Mismas bandas que G1…NOG (int16 ×1000 + clear_pixel_count crudo).
 COMPOSED_BANDS = COMPOSED_INDEX_BANDS + ["clear_pixel_count"]
 SKIP_PREDIO_CODES = {"LOTE_DEMO"}
 
@@ -113,13 +113,14 @@ def predios_needing_export(
 def load_predio_geoms(config: dict) -> dict[str, dict]:
     master = ensure_master_aoi(config)
     gdf = gpd.read_file(master).to_crs("EPSG:4326")
-    id_col = config["shapefile_id_col"]
+    id_col = config.get("export_aoi_id_col", "wetland_id")
+    if id_col not in gdf.columns and "wetland_id" in gdf.columns:
+        id_col = "wetland_id"
     out: dict[str, dict] = {}
     for _, row in gdf.iterrows():
         wid = str(row[id_col]).strip().lower()
-        code = wid.upper()
-        if wid == "nog":
-            code = "NOG"
+        wcfg = config.get("wetlands", {}).get(wid, {})
+        code = str(wcfg.get("s2_code") or wid).strip().upper()
         if code in SKIP_PREDIO_CODES:
             continue
         geom = row.geometry
@@ -191,7 +192,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Export S2 semanal recortado por predio a data/sentinel2/")
     ap.add_argument("--collection", default=os.environ.get("GEE_STATS_COLLECTION", DEFAULT_COLLECTION))
     ap.add_argument("--project", default=None)
-    ap.add_argument("--reference", default="G1", help="Predio cuyas semanas locales definen el calendario.")
+    ap.add_argument("--reference", default="E_SAZO", help="Predio cuyas semanas locales definen el calendario (s2_code en config.yaml).")
     ap.add_argument(
         "--predios",
         default=None,

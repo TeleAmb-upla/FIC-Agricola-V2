@@ -41,6 +41,102 @@
     ];
   }
 
+  /** WGS84 → UTM (hemisferio sur). Zona por defecto 19 (Los Andes). */
+  function wgs84ToUtm(lng, lat, zone) {
+    const z = zone || 19;
+    const a = 6378137.0;
+    const k0 = 0.9996;
+    const e = 0.081819191784;
+    const latR = lat * Math.PI / 180;
+    const lngR = lng * Math.PI / 180;
+    const lng0 = ((z - 1) * 6 - 180 + 3) * Math.PI / 180;
+    const sinLat = Math.sin(latR);
+    const cosLat = Math.cos(latR);
+    const tanLat = Math.tan(latR);
+    const e2 = e * e;
+    const ep2 = e2 / (1 - e2);
+    const N = a / Math.sqrt(1 - e2 * sinLat * sinLat);
+    const T = tanLat * tanLat;
+    const C = ep2 * cosLat * cosLat;
+    const A = cosLat * (lngR - lng0);
+    const M = a * (
+      (1 - e2 / 4 - 3 * e2 * e2 / 64 - 5 * e2 * e2 * e2 / 256) * latR
+      - (3 * e2 / 8 + 3 * e2 * e2 / 32 + 45 * e2 * e2 * e2 / 1024) * Math.sin(2 * latR)
+      + (15 * e2 * e2 / 256 + 45 * e2 * e2 * e2 / 1024) * Math.sin(4 * latR)
+      - (35 * e2 * e2 * e2 / 3072) * Math.sin(6 * latR)
+    );
+    const easting = k0 * N * (
+      A + (1 - T + C) * A * A * A / 6
+      + (5 - 18 * T + T * T + 72 * C - 58 * ep2) * A * A * A * A * A / 120
+    ) + 500000;
+    const northing = k0 * (
+      M + N * tanLat * (
+        A * A / 2
+        + (5 - T + 9 * C + 4 * C * C) * A * A * A * A / 24
+        + (61 - 58 * T + T * T + 600 * C - 330 * ep2) * A * A * A * A * A * A / 720
+      )
+    );
+    return [easting, northing + (lat < 0 ? 10000000 : 0)];
+  }
+
+  function pointInRing(x, y, ring) {
+    if (!ring || ring.length < 3) return true;
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const xi = ring[i][0];
+      const yi = ring[i][1];
+      const xj = ring[j][0];
+      const yj = ring[j][1];
+      const intersect = ((yi > y) !== (yj > y))
+        && (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-12) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  function exteriorRingFromGeometry(geom) {
+    if (!geom) return null;
+    if (geom.type === 'Polygon') return geom.coordinates && geom.coordinates[0];
+    if (geom.type === 'MultiPolygon') {
+      let best = null;
+      let bestArea = 0;
+      (geom.coordinates || []).forEach(function (poly) {
+        const ring = poly && poly[0];
+        if (!ring || ring.length < 4) return;
+        let area = 0;
+        for (let i = 0; i < ring.length - 1; i++) {
+          area += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1];
+        }
+        area = Math.abs(area);
+        if (area > bestArea) {
+          bestArea = area;
+          best = ring;
+        }
+      });
+      return best;
+    }
+    return null;
+  }
+
+  function cuartelLocalRing(pcdData) {
+    const cid = api.state && api.state.selectedCuartel;
+    if (!cid || typeof global.ficGetCuartelFeature !== 'function') return null;
+    const feat = global.ficGetCuartelFeature(cid);
+    const ring = exteriorRingFromGeometry(feat && feat.geometry);
+    const origin = pcdData && pcdData.origin;
+    if (!ring || !origin || origin.length < 2) return null;
+    const zone = 19;
+    const local = [];
+    ring.forEach(function (pt) {
+      const utm = wgs84ToUtm(Number(pt[0]), Number(pt[1]), zone);
+      local.push([
+        Math.round((utm[0] - origin[0]) * 1000) / 1000,
+        Math.round((utm[1] - origin[1]) * 1000) / 1000
+      ]);
+    });
+    return local.length >= 3 ? local : null;
+  }
+
   const api = {
     state: null,
     baseUrl: '',
@@ -117,7 +213,8 @@
     },
 
     viewKey: function (wid, pk) {
-      return String(wid || '') + '|' + String(pk || '');
+      const cid = api.state && api.state.selectedCuartel;
+      return String(wid || '') + '|' + String(pk || '') + '|' + String(cid || '');
     },
 
     clearPoints: function () {
@@ -240,10 +337,11 @@
       box.setAttribute('aria-hidden', 'false');
     },
 
-    addBoundary: function (data, colorHex) {
-      if (!data || !data.boundary || data.boundary.length < 2 || !api.las3d.scene) return;
+    addBoundary: function (data, colorHex, ringOverride) {
+      const ring = ringOverride || (data && data.boundary);
+      if (!ring || ring.length < 2 || !api.las3d.scene) return;
       const flat = [];
-      data.boundary.forEach(function (p) {
+      ring.forEach(function (p) {
         flat.push(p[0], p[1], p[2] != null ? p[2] : 0);
       });
       const geom = new THREE.BufferGeometry();
@@ -268,7 +366,13 @@
         return;
       }
       const attrs = api.droneMeta().lidar_attributes || {};
-      const ids = Object.keys(attrs);
+      const ids = Object.keys(attrs).sort(function (a, b) {
+        if (a === 'rgb') return -1;
+        if (b === 'rgb') return 1;
+        const la = (attrs[a] && attrs[a].label) || a;
+        const lb = (attrs[b] && attrs[b].label) || b;
+        return la.localeCompare(lb, 'es', { sensitivity: 'base' });
+      });
       if (!ids.length) return;
       sel.innerHTML = '';
       ids.forEach(function (id) {
@@ -277,7 +381,7 @@
         opt.textContent = (attrs[id] && attrs[id].label) || id;
         sel.appendChild(opt);
       });
-      const def = api.droneMeta().lidar_default_attribute || 'canopy';
+      const def = api.droneMeta().lidar_default_attribute || 'rgb';
       if (ids.indexOf(api.state.lidarAttribute) < 0) api.state.lidarAttribute = def;
       sel.value = api.state.lidarAttribute || def;
       if (!sel.dataset.ficBound) {
@@ -286,18 +390,22 @@
           api.state.lidarAttribute = sel.value;
           api.updateView({ preserveCamera: true });
           if (typeof global.ficApplyLidarLegends === 'function') global.ficApplyLidarLegends();
+          if (typeof global.ficUpdateLidarAttrDescription === 'function') global.ficUpdateLidarAttrDescription();
+          if (typeof global.ficSyncDroneMapTitle === 'function') global.ficSyncDroneMapTitle();
         });
       }
     },
 
-    loadPointcloud: function (wid, periodKey, colorHex, cachedData) {
+    loadPointcloud: function (wid, periodKey, colorHex, cachedData, opts) {
+      opts = opts || {};
       let data = cachedData;
       if (!data) return null;
       if (!data.count || !data.positions || !data.positions.length) return null;
-      const attrId = api.state.lidarAttribute || 'canopy';
+      const attrId = api.state.lidarAttribute || 'rgb';
       const attr = (data.attributes && data.attributes[attrId]) || null;
       const lim = api.stretchForAttr(attrId, data);
       const pos = data.positions;
+      const clipRing = opts.skipCuartelClip ? null : cuartelLocalRing(data);
       let n = pos.length / 3;
       const maxRender = 750000;
       const step = n > maxRender ? Math.ceil(n / maxRender) : 1;
@@ -307,6 +415,9 @@
       let oi = 0;
       for (let i = 0; i < n; i += step) {
         const pi = i * 3;
+        const px = pos[pi];
+        const py = pos[pi + 1];
+        if (clipRing && !pointInRing(px, py, clipRing)) continue;
         verts[oi * 3] = pos[pi];
         verts[oi * 3 + 1] = pos[pi + 1];
         verts[oi * 3 + 2] = pos[pi + 2];
@@ -341,11 +452,15 @@
         cols[oi * 3 + 2] = b;
         oi++;
       }
+      if (!oi && clipRing && !opts.skipCuartelClip) {
+        return api.loadPointcloud(wid, periodKey, colorHex, cachedData, { skipCuartelClip: true });
+      }
+      if (!oi) return null;
       const geom = new THREE.BufferGeometry();
       geom.setAttribute('position', new THREE.BufferAttribute(verts.subarray(0, oi * 3), 3));
       geom.setAttribute('color', new THREE.BufferAttribute(cols.subarray(0, oi * 3), 3));
       geom.computeBoundingSphere();
-      const pointSize = Math.max(0.06, Math.min(0.17, 620 / Math.sqrt(oi)));
+      const pointSize = Math.max(0.1, Math.min(0.24, 820 / Math.sqrt(Math.max(oi, 1))));
       const mat = new THREE.PointsMaterial({
         size: pointSize,
         vertexColors: true,
@@ -354,6 +469,18 @@
         opacity: 0.92
       });
       return new THREE.Points(geom, mat);
+    },
+
+  fitCameraToBoundary: function (data) {
+      const ring = data && data.boundary;
+      if (!ring || ring.length < 2 || !api.las3d.camera) return false;
+      const box3 = new THREE.Box3();
+      ring.forEach(function (p) {
+        box3.expandByPoint(new THREE.Vector3(p[0], p[1], p[2] != null ? p[2] : 0));
+      });
+      if (box3.isEmpty()) return false;
+      api.fitCamera(box3, false, null);
+      return true;
     },
 
     fitCamera: function (box3, preserveCamera, viewKey) {
@@ -399,6 +526,18 @@
         api.showView(false);
         return;
       }
+      if (!entry) {
+        api.showView(false);
+        if (typeof global.ficSyncDroneMapTitle === 'function') {
+          global.ficSyncDroneMapTitle(
+            typeof global.ficDroneUnavailableMessage === 'function'
+              ? global.ficDroneUnavailableMessage('lidar', pk)
+              : 'No hay datos LiDAR para este vuelo.'
+          );
+        }
+        api.applyClassLegend(false);
+        return;
+      }
       api.showView(true);
       api.init();
       if (!api.las3d.inited) return;
@@ -406,14 +545,8 @@
       const loadGen = ++api.loadGen;
       api.clearPoints();
       const viewKey = api.viewKey(wid, pk);
-      const preserveCamera = !!(opts && opts.preserveCamera) ||
-        (api.las3d.cameraReady && api.las3d.lastViewKey === viewKey);
-      if (!entry) {
-        const note = document.getElementById('mapNote');
-        if (note) note.textContent = 'No hay nube LiDAR para este predio y fecha.';
-        api.applyClassLegend(false);
-        return;
-      }
+      const preserveCamera = !!(opts && opts.preserveCamera) &&
+        api.las3d.cameraReady && api.las3d.lastViewKey === viewKey;
       const col = (api.droneMeta().wetlands && api.droneMeta().wetlands[wid] && api.droneMeta().wetlands[wid].color) || '#1d6b4a';
       try {
         let pcdData = api.las3d.pcdCache && api.las3d.pcdCache.key === viewKey ? api.las3d.pcdCache.data : null;
@@ -432,16 +565,33 @@
           api.las3d.scene.add(pts);
           api.las3d.points.push(pts);
           box3.expandByObject(pts);
+        } else if (typeof global.ficSyncDroneMapTitle === 'function') {
+          global.ficSyncDroneMapTitle('LiDAR — no se pudieron dibujar puntos para este cuartel. Prueba otra capa o fecha.');
         }
-        if (pcdData) api.addBoundary(pcdData, col);
-        api.fitCamera(box3, preserveCamera && pts, viewKey);
+        const cuRing = cuartelLocalRing(pcdData);
+        if (cuRing) {
+          const ring3d = cuRing.map(function (p) { return [p[0], p[1], 0]; });
+          api.addBoundary(pcdData, col, ring3d);
+        } else if (pcdData) {
+          api.addBoundary(pcdData, col);
+        }
+        if (!pts || box3.isEmpty()) {
+          api.fitCameraToBoundary(pcdData);
+        } else {
+          api.fitCamera(box3, preserveCamera && pts, viewKey);
+        }
+        if (api.las3d._resize) {
+          requestAnimationFrame(function () {
+            if (api.las3d._resize) api.las3d._resize();
+          });
+        }
         if (typeof global.ficApplyLidarLegends === 'function') global.ficApplyLidarLegends();
-        const note = document.getElementById('mapNote');
-        if (note) note.textContent = 'LiDAR 3D · arrastra para rotar · usa la rueda para zoom · clic derecho para desplazar';
+        if (typeof global.ficSyncDroneMapTitle === 'function') global.ficSyncDroneMapTitle();
       } catch (e) {
         console.warn('LiDAR 3D:', e);
-        const note = document.getElementById('mapNote');
-        if (note) note.textContent = 'No se pudo cargar la nube LiDAR.';
+        if (typeof global.ficSyncDroneMapTitle === 'function') {
+          global.ficSyncDroneMapTitle('LiDAR — error al cargar');
+        }
       }
     }
   };

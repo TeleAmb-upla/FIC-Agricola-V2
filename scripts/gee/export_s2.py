@@ -87,7 +87,7 @@ DEFAULT_EXPORT_PREFIX = "projects/teleambagr/assets/S2_weekly_valpo"
 # Proyecto Google Cloud para ``ee.Initialize(project=...)`` (API / facturación EE).
 DEFAULT_CLOUD_PROJECT = "teleambagr"
 
-DEFAULT_START_YEAR = 2017
+DEFAULT_START_YEAR = 2026
 DEFAULT_END_YEAR = 2026
 
 # Raíz del repositorio (…/fic_agro): scripts/gee/export_s2.py → parents[2]
@@ -781,18 +781,17 @@ def _snap_lai_cab_fapar_fcover(img: ee.Image) -> tuple[ee.Image, ee.Image, ee.Im
 
 def reduce_radiometric_resolution(img: ee.Image) -> ee.Image:
     """
-    Cuantiza índices a enteros tras ``×100`` (menor resolución radiométrica / tamaño).
+    Cuantiza índices a enteros tras ``×INDEX_INT16_SCALE`` (menor resolución radiométrica / tamaño).
 
     Se aplica **solo al mosaico semanal** listo para exportar (índices ya en reflectancia
     0–1 o rango físico del índice), no por escena: así ``median()`` y el clip no
     reintroducen float sobre enteros ya cuantizados.
 
-    Equivale a la idea de ``img.multiply(100).toInt8()`` en JavaScript; aquí se usa
     **Int16** porque LAI, Cab, CCC y otros pueden superar el rango de Int8 tras escalar.
     ``clear_pixel_count`` no se altera.
     """
     clear = img.select("clear_pixel_count")
-    idx = img.select(COMPOSED_INDEX_BANDS).multiply(100).round().toInt16()
+    idx = img.select(COMPOSED_INDEX_BANDS).multiply(INDEX_INT16_SCALE).round().toInt16()
     return idx.addBands(clear).copyProperties(img, ["system:time_start", "system:index"])
 
 
@@ -941,6 +940,9 @@ COMPOSED_INDEX_BANDS = [
     "PSRI",
 ]
 
+# Escala entera al exportar índices (Int16): valor_físico ≈ pixel / INDEX_INT16_SCALE.
+INDEX_INT16_SCALE = 1000
+
 
 def ee_date_min(a: ee.Date, b: ee.Date) -> ee.Date:
     """Menor de dos ``ee.Date``. En JavaScript existe ``ee.Date.min``; en la API Python no."""
@@ -1079,13 +1081,19 @@ def build_weekly_collection(
             idx_median = week_col.select(COMPOSED_INDEX_BANDS).median()
             clear_sum = week_col.select("clear_pixel_count").sum().rename("clear_pixel_count")
             iso_w = int(spec["iso_week"])
-            weekly_for_export = reduce_radiometric_resolution(idx_median.addBands(clear_sum)).set(
+            mosaic = reduce_radiometric_resolution(idx_median.addBands(clear_sum)).set(
                 {
                     "year": cy,
                     "week": iso_w,
                     "system:time_start": start.millis(),
-                    "n_images": week_col.size(),
                 }
+            )
+            weekly_for_export = ee.Image(
+                ee.Algorithms.If(
+                    week_col.size().gt(0),
+                    mosaic,
+                    mosaic.set("year", -1),
+                )
             )
             imgs.append(weekly_for_export)
 
@@ -1097,12 +1105,12 @@ def build_weekly_collection(
         # No usar .float(): anularía el int16 aplicado en reduce_radiometric_resolution (mosaico semanal).
         return im.clip(aoi).copyProperties(
             im,
-            ["system:time_start", "week", "year", "n_images"],
+            ["system:time_start", "week", "year"],
         )
 
     return (
         ee.ImageCollection(imgs)
-        .filter(ee.Filter.gt("n_images", 0))
+        .filter(ee.Filter.neq("year", -1))
         .map(_clip_keep_meta)
     )
 
@@ -1889,7 +1897,7 @@ def export_predios_composites_to_drive(
 ) -> tuple[list[ee.batch.Task], set[str]]:
     """
     Por cada predio encola exports Drive de GeoTIFF multi-banda (``bands`` como capas).
-    Los valores son int16 ×100 (misma convención que el asset de exportación).
+    Los valores son int16 ×INDEX_INT16_SCALE (misma convención que el asset de exportación).
 
     Los archivos van bajo **una** carpeta Drive (nombre colapsado de ``drive_root_folder``), por
     ejemplo ``FIC_RASTER_S2_semanales_por_predio`` con ``S2_G1_annual_alltime.tif`` (subcarpetas por uso no son posibles vía
@@ -2104,7 +2112,7 @@ def run_image_collection_exports(
         )
         n_m = final_collection.size().getInfo()
         total_mosaics += n_m
-        print(f"  Mosaicos con datos (n_images > 0): {n_m}")
+        print(f"  Mosaicos semanales con escenas: {n_m}")
         precalc = audit_by_year.get(y) if audit_by_year else None
         enq, skipped = export_year(
             final_collection,
@@ -2407,7 +2415,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--export-predios-aoi-json",
-        default=os.environ.get("FIC_AOI_GEOJSON", "data/shapefiles/aoi.geojson"),
+        default=os.environ.get("FIC_AOI_GEOJSON", "data/shapefiles/predios.geojson"),
         metavar="PATH",
         help="GeoJSON de predios (relativo al repo si no es absoluta).",
     )

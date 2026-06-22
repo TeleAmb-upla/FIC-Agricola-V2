@@ -20,7 +20,7 @@ Ejemplos de COMPOSITE_KEY:
   weekly_last             → última semana completa
 
 Cada banda del GeoTIFF se convierte en un WebP con colormap; los valores int16
-están escalados ×100 (el divisor es 100).
+están escalados ×1000 (el divisor es 1000).
 
 Colormaps por banda (extensibles con --colormaps JSON):
   NDVI   → RdYlGn
@@ -66,7 +66,7 @@ except ImportError:
 # Constants
 # ---------------------------------------------------------------------------
 
-DIVISOR = 100.0  # int16 × 100 en el asset GEE → dividir para obtener valor real
+DIVISOR = 1000.0  # int16 × 1000 en el asset GEE → dividir para obtener valor real
 
 BAND_VIZ: dict[str, dict] = {
     "NDVI":  {"label": "NDVI",  "vmin": -1.0, "vmax": 1.0,  "colormap": "RdYlGn"},

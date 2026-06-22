@@ -14,6 +14,7 @@ from pathlib import Path
 import numpy as np
 from shapely import make_valid
 from shapely.geometry import box, mapping, shape as shp_shape
+from shapely.ops import unary_union
 
 
 def _proj_dir_ready(root: Path) -> bool:
@@ -605,23 +606,43 @@ def _to_2d(geometry):
 
 
 def ensure_master_aoi(config: dict) -> Path:
-    output_path = Path(config["shapefile_path"])
+    output_path = Path(config.get("export_aoi_path") or config["shapefile_path"])
+    id_col = config.get("export_aoi_id_col", "wetland_id")
+    default_aoi = config.get("shapefile_path", "data/shapefiles/predios.geojson")
     wetlands_cfg = config.get("wetlands", {})
     records = []
 
     os.environ.setdefault("OGR_GEOMETRY_ACCEPT_UNCLOSED_RING", "YES")
 
     for wetland_id, wetland_cfg in wetlands_cfg.items():
-        aoi_source = wetland_cfg.get("aoi_source")
+        aoi_source = wetland_cfg.get("aoi_source") or default_aoi
         if not aoi_source:
             continue
 
         forced_crs = wetland_cfg.get("aoi_crs") or wetland_cfg.get("crs")
         gdf = read_wetland_aoi_dataset(aoi_source, forced_crs)
+
+        filter_col = wetland_cfg.get("aoi_filter_col")
+        filter_val = wetland_cfg.get("aoi_filter_val")
+        if filter_col and filter_val and filter_col in gdf.columns:
+            mask = gdf[filter_col].astype(str).str.strip().str.upper() == str(filter_val).strip().upper()
+            gdf = gdf[mask].copy()
+            if gdf.empty:
+                print(
+                    f"  [WARN] {wetland_id!r}: sin filas con {filter_col}={filter_val!r} en {aoi_source!r}",
+                    flush=True,
+                )
+                continue
+            if len(gdf) > 1:
+                print(
+                    f"  [aoi] {wetland_id!r}: unión de {len(gdf)} cuarteles ({filter_col}={filter_val!r}).",
+                    flush=True,
+                )
+
         plot_id_cfg = wetland_cfg.get("plot_id")
         resolved_by_layer = False
         by_layer = filter_gdf_by_layer_marker(gdf, wetland_id)
-        if len(by_layer) >= 1:
+        if len(by_layer) >= 1 and not (filter_col and filter_val):
             if len(by_layer) > 1:
                 print(
                     f"  [WARN] {wetland_id!r}: hay {len(by_layer)} filas con columna 'layer'; "
@@ -685,6 +706,7 @@ def ensure_master_aoi(config: dict) -> Path:
 
         records.append(
             {
+                id_col: wetland_id,
                 "wetland_id": wetland_id,
                 "nombre": wetland_cfg.get("name") or raw_name or wetland_id,
                 "fuente": str(aoi_source).replace("\\", "/"),
@@ -700,6 +722,148 @@ def ensure_master_aoi(config: dict) -> Path:
     return output_path
 
 
+def _metric_epsg_from_geometry(geom_wgs84) -> int:
+    centroid = geom_wgs84.centroid
+    utm_zone = int((centroid.x + 180) / 6) + 1
+    hemisphere = "south" if centroid.y < 0 else "north"
+    return 32600 + utm_zone if hemisphere == "north" else 32700 + utm_zone
+
+
+def wetland_aoi_gdf(wetland_id: str, wetland_cfg: dict, config: dict) -> gpd.GeoDataFrame:
+    """Geometrías del AOI de un predio (misma lógica de filtro que ``ensure_master_aoi``)."""
+    default_aoi = config.get("shapefile_path", "data/shapefiles/predios.geojson")
+    aoi_source = wetland_cfg.get("aoi_source") or default_aoi
+    forced_crs = wetland_cfg.get("aoi_crs") or wetland_cfg.get("crs")
+    gdf = read_wetland_aoi_dataset(aoi_source, forced_crs)
+
+    filter_col = wetland_cfg.get("aoi_filter_col")
+    filter_val = wetland_cfg.get("aoi_filter_val")
+    if filter_col and filter_val and filter_col in gdf.columns:
+        mask = (
+            gdf[filter_col].astype(str).str.strip().str.upper()
+            == str(filter_val).strip().upper()
+        )
+        gdf = gdf[mask].copy()
+
+    if gdf.crs is None:
+        raise ValueError(f"Sin CRS en AOI de {wetland_id!r} ({aoi_source})")
+    return gdf.to_crs("EPSG:4326")
+
+
+def load_cuartels_by_wetland(config: dict) -> dict[str, list[dict]]:
+    """
+    Asigna cada fila de ``predios.geojson`` (``id_cuartel``) al ``wetland_id`` cuyo AOI
+    intersecta más área con el cuartel.
+    """
+    master_path = Path(config.get("shapefile_path") or "data/shapefiles/predios.geojson")
+    master = read_wetland_aoi_dataset(str(master_path), None)
+    if master.crs is None:
+        master = master.set_crs("EPSG:4326")
+    master = master.to_crs("EPSG:4326")
+
+    wetland_unions: dict[str, object] = {}
+    for wetland_id, wetland_cfg in config.get("wetlands", {}).items():
+        try:
+            gdf_w = wetland_aoi_gdf(wetland_id, wetland_cfg, config)
+        except ValueError:
+            continue
+        if gdf_w.empty:
+            continue
+        wetland_unions[wetland_id] = gdf_w.geometry.union_all()
+
+    if master.empty or not wetland_unions:
+        return {}
+
+    metric_epsg = _metric_epsg_from_geometry(master.geometry.union_all())
+    master_m = master.to_crs(epsg=metric_epsg)
+    unions_m = {
+        wid: gpd.GeoSeries([geom], crs="EPSG:4326").to_crs(epsg=metric_epsg).iloc[0]
+        for wid, geom in wetland_unions.items()
+    }
+
+    assignments: dict[str, str] = {}
+    for _, row in master_m.iterrows():
+        cid = str(row.get("id_cuartel") or "").strip()
+        if not cid:
+            continue
+        geom = row.geometry
+        if geom is None or geom.is_empty:
+            continue
+        area = float(geom.area)
+        if area <= 0:
+            continue
+        best_wid: str | None = None
+        best_ratio = 0.0
+        for wid, wgeom in unions_m.items():
+            try:
+                inter = geom.intersection(wgeom)
+                if inter.is_empty:
+                    continue
+                ratio = float(inter.area) / area
+                if ratio > best_ratio:
+                    best_ratio = ratio
+                    best_wid = wid
+            except Exception:
+                continue
+        if best_wid and best_ratio >= 0.05:
+            assignments[cid] = best_wid
+
+    result: dict[str, list[dict]] = {}
+    for _, row in master.iterrows():
+        cid = str(row.get("id_cuartel") or "").strip()
+        wid = assignments.get(cid)
+        if not wid:
+            continue
+        props = {k: row[k] for k in master.columns if k != "geometry"}
+        entry = {
+            "id_cuartel": cid,
+            "nom_cuartel": str(props.get("nom_cuartel") or cid).strip(),
+            "cultivo": str(props.get("cultivo") or "").strip(),
+            "nom_predio": str(props.get("nom_predio") or "").strip(),
+            "propietario": str(props.get("propietario") or "").strip(),
+            "superficie": props.get("superficie"),
+            "geometry": mapping(_to_2d(row.geometry)),
+        }
+        result.setdefault(wid, []).append(entry)
+
+    for wid in result:
+        result[wid].sort(key=lambda item: item["id_cuartel"])
+    return result
+
+
+def load_wetland_clip_geometries(config: dict) -> dict[str, dict]:
+    """
+    Geometría de recorte por ``wetland_id``: unión de cuarteles en ``predios.geojson``.
+    Cada fila del shape es un cuartel (no un polígono agregado de predio).
+    """
+    result: dict[str, dict] = {}
+    for wid, cuartels in load_cuartels_by_wetland(config).items():
+        geoms = []
+        for cu in cuartels:
+            g = cu.get("geometry")
+            if g:
+                geoms.append(shp_shape(g))
+        if geoms:
+            result[wid] = mapping(_to_2d(unary_union(geoms)))
+    return result
+
+
+def build_cuarteles_index(config: dict) -> dict[str, dict]:
+    """Índice plano ``id_cuartel`` → metadatos + ``wetland_id`` (para el explorador)."""
+    index: dict[str, dict] = {}
+    for wid, cuartels in load_cuartels_by_wetland(config).items():
+        for cu in cuartels:
+            index[cu["id_cuartel"]] = {
+                "wetland_id": wid,
+                "nom_cuartel": cu["nom_cuartel"],
+                "cultivo": cu["cultivo"],
+                "nom_predio": cu["nom_predio"],
+                "propietario": cu.get("propietario", ""),
+                "superficie": cu["superficie"],
+            }
+    return index
+
+
 def get_source_input_roots(source_cfg: dict) -> list[Path]:
     roots = [Path(source_cfg["input_root"])]
     roots.extend(Path(item) for item in source_cfg.get("legacy_input_roots", []))
@@ -708,3 +872,37 @@ def get_source_input_roots(source_cfg: dict) -> list[Path]:
         if root not in seen:
             seen.append(root)
     return seen
+
+
+LEGACY_DRONE_CODE_TO_WETLAND = {
+    "g1": "e_sazo",
+    "g2": "d_mondaca",
+    "g3": "r_pani",
+    "g4": "j_contreras",
+    "g5": "l_martinez",
+    "g6": "o_herrera",
+    "nog": "c_alvarado",
+    "rci": "a_brito_rci",
+    "rpa": "a_brito_rpa",
+    "riv": "b_devoto",
+}
+
+
+def resolve_wetland_id_from_drone_code(code: str, config: dict | None = None) -> str:
+    raw = str(code or "").strip().lower()
+    if config:
+        for wid, wcfg in config.get("wetlands", {}).items():
+            dc = str(wcfg.get("drone_code") or "").strip().lower()
+            if dc and dc == raw:
+                return wid
+    return LEGACY_DRONE_CODE_TO_WETLAND.get(raw, raw)
+
+
+def build_s2_file_to_wetland_map(config: dict) -> dict[str, str]:
+    """``G5`` (prefijo S2_G5_…) → ``l_martinez`` (wetland_id en config)."""
+    out: dict[str, str] = {}
+    for wid, wcfg in config.get("wetlands", {}).items():
+        s2 = str(wcfg.get("s2_code") or "").strip().upper()
+        if s2:
+            out[s2] = wid
+    return out

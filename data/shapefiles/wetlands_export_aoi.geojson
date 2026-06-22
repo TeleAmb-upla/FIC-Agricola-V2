@@ -1,6 +1,6 @@
 {
 "type": "FeatureCollection",
-"name": "wetlands_aoi",
+"name": "wetlands_export_aoi",
 "crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
 "features": [
 { "type": "Feature", "properties": { "wetland_id": "l_martinez", "nombre": "Parcela 17 — Luisa Martinez", "fuente": "data/shapefiles/predios.geojson" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ -70.582373109999935, -32.751065095999934 ], [ -70.582517177999989, -32.751031632999968 ], [ -70.58261450599997, -32.751273558999969 ], [ -70.583423178999965, -32.751132178999967 ], [ -70.583022310999979, -32.750097034999953 ], [ -70.582079431999944, -32.750300206999952 ], [ -70.582373109999935, -32.751065095999934 ] ] ] } },

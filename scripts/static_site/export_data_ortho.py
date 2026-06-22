@@ -43,10 +43,12 @@ from shapely.geometry import box, mapping, shape
 from pipeline_utils import (
     build_file_fingerprint,
     ensure_master_aoi,
+    resolve_wetland_id_from_drone_code,
     ensure_predios_gv_utm19s_clone,
     get_source_input_roots,
     load_config,
     load_json_if_exists,
+    load_wetland_clip_geometries,
     resolve_years,
     write_json,
 )
@@ -56,7 +58,7 @@ OUTPUT_DIR = Path("data_static")
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Subir cuando cambien máscaras / recorte RGB en ``build_preview_rgb`` (invalida WebP cacheados con reuse).
-RGB_PREVIEW_MASK_REVISION = 11
+RGB_PREVIEW_MASK_REVISION = 12
 THERMAL_PREVIEW_REVISION = 5
 
 
@@ -1001,21 +1003,58 @@ def _extract_zonal_mean_gdalwarp(tiff_path: Path, zone_geom_wgs84: dict) -> floa
                 pass
 
 
-def extract_zonal_mean(tiff_path: str | Path, zone_geom_wgs84: dict) -> float | None:
+def _full_raster_trimmed_mean(tiff_path: Path, max_dim: int = 1024) -> float | None:
+    """
+    Media física sobre todos los píxeles válidos del ráster, leído con submuestreo.
+
+    Se usa como respaldo cuando el polígono del predio no coincide con la huella real del
+    vuelo (desfase de georreferencia) o cuando ``rasterio.mask`` no puede leer. Como cada
+    GeoTIFF de dron ya está recortado al predio, su media global es representativa.
+    """
+    try:
+        with rasterio.open(tiff_path) as src:
+            scale = max(1, int(max(src.width, src.height) / max_dim))
+            out_h = max(1, src.height // scale)
+            out_w = max(1, src.width // scale)
+            raw = src.read(1, out_shape=(out_h, out_w)).astype(np.float64)
+            invalid = ~np.isfinite(raw)
+            if src.nodata is not None and np.isfinite(float(src.nodata)):
+                invalid |= np.isclose(raw, float(src.nodata), rtol=1e-5, atol=1e-6)
+            physical = normalize_drone_index_band_values(raw, src, band_idx=1)
+            return _trimmed_physical_mean(physical, invalid)
+    except Exception as exc:
+        print(f"    [zonal full-raster fallback] {exc}")
+        return None
+
+
+def extract_zonal_mean(
+    tiff_path: str | Path,
+    zone_geom_wgs84: dict,
+    allow_full_raster_fallback: bool = False,
+) -> float | None:
     """
     Media zonal dentro de ``zone_geom_wgs84``. Usa la misma normalización de escala que el WebP de índices.
+
+    Si ``allow_full_raster_fallback`` y la zona no produce píxeles válidos (predio mal
+    georreferenciado respecto al vuelo o lectura fallida), recurre a la media global del
+    ráster. No usar el respaldo a nivel de cuartel (devolvería la media del predio).
     """
     tiff_path = Path(tiff_path)
     try:
         with rasterio.open(tiff_path) as src:
             if not _aoi_intersects_raster_extent_wgs84(src, zone_geom_wgs84):
+                if allow_full_raster_fallback:
+                    fv = _full_raster_trimmed_mean(tiff_path)
+                    if fv is not None:
+                        print("    [zonal] AOI fuera de huella; uso media global del ráster")
+                    return fv
                 return None
             crs = src.crs
             zone_s = zone_geom_wgs84
             if crs and str(crs) != "EPSG:4326":
                 zone_s = transform_geom("EPSG:4326", crs, zone_geom_wgs84)
 
-            out_image, _ = mask(src, [zone_s], crop=True, indexes=1, nodata=src.nodata)
+            out_image, _ = mask(src, [zone_s], crop=True, indexes=[1], nodata=src.nodata)
             raw = out_image[0]
             invalid = np.zeros(raw.shape, dtype=bool)
             if src.nodata is not None and np.isfinite(float(src.nodata)):
@@ -1025,16 +1064,29 @@ def extract_zonal_mean(tiff_path: str | Path, zone_geom_wgs84: dict) -> float | 
             invalid |= ~np.isfinite(raw.astype(np.float64))
 
             physical = normalize_drone_index_band_values(raw, src, band_idx=1)
-            return _trimmed_physical_mean(physical, invalid)
+            value = _trimmed_physical_mean(physical, invalid)
+            if value is None and allow_full_raster_fallback:
+                fv = _full_raster_trimmed_mean(tiff_path)
+                if fv is not None:
+                    print("    [zonal] Zona sin píxeles válidos; uso media global del ráster")
+                return fv
+            return value
 
     except Exception as exc:
         if "do not overlap" in str(exc).lower():
+            if allow_full_raster_fallback:
+                return _full_raster_trimmed_mean(tiff_path)
             return None
         if isinstance(exc, rasterio.RasterioIOError) or "Read failed" in str(exc):
             gv = _extract_zonal_mean_gdalwarp(tiff_path, zone_geom_wgs84)
             if gv is not None:
                 print("    [zonal] Fallback gdalwarp tras error de lectura TIFF")
                 return gv
+            if allow_full_raster_fallback:
+                fv = _full_raster_trimmed_mean(tiff_path)
+                if fv is not None:
+                    print("    [zonal] Fallback media global tras error de lectura TIFF")
+                return fv
         print(f"    Error: {exc}")
         return None
 
@@ -1070,14 +1122,12 @@ def _flat_filename_date_to_ymd(date_token: str) -> str:
     return digits[:8]
 
 
-# G1…G6 u NOG + fecha compacta (20260121) o separada (2026_01_21, 2026-01-21).
-# Separador entre código / fecha / índice: guión bajo o espacio (ej. ``G6 2026_01_21_rgb.tif``).
-# Token opcional entre fecha e índice (p. ej. ``G4_2026_01_21_G4_ndwi.tif``).
+# Códigos de vuelo alineados con fic_database / nombres de archivo dron.
 FLAT_DRONE_NAME = re.compile(
-    r"^((?:[Gg]\d+)|(?:[Nn][Oo][Gg])|(?:RCI)|(?:RPA)|(?:RIV))(?:[\s_]+)"
+    r"^((?:[A-Za-z][A-Za-z0-9_]*))(?:[\s_]+)"
     r"((?:\d{8})|(?:\d{4}[_-]\d{2}[_-]\d{2}))(?:[\s_]+)"
-    r"(?:([A-Za-z0-9]{1,12})_)?"
-    r"(ndvi|ndwi|rgb|thermal)\.(?:tif|tiff)$",
+    r"(?:([A-Za-z0-9]{1,20})_)?"
+    r"(ndvi|ndwi|ndci|rgb|thermal)\.(?:tif|tiff)$",
     re.I,
 )
 
@@ -1126,6 +1176,7 @@ def resolve_pause_between_drone_tiffs_sec(visualization_cfg: dict) -> float:
 
 def ingest_flat_drone_date_assets(
     *,
+    config: dict,
     source_cfg: dict,
     source_key: str,
     visualization_cfg: dict,
@@ -1171,7 +1222,8 @@ def ingest_flat_drone_date_assets(
         if not parsed:
             bump_skip("parse_failed", file=tiff_path.name)
             continue
-        code_wid, ymd_raw, index_key = parsed.group(1).lower(), parsed.group(2), parsed.group(4).lower()
+        code_wid = resolve_wetland_id_from_drone_code(parsed.group(1), config)
+        ymd_raw, index_key = parsed.group(2), parsed.group(4).lower()
         try:
             ymd = _flat_filename_date_to_ymd(ymd_raw)
         except ValueError:
@@ -1253,7 +1305,9 @@ def ingest_flat_drone_date_assets(
                 source_fingerprint,
                 reuse_if_unchanged=_reuse_previews_allowed(viz_flat),
             )
-            mean_value = extract_zonal_mean(tiff_path, geom_union)
+            mean_value = extract_zonal_mean(
+                tiff_path, geom_union, allow_full_raster_fallback=True
+            )
             if preview_meta is None:
                 preview_meta = build_preview_raster(
                     tiff_path,
@@ -1433,8 +1487,10 @@ def export_source(
     source_cfg: dict,
     gdf_aoi: gpd.GeoDataFrame,
     years: list[int],
+    *,
+    aoi_id_col: str | None = None,
 ) -> dict:
-    id_col = config["shapefile_id_col"]
+    id_col = aoi_id_col or config.get("export_aoi_id_col") or config["shapefile_id_col"]
     indices_cfg = config["indices"]
     source_indices = source_cfg.get("indices") or list(indices_cfg.keys())
     visualization_cfg = config.get("raster_visualization", {})
@@ -1469,12 +1525,13 @@ def export_source(
     total_visual_rasters = 0
 
     print(f"\nFuente: {source_cfg['label']} ({source_key})")
+    clip_geoms = load_wetland_clip_geometries(config)
 
     for wetland_id, wetland_cfg in config["wetlands"].items():
         wetland_name = wetland_cfg.get("name", wetland_id)
-        gdf_w = gdf_aoi[gdf_aoi[id_col].astype(str).str.strip().str.lower() == wetland_id.lower()]
-        if gdf_w.empty:
-            print(f"  [WARN] Sin polígonos para {wetland_id}")
+        geom_union = clip_geoms.get(wetland_id)
+        if not geom_union:
+            print(f"  [WARN] Sin cuarteles para {wetland_id}")
             wetlands_info[wetland_id] = {
                 "name": wetland_name,
                 "area_ha": None,
@@ -1486,11 +1543,11 @@ def export_source(
             }
             continue
 
+        gdf_w = gpd.GeoDataFrame(geometry=[shape(geom_union)], crs="EPSG:4326")
         area_ha = compute_area_ha(gdf_w)
-        geom_union = mapping(gdf_w.geometry.union_all())
         preview_geom_union = buffer_geom_wgs84(geom_union, clip_aoi_buffer_m)
         center = gdf_w.geometry.union_all().centroid
-        print(f"  - {wetland_name} ({wetland_id}) | {area_ha} ha")
+        print(f"  - {wetland_name} ({wetland_id}) | {area_ha} ha | recorte: unión cuarteles")
         wetland_ctx[wetland_id] = {"name": wetland_name, "geom_union": geom_union}
 
         wetland_entry = {"name": wetland_name, "indices": {}}
@@ -1646,7 +1703,7 @@ def export_source(
         if wetland_periods:
             latest_period = sorted(wetland_periods, key=lambda item: item[0])[-1][1]
         has_wetland_visuals = any(key.startswith(f"{wetland_id}_") for key in rasters_index)
-        wetlands_info[wetland_id] = {
+        info_entry = {
             "name": wetland_name,
             "area_ha": area_ha,
             "center": [round(center.y, 4), round(center.x, 4)],
@@ -1655,9 +1712,15 @@ def export_source(
             "available_years": sorted({int(item[0].split("_")[0]) for item in wetland_periods}),
             "status": "ready" if (wetland_periods or has_wetland_visuals) else "empty",
         }
+        if wetland_cfg.get("drone_code"):
+            info_entry["drone_code"] = wetland_cfg["drone_code"]
+        if wetland_cfg.get("s2_code"):
+            info_entry["s2_code"] = wetland_cfg["s2_code"]
+        wetlands_info[wetland_id] = info_entry
 
     if source_key == "drone" and source_cfg.get("flat_date_filenames", True):
         n_flat = ingest_flat_drone_date_assets(
+            config=config,
             source_cfg=source_cfg,
             source_key=source_key,
             visualization_cfg=visualization_cfg,
@@ -1677,6 +1740,7 @@ def export_source(
                 cleaned = sorted(pts, key=lambda p: (str(p.get("date", "")), str(p.get("period_key", ""))))
                 ix["points"] = [dict(x) for x in cleaned]
                 ix["metrics"] = compute_metrics([dict(x) for x in cleaned])
+                total_points += len(cleaned)
             info = wetlands_info.get(wid)
             if not info or info.get("status") == "missing_aoi":
                 continue
@@ -1823,7 +1887,7 @@ def export_static_data(selected_sources: list[str] | None = None) -> None:
     ensure_predios_gv_utm19s_clone(REPO_ROOT)
     years = resolve_years(config)
     master_aoi_path = ensure_master_aoi(config)
-    id_col = config["shapefile_id_col"]
+    id_col = config.get("export_aoi_id_col", config["shapefile_id_col"])
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     gdf_aoi = load_aoi(master_aoi_path, id_col)
@@ -1860,7 +1924,10 @@ def export_static_data(selected_sources: list[str] | None = None) -> None:
 
     for source_key in requested_sources:
         source_cfg = available_sources[source_key]
-        manifest["sources"][source_key] = export_source(config, source_key, source_cfg, gdf_aoi, years)
+        manifest["sources"][source_key] = export_source(
+            config, source_key, source_cfg, gdf_aoi, years,
+            aoi_id_col=id_col,
+        )
 
     # Preservar Sentinel-2 en el manifiesto aunque no se re-exporte en esta corrida.
     existing_sources = existing_manifest.get("sources", {})
@@ -1869,6 +1936,15 @@ def export_static_data(selected_sources: list[str] | None = None) -> None:
 
     json_dump(manifest_path, manifest)
     print(f"\nManifest -> {manifest_path.as_posix()}")
+
+    if "drone" in requested_sources:
+        try:
+            from build_cuarteles_display_geojson import main as build_display_geojson
+
+            build_display_geojson()
+        except Exception as exc:
+            print(f"  [warn] cuarteles_display.geojson: {exc}")
+
     print("\n--- Exportación finalizada ---")
 
 
