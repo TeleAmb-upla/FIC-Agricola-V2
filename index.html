@@ -164,7 +164,7 @@
             <button type="submit" class="fic-btn" id="ficLoginSubmit">Entrar al mapa</button>
         </form>
         <div class="fic-error" id="ficLoginError" role="alert" aria-hidden="true"></div>
-        <p class="fic-hint">Usuario: nombre completo · contraseña: apellido (mismo formato para agricultores y asesores).</p>
+        <p class="fic-hint">Usuario: nombre y apellido · contraseña: apellido. No importan mayúsculas ni tildes (ej. «luisa martinez» / «martinez»).</p>
     </div>
 </div>
 <script>
@@ -179,7 +179,14 @@
     }
 
     function norm(s) {
-        return trim(s).toLocaleLowerCase('es');
+        return trim(s)
+            .toLocaleLowerCase('es')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+    }
+
+    function namesEqual(a, b) {
+        return norm(a) === norm(b);
     }
 
     function apellidoFromNombre(nombre) {
@@ -190,15 +197,27 @@
     function parseCsv(text) {
         var rows = [];
         var lines = text.split(/\r?\n/);
+        if (lines.length < 2) return rows;
+        var header = lines[0].split(',').map(function (h) { return trim(h); });
+        var col = {};
+        header.forEach(function (h, j) { col[h] = j; });
+        var isNewSchema = col.propietario != null && col.asesor != null;
         for (var i = 1; i < lines.length; i++) {
             var ln = trim(lines[i]);
             if (!ln) continue;
             var p = ln.split(',');
-            rows.push({
-                codigo_predio: trim(p[0]).toUpperCase(),
-                nombre_agricultor: trim(p[1] || ''),
-                nombre_sat_asesor: trim(p[2] || '')
-            });
+            if (isNewSchema) {
+                rows.push({
+                    nombre_agricultor: trim(p[col.propietario] || ''),
+                    nombre_sat_asesor: trim(p[col.asesor] || '')
+                });
+            } else {
+                rows.push({
+                    codigo_predio: trim(p[0]).toUpperCase(),
+                    nombre_agricultor: trim(p[1] || ''),
+                    nombre_sat_asesor: trim(p[2] || '')
+                });
+            }
         }
         return rows;
     }
@@ -221,14 +240,14 @@
         if (!u || !p) return { ok: false };
 
         var matchAg = index.agricultores[u];
-        if (matchAg && norm(apellidoFromNombre(matchAg)) === p) {
+        if (matchAg && namesEqual(apellidoFromNombre(matchAg), password)) {
             return {
                 ok: true,
                 session: { rol: 'agricultor', nivel: 'agricultor', nombre: matchAg }
             };
         }
         var matchAsesor = index.asesores[u];
-        if (matchAsesor && norm(apellidoFromNombre(matchAsesor)) === p) {
+        if (matchAsesor && namesEqual(apellidoFromNombre(matchAsesor), password)) {
             return {
                 ok: true,
                 session: { rol: 'asesor', nivel: 'asesor', nombre: matchAsesor }
