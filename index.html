@@ -161,10 +161,9 @@
                 <label for="ficLoginPass">Contraseña</label>
                 <input id="ficLoginPass" name="password" type="password" required autocomplete="current-password">
             </div>
-            <button type="submit" class="fic-btn" id="ficLoginSubmit">Entrar al mapa</button>
+        <button type="submit" class="fic-btn" id="ficLoginSubmit" disabled>Cargando usuarios…</button>
         </form>
         <div class="fic-error" id="ficLoginError" role="alert" aria-hidden="true"></div>
-        <p class="fic-hint">Usuario: nombre y apellido · contraseña: apellido. No importan mayúsculas ni tildes (ej. «luisa martinez» / «martinez»).</p>
     </div>
 </div>
 <script>
@@ -275,24 +274,44 @@
     }
 
     var authIndex = null;
+    var authLoadFailed = false;
+    var submitBtn = document.getElementById('ficLoginSubmit');
+
+    function setLoginReady(ready, label) {
+        if (!submitBtn) return;
+        submitBtn.disabled = !ready;
+        submitBtn.textContent = label || (ready ? 'Entrar al mapa' : 'Cargando usuarios…');
+    }
 
     fetch(CSV_URL)
         .then(function (r) {
-            if (!r.ok) throw new Error('CSV');
+            if (!r.ok) throw new Error('CSV HTTP ' + r.status);
             return r.text();
         })
         .then(function (text) {
             authIndex = buildAuthIndex(parseCsv(text));
+            if (!Object.keys(authIndex.agricultores).length && !Object.keys(authIndex.asesores).length) {
+                throw new Error('CSV vacío');
+            }
+            setLoginReady(true);
         })
-        .catch(function () {
-            showError('No se pudo cargar la base de usuarios. Revisa la conexión o avisa al equipo técnico.');
+        .catch(function (err) {
+            authLoadFailed = true;
+            console.warn('Login CSV:', err);
+            setLoginReady(false, 'No disponible');
+            showError('No se pudo cargar la base de usuarios (' + CSV_URL + '). '
+                + 'Abre el sitio con Live Server (no como archivo local) o avisa al equipo técnico.');
         });
 
     document.getElementById('ficLoginForm').addEventListener('submit', function (ev) {
         ev.preventDefault();
         showError('');
+        if (authLoadFailed) {
+            showError('No se pudo cargar la base de usuarios. Revisa la conexión o abre con Live Server.');
+            return;
+        }
         if (!authIndex) {
-            showError('Aún cargando usuarios… intenta de nuevo en unos segundos.');
+            showError('Aún cargando usuarios… espera un momento e intenta de nuevo.');
             return;
         }
         var usuario = document.getElementById('ficLoginUser').value;

@@ -11,7 +11,7 @@
         "nom_predio": "Parcela 8",
         "propietario": "Domingo Mondaca",
         "superficie": "0.89014",
-        "wetland_id": "d_mondaca",
+        "predio_id": "d_mondaca",
         "raster_key": "d_mondaca_20260121_ndwi",
         "fuente": "drone_webp_alpha"
       },
@@ -5886,7 +5886,7 @@
         "nom_predio": "Parcela 8",
         "propietario": "Domingo Mondaca",
         "superficie": "0.94251",
-        "wetland_id": "d_mondaca",
+        "predio_id": "d_mondaca",
         "raster_key": "d_mondaca_20260121_ndwi",
         "fuente": "drone_webp_alpha"
       },
@@ -11311,7 +11311,7 @@
         "nom_predio": "Parcela 8",
         "propietario": "Domingo Mondaca",
         "superficie": "0.90939",
-        "wetland_id": "d_mondaca",
+        "predio_id": "d_mondaca",
         "raster_key": "d_mondaca_20260121_ndwi",
         "fuente": "drone_webp_alpha"
       },

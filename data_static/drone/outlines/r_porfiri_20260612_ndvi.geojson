@@ -11,7 +11,7 @@
         "nom_predio": "Hacienda Rinconada",
         "propietario": "Ricardo Porfiri",
         "superficie": "4.18653",
-        "wetland_id": "r_porfiri",
+        "predio_id": "r_porfiri",
         "raster_key": "r_porfiri_20260612_ndvi",
         "fuente": "drone_webp_alpha"
       },
@@ -12188,7 +12188,7 @@
         "nom_predio": "Hacienda Rinconada",
         "propietario": "Ricardo Porfiri",
         "superficie": "2.94562",
-        "wetland_id": "r_porfiri",
+        "predio_id": "r_porfiri",
         "raster_key": "r_porfiri_20260612_ndvi",
         "fuente": "drone_webp_alpha"
       },
@@ -22911,7 +22911,7 @@
         "nom_predio": "Hacienda Rinconada",
         "propietario": "Ricardo Porfiri",
         "superficie": "3.02729",
-        "wetland_id": "r_porfiri",
+        "predio_id": "r_porfiri",
         "raster_key": "r_porfiri_20260612_ndvi",
         "fuente": "drone_webp_alpha"
       },
@@ -32744,7 +32744,7 @@
         "nom_predio": "Hacienda Rinconada",
         "propietario": "Ricardo Porfiri",
         "superficie": "1.19807",
-        "wetland_id": "r_porfiri",
+        "predio_id": "r_porfiri",
         "raster_key": "r_porfiri_20260612_ndvi",
         "fuente": "drone_webp_alpha"
       },

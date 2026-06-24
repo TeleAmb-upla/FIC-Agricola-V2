@@ -9,9 +9,9 @@
         "nom_cuartel": "1",
         "cultivo": "Uva de mesa",
         "nom_predio": "Von Siebenthal",
-        "propietario": "Viña Von Siebenthal",
+        "propietario": "Vina Von Siebenthal",
         "superficie": "8.46543",
-        "wetland_id": "v_siebenthal",
+        "predio_id": "v_siebenthal",
         "raster_key": "v_siebenthal_20260612_ndvi",
         "fuente": "drone_webp_alpha"
       },

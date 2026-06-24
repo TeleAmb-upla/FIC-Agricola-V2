@@ -1,24 +1,31 @@
-id_cuartel,nom_cuartel,cultivo,nom_predio,propietario,superficie,asesor,area_indap,comuna,provincia,poligono_cuartel,poligono_vuelo
-c00001,1,Uva de mesa,Parcela 17,Luisa Martinez,1.04218,Guillermo Vasquez,Los Andes,San Esteban,Los Andes,c00001,FIC-L-MARTINEZ-X
-c00002,1,Uva de mesa,Parcela 31,Roxana Pani,2.33416,Guillermo Vasquez,Los Andes,San Esteban,Los Andes,c00002,FIC-R-PANI-X
-c00003,2,Uva de mesa,Parcela 31,Roxana Pani,2.39736,Guillermo Vasquez,Los Andes,San Esteban,Los Andes,c00003,FIC-R-PANI-X
-c00004,Eugenia Aranda,Uva de mesa,Parcela 8,Domingo Mondaca,0.89014,Guillermo Vasquez,Los Andes,San Esteban,Los Andes,c00004,FIC-D-MONDACA-X
-c00005,Blanca Aranda,Uva de mesa,Parcela 8,Domingo Mondaca,0.94251,Guillermo Vasquez,Los Andes,San Esteban,Los Andes,c00005,FIC-D-MONDACA-X
-c00006,Domingo Mondaca,Uva de mesa,Parcela 8,Domingo Mondaca,0.90939,Guillermo Vasquez,Los Andes,San Esteban,Los Andes,c00006,FIC-D-MONDACA-X
-c00007,1,Uva de mesa,Parcela 14,Juan Contreras,1.91006,Guillermo Vasquez,Los Andes,San Esteban,Los Andes,c00007,FIC-J-CONTRERAS-X
-c00008,1,Durazno conservero,Parcela 24,Emilio Sazo,1.52263,Guillermo Vasquez,Los Andes,San Esteban,Los Andes,c00008,FIC-E-SAZO-X
-c00009,2,Uva Red Globe,Parcela 24,Emilio Sazo,1.13928,Guillermo Vasquez,Los Andes,San Esteban,Los Andes,c00009,FIC-E-SAZO-X
-c00010,3,Uva Red Globe,Parcela 24,Emilio Sazo,0.78926,Guillermo Vasquez,Los Andes,San Esteban,Los Andes,c00010,FIC-E-SAZO-X
-c00011,1,Nectarin,NN,Oscar Herrera,4.31247,Guillermo Vasquez,Los Andes,San Esteban,Los Andes,c00011,FIC-O-HERRERA-X
-c00012,1,Palto,El resguardo,Alejandra Brito,1.40778,Alejandra Brito,Independiente,Nogales,Quillota,c00012,FIC-A-BRITO-X
-c00013,2,Palto,El resguardo,Alejandra Brito,0.77359,Alejandra Brito,Independiente,Nogales,Quillota,c00013,FIC-A-BRITO-X
-c00014,3,Limones,El resguardo,Alejandra Brito,4.59594,Alejandra Brito,Independiente,Nogales,Quillota,c00014,FIC-A-BRITO-X
-c00015,1,Limones,Agr. Rivarola,Bruno Devoto,1.58594,Bruno Devoto,Independiente,Limache,Marga Marga,c00015,FIC-B-DEVOTO-X
-c00016,2,Limones,Agr. Rivarola,Bruno Devoto,1.75524,Bruno Devoto,Independiente,Limache,Marga Marga,c00016,FIC-B-DEVOTO-X
-c00017,3,Limones,Agr. Rivarola,Bruno Devoto,5.05378,Bruno Devoto,Independiente,Limache,Marga Marga,c00017,FIC-B-DEVOTO-X
-c00018,1,Nogales,NN,Claudio Alvarado,2.16838,Ramiro Martinez,Los Andes,San Esteban,Los Andes,c00018,FIC-C-ALVARADO-X
-c00019,2,Uva de mesa,Hacienda Rinconada,Ricardo Porfiri,4.18653,Ricardo Porfiri,Independiente,Olmue,Marga Marga,c00019,FIC-B-PORFIRI-X
-c00020,3,Uva de mesa,Hacienda Rinconada,Ricardo Porfiri,2.94562,Ricardo Porfiri,Independiente,Olmue,Marga Marga,c00020,FIC-B-PORFIRI-X
-c00021,4,Uva de mesa,Hacienda Rinconada,Ricardo Porfiri,3.02729,Ricardo Porfiri,Independiente,Olmue,Marga Marga,c00021,FIC-B-PORFIRI-X
-c00022,5,Uva de mesa,Hacienda Rinconada,Ricardo Porfiri,1.19807,Ricardo Porfiri,Independiente,Olmue,Marga Marga,c00022,FIC-B-PORFIRI-X
-c00023,1,Uva de mesa,Von Siebenthal,Vina Von Siebenthal,8.46543,Vina Von Siebenthal,Independiente,Olmue,Marga Marga,c00023,FIC-V-SIEBENTHAL
+id_cuartel,nom_cuartel,cultivo,nom_predio,propietario,superficie,asesor,area_indap,comuna,provincia,poligono_cuartel,poligono_vuelo
+c00001,1,Uva de mesa,Parcela 17,Luisa Martinez,1.04191,Guillermo Vasquez,Los Andes,San Esteban,Los Andes,c00001,FIC-L-MARTINEZ-X
+c00002,1,Uva de mesa,Parcela 31,Roxana Pani,2.3336,Guillermo Vasquez,Los Andes,San Esteban,Los Andes,c00002,FIC-R-PANI-X
+c00003,2,Uva de mesa,Parcela 31,Roxana Pani,2.39677,Guillermo Vasquez,Los Andes,San Esteban,Los Andes,c00003,FIC-R-PANI-X
+c00004,Eugenia Aranda,Uva de mesa,Parcela 8,Domingo Mondaca,0.88991,Guillermo Vasquez,Los Andes,San Esteban,Los Andes,c00004,FIC-D-MONDACA-X
+c00005,Blanca Aranda,Uva de mesa,Parcela 8,Domingo Mondaca,0.94227,Guillermo Vasquez,Los Andes,San Esteban,Los Andes,c00005,FIC-D-MONDACA-X
+c00006,Domingo Mondaca,Uva de mesa,Parcela 8,Domingo Mondaca,0.90916,Guillermo Vasquez,Los Andes,San Esteban,Los Andes,c00006,FIC-D-MONDACA-X
+c00007,1,Uva de mesa,Parcela 14,Juan Contreras,3.64453,Guillermo Vasquez,Los Andes,Santa María,San Felipe de Aconcagua,c00007,FIC-J-CONTRERAS-X
+c00008,1,Durazno conservero,Parcela 24,Emilio Sazo,1.52224,Guillermo Vasquez,Los Andes,San Esteban,Los Andes,c00008,FIC-E-SAZO-X
+c00009,2,Uva Red Globe,Parcela 24,Emilio Sazo,1.139,Guillermo Vasquez,Los Andes,San Esteban,Los Andes,c00009,FIC-E-SAZO-X
+c00010,3,Uva Red Globe,Parcela 24,Emilio Sazo,0.78906,Guillermo Vasquez,Los Andes,San Esteban,Los Andes,c00010,FIC-E-SAZO-X
+c00011,1,Durazno Nectarin,NN,Oscar Herrera,4.33348,Guillermo Vasquez,Los Andes,Santa María,San Felipe de Aconcagua,c00011,FIC-O-HERRERA-X
+c00012,1,Palto,El resguardo,Alejandra Brito,1.40815,Alejandra Brito,Independiente,Nogales,Quillota,c00012,FIC-A-BRITO-X
+c00013,2,Palto,El resguardo,Alejandra Brito,0.77379,Alejandra Brito,Independiente,Nogales,Quillota,c00013,FIC-A-BRITO-X
+c00014,3,Limones,El resguardo,Alejandra Brito,4.59707,Alejandra Brito,Independiente,Nogales,Quillota,c00014,FIC-A-BRITO-X
+c00015,1,Limones,Agr. Rivarola,Bruno Devoto,1.58644,Bruno Devoto,Independiente,Limache,Marga Marga,c00015,FIC-B-DEVOTO-X
+c00016,2,Limones,Agr. Rivarola,Bruno Devoto,1.75575,Bruno Devoto,Independiente,Limache,Marga Marga,c00016,FIC-B-DEVOTO-X
+c00017,3,Limones,Agr. Rivarola,Bruno Devoto,0.6489,Bruno Devoto,Independiente,Limache,Marga Marga,c00017,FIC-B-DEVOTO-X
+c00018,1,Nogales,NN,Claudio Alvarado,1.69976,Ramiro Martinez,Los Andes,San Esteban,Los Andes,c00018,FIC-C-ALVARADO-X
+c00019,2,Nogales,NN,Claudio Alvarado,1.01933,Ramiro Martinez,Los Andes,San Esteban,Los Andes,c00019,FIC-C-ALVARADO-X
+c00020,2,Uva de mesa,Hacienda Rinconada,Ricardo Porfiri,4.18585,Ricardo Porfiri,Independiente,Rinconada,Los Andes,c00020,FIC-B-PORFIRI-X
+c00021,3,Uva de mesa,Hacienda Rinconada,Ricardo Porfiri,2.94514,Ricardo Porfiri,Independiente,Rinconada,Los Andes,c00021,FIC-B-PORFIRI-X
+c00022,4,Uva de mesa,Hacienda Rinconada,Ricardo Porfiri,3.02679,Ricardo Porfiri,Independiente,Rinconada,Los Andes,c00022,FIC-B-PORFIRI-X
+c00023,5,Uva de mesa,Hacienda Rinconada,Ricardo Porfiri,1.19787,Ricardo Porfiri,Independiente,Rinconada,Los Andes,c00023,FIC-B-PORFIRI-X
+c00024,1,Uva de mesa,Von Siebenthal,Vina Von Siebenthal,8.46486,Vina Von Siebenthal,Independiente,Panquehue,San Felipe de Aconcagua,c00024,FIC-V-SIEBENTHAL-X
+c00025,2,Uva de mesa,Von Siebenthal,Vina Von Siebenthal,10.08441,Vina Von Siebenthal,Independiente,Panquehue,San Felipe de Aconcagua,c00025,FIC-V-SIEBENTHAL2-X
+c00026,3,Uva de mesa,Von Siebenthal,Vina Von Siebenthal,4.6143,Vina Von Siebenthal,Independiente,Panquehue,San Felipe de Aconcagua,c00026,FIC-V-SIEBENTHAL3-X
+c00027,1,Alfalfa,NN,Anita Inguerzon,5.8694,Anita Inguerzon,Independiente,Rinconada,Los Andes,c00027,FIC-A-INGUERZON-X
+c00028,1,Durazno Andross,Trinidad,Vicente Figueroa,4.47945,Vicente Figueroa,Independiente,Rinconada,Los Andes,c00028,FIC-V-FERNANDEZ-X
+c00029,2,Uva Allison,Trinidad,Vicente Figueroa,2.83128,Vicente Figueroa,Independiente,Rinconada,Los Andes,c00029,FIC-V-FERNANDEZ-X
+c00030,3,Uva Ivory,Trinidad,Vicente Figueroa,2.81894,Vicente Figueroa,Independiente,Rinconada,Los Andes,c00030,FIC-V-FERNANDEZ-X

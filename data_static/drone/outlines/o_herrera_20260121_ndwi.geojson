@@ -11,7 +11,7 @@
         "nom_predio": "NN",
         "propietario": "Oscar Herrera",
         "superficie": "4.31247",
-        "wetland_id": "o_herrera",
+        "predio_id": "o_herrera",
         "raster_key": "o_herrera_20260121_ndwi",
         "fuente": "drone_webp_alpha"
       },

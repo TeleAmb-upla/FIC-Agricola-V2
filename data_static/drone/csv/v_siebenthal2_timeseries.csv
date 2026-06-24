@@ -1,0 +1,3 @@
+source,wetland_id,wetland_name,index,date,year,season,period_key,mean
+drone,v_siebenthal2,Von Siebenthal 2 — Viña Von Siebenthal,NDVI,2026-06-18,2026,18 Jun 2026,20260618,0.2261
+drone,v_siebenthal2,Von Siebenthal 2 — Viña Von Siebenthal,NDWI,2026-06-18,2026,18 Jun 2026,20260618,-0.0409

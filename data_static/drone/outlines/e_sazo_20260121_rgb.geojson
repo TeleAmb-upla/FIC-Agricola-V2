@@ -11,7 +11,7 @@
         "nom_predio": "Parcela 24",
         "propietario": "Emilio Sazo",
         "superficie": "1.52263",
-        "wetland_id": "e_sazo",
+        "predio_id": "e_sazo",
         "raster_key": "e_sazo_20260121_rgb",
         "fuente": "drone_webp_alpha"
       },
@@ -20020,7 +20020,7 @@
         "nom_predio": "Parcela 24",
         "propietario": "Emilio Sazo",
         "superficie": "1.13928",
-        "wetland_id": "e_sazo",
+        "predio_id": "e_sazo",
         "raster_key": "e_sazo_20260121_rgb",
         "fuente": "drone_webp_alpha"
       },
@@ -34245,7 +34245,7 @@
         "nom_predio": "Parcela 24",
         "propietario": "Emilio Sazo",
         "superficie": "0.78926",
-        "wetland_id": "e_sazo",
+        "predio_id": "e_sazo",
         "raster_key": "e_sazo_20260121_rgb",
         "fuente": "drone_webp_alpha"
       },

@@ -11,7 +11,7 @@
         "nom_predio": "El resguardo",
         "propietario": "Alejandra Brito",
         "superficie": "1.40778",
-        "wetland_id": "a_brito_rpa",
+        "predio_id": "a_brito_rpa",
         "raster_key": "a_brito_rpa_20260528_ndvi",
         "fuente": "drone_webp_alpha"
       },
@@ -25078,7 +25078,7 @@
         "nom_predio": "El resguardo",
         "propietario": "Alejandra Brito",
         "superficie": "0.77359",
-        "wetland_id": "a_brito_rpa",
+        "predio_id": "a_brito_rpa",
         "raster_key": "a_brito_rpa_20260528_ndvi",
         "fuente": "drone_webp_alpha"
       },

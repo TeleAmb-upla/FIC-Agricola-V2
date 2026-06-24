@@ -54,7 +54,7 @@
   "predios": [
     {
       "codigo_temporal": "G1",
-      "wetland_id": "g1",
+      "predio_id": "g1",
       "nombre": "Campo temporal G1",
       "agricultor_id": "agr_vinedos",
       "cadena_superior": {
@@ -68,7 +68,7 @@
     },
     {
       "codigo_temporal": "G2",
-      "wetland_id": "g2",
+      "predio_id": "g2",
       "nombre": "Parcela demostración G2",
       "agricultor_id": "agr_agricola",
       "cadena_superior": {
@@ -82,7 +82,7 @@
     },
     {
       "codigo_temporal": "G3",
-      "wetland_id": "g3",
+      "predio_id": "g3",
       "nombre": "Lote pendiente alta resolución G3",
       "agricultor_id": "agr_vinedos",
       "cadena_superior": {
@@ -96,7 +96,7 @@
     },
     {
       "codigo_temporal": "G4",
-      "wetland_id": "g4",
+      "predio_id": "g4",
       "nombre": "Predio temporal G4",
       "agricultor_id": "agr_vinedos",
       "cadena_superior": {
@@ -110,7 +110,7 @@
     },
     {
       "codigo_temporal": "G5",
-      "wetland_id": "g5",
+      "predio_id": "g5",
       "nombre": "Predio temporal G5",
       "agricultor_id": "agr_agricola",
       "cadena_superior": {
@@ -124,7 +124,7 @@
     },
     {
       "codigo_temporal": "G6",
-      "wetland_id": "g6",
+      "predio_id": "g6",
       "nombre": "Predio temporal G6",
       "agricultor_id": "agr_vinedos",
       "cadena_superior": {
@@ -138,7 +138,7 @@
     },
     {
       "codigo_temporal": "NOG",
-      "wetland_id": "nog",
+      "predio_id": "nog",
       "nombre": "Predio NOG (nombre sin G numérico)",
       "agricultor_id": "agr_agricola",
       "cadena_superior": {

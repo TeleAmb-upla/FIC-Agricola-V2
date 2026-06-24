@@ -118,23 +118,60 @@
     return null;
   }
 
-  function cuartelLocalRing(pcdData) {
-    const cid = api.state && api.state.selectedCuartel;
-    if (!cid || typeof global.ficGetCuartelFeature !== 'function') return null;
-    const feat = global.ficGetCuartelFeature(cid);
-    const ring = exteriorRingFromGeometry(feat && feat.geometry);
-    const origin = pcdData && pcdData.origin;
-    if (!ring || !origin || origin.length < 2) return null;
-    const zone = 19;
-    const local = [];
-    ring.forEach(function (pt) {
-      const utm = wgs84ToUtm(Number(pt[0]), Number(pt[1]), zone);
-      local.push([
-        Math.round((utm[0] - origin[0]) * 1000) / 1000,
-        Math.round((utm[1] - origin[1]) * 1000) / 1000
-      ]);
+  function geometryToLocalRings(geom, origin, zone) {
+    if (!geom || !origin || origin.length < 2) return [];
+    const ringsLngLat = [];
+    if (geom.type === 'Polygon') {
+      const ring = geom.coordinates && geom.coordinates[0];
+      if (ring && ring.length >= 4) ringsLngLat.push(ring);
+    } else if (geom.type === 'MultiPolygon') {
+      (geom.coordinates || []).forEach(function (poly) {
+        const ring = poly && poly[0];
+        if (ring && ring.length >= 4) ringsLngLat.push(ring);
+      });
+    }
+    const localRings = [];
+    ringsLngLat.forEach(function (ring) {
+      const local = [];
+      ring.forEach(function (pt) {
+        const utm = wgs84ToUtm(Number(pt[0]), Number(pt[1]), zone);
+        local.push([
+          Math.round((utm[0] - origin[0]) * 1000) / 1000,
+          Math.round((utm[1] - origin[1]) * 1000) / 1000
+        ]);
+      });
+      if (local.length >= 3) localRings.push(local);
     });
-    return local.length >= 3 ? local : null;
+    return localRings;
+  }
+
+  function cuartelesClipLocalRings(pcdData) {
+    const origin = pcdData && pcdData.origin;
+    if (!origin || origin.length < 2) return [];
+    const zone = 19;
+    let cids = typeof global.ficCuartelIdsForClip === 'function'
+      ? global.ficCuartelIdsForClip()
+      : [];
+    if (!cids.length && api.state && api.state.selectedCuartel) {
+      cids = [api.state.selectedCuartel];
+    }
+    if (!cids.length || typeof global.ficGetCuartelFeature !== 'function') return [];
+    const out = [];
+    cids.forEach(function (cid) {
+      const feat = global.ficGetCuartelFeature(cid);
+      geometryToLocalRings(feat && feat.geometry, origin, zone).forEach(function (ring) {
+        out.push(ring);
+      });
+    });
+    return out;
+  }
+
+  function pointInAnyRing(x, y, rings) {
+    if (!rings || !rings.length) return true;
+    for (let i = 0; i < rings.length; i++) {
+      if (pointInRing(x, y, rings[i])) return true;
+    }
+    return false;
   }
 
   const api = {
@@ -151,6 +188,12 @@
     bind: function (appState, dataStaticBase) {
       api.state = appState;
       api.baseUrl = dataStaticBase;
+    },
+
+    selectedPredioId: function () {
+      var s = api.state;
+      if (!s) return null;
+      return s.selectedPredio || s.selectedWetland || null;
     },
 
     isLidarLayer: function () {
@@ -226,6 +269,12 @@
         if (p.material) p.material.dispose();
       });
       L3.points = [];
+      (L3.boundaries || []).forEach(function (line) {
+        L3.scene.remove(line);
+        if (line.geometry) line.geometry.dispose();
+        if (line.material) line.material.dispose();
+      });
+      L3.boundaries = [];
       if (L3.boundary) {
         L3.scene.remove(L3.boundary);
         if (L3.boundary.geometry) L3.boundary.geometry.dispose();
@@ -261,6 +310,7 @@
         cameraReady: prev.cameraReady || false,
         pcdCache: prev.pcdCache || null,
         boundary: null,
+        boundaries: [],
         _resize: null
       };
       function resize() {
@@ -338,22 +388,38 @@
     },
 
     addBoundary: function (data, colorHex, ringOverride) {
-      const ring = ringOverride || (data && data.boundary);
-      if (!ring || ring.length < 2 || !api.las3d.scene) return;
-      const flat = [];
-      ring.forEach(function (p) {
-        flat.push(p[0], p[1], p[2] != null ? p[2] : 0);
+      if (!api.las3d.scene) return;
+      const rings = [];
+      if (ringOverride) {
+        if (Array.isArray(ringOverride[0]) && Array.isArray(ringOverride[0][0])) {
+          ringOverride.forEach(function (r) { if (r && r.length >= 2) rings.push(r); });
+        } else if (Array.isArray(ringOverride[0]) && typeof ringOverride[0][0] === 'number') {
+          rings.push(ringOverride);
+        } else if (ringOverride.length >= 2) {
+          rings.push(ringOverride);
+        }
+      } else if (data && data.boundary && data.boundary.length >= 2) {
+        rings.push(data.boundary);
+      }
+      if (!rings.length) return;
+      if (!api.las3d.boundaries) api.las3d.boundaries = [];
+      rings.forEach(function (ring) {
+        const flat = [];
+        ring.forEach(function (p) {
+          flat.push(p[0], p[1], p[2] != null ? p[2] : 0);
+        });
+        const geom = new THREE.BufferGeometry();
+        geom.setAttribute('position', new THREE.Float32BufferAttribute(flat, 3));
+        const mat = new THREE.LineBasicMaterial({
+          color: new THREE.Color(colorHex || '#ffffff'),
+          transparent: true,
+          opacity: 0.95
+        });
+        const line = new THREE.LineLoop(geom, mat);
+        api.las3d.scene.add(line);
+        api.las3d.boundaries.push(line);
       });
-      const geom = new THREE.BufferGeometry();
-      geom.setAttribute('position', new THREE.Float32BufferAttribute(flat, 3));
-      const mat = new THREE.LineBasicMaterial({
-        color: new THREE.Color(colorHex || '#ffffff'),
-        transparent: true,
-        opacity: 0.95
-      });
-      const line = new THREE.LineLoop(geom, mat);
-      api.las3d.scene.add(line);
-      api.las3d.boundary = line;
+      api.las3d.boundary = api.las3d.boundaries[api.las3d.boundaries.length - 1] || null;
     },
 
     populateLidarAttrSelect: function () {
@@ -405,19 +471,17 @@
       const attr = (data.attributes && data.attributes[attrId]) || null;
       const lim = api.stretchForAttr(attrId, data);
       const pos = data.positions;
-      const clipRing = opts.skipCuartelClip ? null : cuartelLocalRing(data);
+      const clipRings = opts.skipCuartelClip ? null : cuartelesClipLocalRings(data);
       let n = pos.length / 3;
-      const maxRender = 750000;
-      const step = n > maxRender ? Math.ceil(n / maxRender) : 1;
-      const nOut = Math.ceil(n / step);
-      const verts = new Float32Array(nOut * 3);
-      const cols = new Float32Array(nOut * 3);
+      const step = 1;
+      const verts = new Float32Array(n * 3);
+      const cols = new Float32Array(n * 3);
       let oi = 0;
       for (let i = 0; i < n; i += step) {
         const pi = i * 3;
         const px = pos[pi];
         const py = pos[pi + 1];
-        if (clipRing && !pointInRing(px, py, clipRing)) continue;
+        if (clipRings && clipRings.length && !pointInAnyRing(px, py, clipRings)) continue;
         verts[oi * 3] = pos[pi];
         verts[oi * 3 + 1] = pos[pi + 1];
         verts[oi * 3 + 2] = pos[pi + 2];
@@ -452,21 +516,18 @@
         cols[oi * 3 + 2] = b;
         oi++;
       }
-      if (!oi && clipRing && !opts.skipCuartelClip) {
-        return api.loadPointcloud(wid, periodKey, colorHex, cachedData, { skipCuartelClip: true });
-      }
       if (!oi) return null;
       const geom = new THREE.BufferGeometry();
       geom.setAttribute('position', new THREE.BufferAttribute(verts.subarray(0, oi * 3), 3));
       geom.setAttribute('color', new THREE.BufferAttribute(cols.subarray(0, oi * 3), 3));
       geom.computeBoundingSphere();
-      const pointSize = Math.max(0.1, Math.min(0.24, 820 / Math.sqrt(Math.max(oi, 1))));
+      const pointSize = Math.max(0.03, Math.min(0.07, 220 / Math.sqrt(Math.max(oi, 1))));
       const mat = new THREE.PointsMaterial({
         size: pointSize,
         vertexColors: true,
         sizeAttenuation: true,
         transparent: true,
-        opacity: 0.92
+        opacity: 0.97
       });
       return new THREE.Points(geom, mat);
     },
@@ -514,7 +575,7 @@
         api.showView(false);
         return;
       }
-      const wid = api.state.selectedWetland;
+      const wid = api.selectedPredioId();
       let pk = api.state.mapPeriodKey;
       if (!wid) {
         api.showView(false);
@@ -547,7 +608,12 @@
       const viewKey = api.viewKey(wid, pk);
       const preserveCamera = !!(opts && opts.preserveCamera) &&
         api.las3d.cameraReady && api.las3d.lastViewKey === viewKey;
-      const col = (api.droneMeta().wetlands && api.droneMeta().wetlands[wid] && api.droneMeta().wetlands[wid].color) || '#1d6b4a';
+      const col = (function () {
+        var dm = api.droneMeta();
+        var block = dm.predios || dm.wetlands || {};
+        var w = block[String(wid || '').toLowerCase()];
+        return (w && w.color) || '#1d6b4a';
+      })();
       try {
         let pcdData = api.las3d.pcdCache && api.las3d.pcdCache.key === viewKey ? api.las3d.pcdCache.data : null;
         if (!pcdData) {
@@ -566,11 +632,13 @@
           api.las3d.points.push(pts);
           box3.expandByObject(pts);
         } else if (typeof global.ficSyncDroneMapTitle === 'function') {
-          global.ficSyncDroneMapTitle('LiDAR — no se pudieron dibujar puntos para este cuartel. Prueba otra capa o fecha.');
+          global.ficSyncDroneMapTitle('LiDAR — no se pudieron dibujar puntos para los cuarteles visibles. Prueba otra capa o fecha.');
         }
-        const cuRing = cuartelLocalRing(pcdData);
-        if (cuRing) {
-          const ring3d = cuRing.map(function (p) { return [p[0], p[1], 0]; });
+        const cuRings = cuartelesClipLocalRings(pcdData);
+        if (cuRings.length) {
+          const ring3d = cuRings.map(function (ring) {
+            return ring.map(function (p) { return [p[0], p[1], 0]; });
+          });
           api.addBoundary(pcdData, col, ring3d);
         } else if (pcdData) {
           api.addBoundary(pcdData, col);

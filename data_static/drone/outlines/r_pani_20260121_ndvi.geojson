@@ -11,7 +11,7 @@
         "nom_predio": "Parcela 31",
         "propietario": "Roxana Pani",
         "superficie": "2.33416",
-        "wetland_id": "r_pani",
+        "predio_id": "r_pani",
         "raster_key": "r_pani_20260121_ndvi",
         "fuente": "drone_webp_alpha"
       },
@@ -13556,7 +13556,7 @@
         "nom_predio": "Parcela 31",
         "propietario": "Roxana Pani",
         "superficie": "2.39736",
-        "wetland_id": "r_pani",
+        "predio_id": "r_pani",
         "raster_key": "r_pani_20260121_ndvi",
         "fuente": "drone_webp_alpha"
       },

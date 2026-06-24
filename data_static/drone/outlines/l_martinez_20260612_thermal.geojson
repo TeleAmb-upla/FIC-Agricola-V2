@@ -11,7 +11,7 @@
         "nom_predio": "Parcela 17",
         "propietario": "Luisa Martinez",
         "superficie": "1.04218",
-        "wetland_id": "l_martinez",
+        "predio_id": "l_martinez",
         "raster_key": "l_martinez_20260612_thermal",
         "fuente": "drone_webp_alpha"
       },

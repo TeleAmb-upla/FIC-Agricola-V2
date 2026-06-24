@@ -1075,6 +1075,9 @@
             gap: 4px;
             margin-right: 4px;
         }
+        .fic-sat-chart-controls--drone .fic-sat-chart-series-pills {
+            display: none !important;
+        }
         .fic-sat-chart-series-pill {
             padding: 3px 10px;
             border-radius: 999px;
@@ -1631,14 +1634,14 @@ function ficSyncMapNoteVisibility() {
         note.textContent = '';
         return;
     }
-    if (state.selectedSource === 'drone' && state.selectedWetland && title && !title.hidden) {
+    if (state.selectedSource === 'drone' && state.selectedPredio && title && !title.hidden) {
         note.hidden = true;
         return;
     }
     note.hidden = false;
 }
 
-/** Datos de origen: capa maestra de cuarteles (= ``predios.geojson``). */
+/** Datos de origen: capa maestra de cuarteles (= ``cuarteles.geojson``). */
 const SOURCE_DATA_ROOT = ficPageDirPrefix() + 'data';
 const LS_HIER = 'fic-hierarchy-level';
 const LS_AUTH = 'ficAuthSession';
@@ -1689,16 +1692,21 @@ const FIC_POLIGONO_TO_WETLAND = {
     'FIC-B-DEVOTO-X': 'b_devoto',
     'FIC-C-ALVARADO-X': 'c_alvarado',
     'FIC-B-PORFIRI-X': 'r_porfiri',
-    'FIC-V-SIEBENTHAL': 'v_siebenthal'
+    'FIC-V-SIEBENTHAL-X': 'v_siebenthal',
+    'FIC-V-SIEBENTHAL': 'v_siebenthal',
+    'FIC-V-SIEBENTHAL2-X': 'v_siebenthal2',
+    'FIC-V-SIEBENTHAL3-X': 'v_siebenthal3',
+    'FIC-A-INGUERZON-X': 'a_inguerzon',
+    'FIC-V-FERNANDEZ-X': 'v_fernandez'
 };
 
-function ficWetlandForCuartel(cid) {
+function ficPredioForCuartel(cid) {
     var id = ficTrim(cid);
     if (!id) return null;
     var idx = state.cuartelesIndex[id];
-    if (idx && idx.wetland_id) return String(idx.wetland_id).toLowerCase();
+    if (idx && idx.predio_id) return String(idx.predio_id).toLowerCase();
     var row = (state.ficDbByCuartel || {})[id];
-    if (row && row.wetland_id) return String(row.wetland_id).toLowerCase();
+    if (row && row.predio_id) return String(row.predio_id).toLowerCase();
     var pv = row && ficTrim(row.poligono_vuelo || '').toUpperCase();
     if (pv && FIC_POLIGONO_TO_WETLAND[pv]) return FIC_POLIGONO_TO_WETLAND[pv];
     if (state.aoi && state.aoi.features) {
@@ -1706,22 +1714,22 @@ function ficWetlandForCuartel(cid) {
             var f = state.aoi.features[i];
             var props = f.properties || {};
             if (ficTrim(props.id_cuartel || '') !== id) continue;
-            var widFeat = ficTrim(props.wetland_id || '');
+            var widFeat = ficTrim(props.predio_id || '');
             if (widFeat) return widFeat.toLowerCase();
         }
     }
     return null;
 }
 
-function cuartelesForWetland(wid) {
+function cuartelesForPredio(wid) {
     var w = String(wid || '').toLowerCase();
     if (!w) return [];
-    var fromIdx = (state.cuartelesByWetland || {})[w];
+    var fromIdx = (state.cuartelesByPredio || {})[w];
     if (fromIdx && fromIdx.length) return fromIdx.slice();
     var out = [];
     var mp = state.ficDbByCuartel || {};
     Object.keys(mp).forEach(function (cid) {
-        if (ficWetlandForCuartel(cid) === w) out.push(cid);
+        if (ficPredioForCuartel(cid) === w) out.push(cid);
     });
     out.sort();
     return out;
@@ -1772,11 +1780,18 @@ function cuartelMetaForCuartel(cid, featureProps) {
 
 async function loadCuartelesIndex() {
     state.cuartelesIndex = {};
-    state.cuartelesByWetland = {};
+    state.cuartelesByPredio = {};
     try {
         var doc = await fetchJson(BASE + '/cuarteles_index.json');
         state.cuartelesIndex = doc.cuarteles || {};
-        state.cuartelesByWetland = doc.by_wetland || {};
+        state.cuartelesByPredio = doc.by_predio || {};
+        Object.keys(state.cuartelesIndex).forEach(function (cid) {
+            var idx = state.cuartelesIndex[cid];
+            var row = state.ficDbByCuartel[cid];
+            if (row && idx && idx.predio_id) {
+                row.predio_id = String(idx.predio_id).toLowerCase();
+            }
+        });
     } catch (e) {
         console.warn('cuarteles_index.json no disponible:', e.message || e);
     }
@@ -1786,10 +1801,10 @@ function listAllSelectableCuartels() {
     var idx = state.cuartelesIndex || {};
     var ids = Object.keys(idx);
     ids.sort();
-    var allowed = wetlandsListedForSelect();
+    var allowed = prediosListedForSelect();
     return ids.filter(function (cid) {
-        var wid = ficWetlandForCuartel(cid);
-        if (!wid || !isUiSelectableWetland(wid)) return false;
+        var wid = ficPredioForCuartel(cid);
+        if (!wid || !isUiSelectablePredio(wid)) return false;
         return allowed.indexOf(wid) >= 0;
     });
 }
@@ -1814,27 +1829,27 @@ function cuartelesForCurrentContext() {
     return listAllSelectableCuartels();
 }
 
-function agricultorHasMultipleWetlands(agrName) {
+function agricultorHasMultiplePredios(agrName) {
     var wids = {};
     cuartelesForAgricultorName(agrName).forEach(function (cid) {
-        var w = ficWetlandForCuartel(cid);
+        var w = ficPredioForCuartel(cid);
         if (w) wids[w] = true;
     });
     return Object.keys(wids).length > 1;
 }
 
-function needsMultiWetlandCuartelLabels() {
+function needsMultiPredioCuartelLabels() {
     var agr = state.selectedAgricultorName;
     if (!agr && state.authSession && state.authSession.rol === 'agricultor') {
         agr = state.authSession.nombre;
     }
-    return !!(agr && agricultorHasMultipleWetlands(agr));
+    return !!(agr && agricultorHasMultiplePredios(agr));
 }
 
 function cuartelSelectOptionLabel(cid, showPredio) {
     var lab = cuartelDisplayLabel(cid);
     if (showPredio) {
-        var code = predioCodeLabel(ficWetlandForCuartel(cid));
+        var code = predioCodeLabel(ficPredioForCuartel(cid));
         if (code) lab += ' · ' + code;
     }
     return lab;
@@ -1843,21 +1858,21 @@ function cuartelSelectOptionLabel(cid, showPredio) {
 function syncSelectionFromContext() {
     var ids = cuartelesForCurrentContext();
     if (state.selectedCuartel && ids.indexOf(state.selectedCuartel) >= 0) {
-        state.selectedWetland = ficWetlandForCuartel(state.selectedCuartel);
+        state.selectedPredio = ficPredioForCuartel(state.selectedCuartel);
         return;
     }
     if (ids.length === 1) {
         state.selectedCuartel = ids[0];
-        state.selectedWetland = ficWetlandForCuartel(ids[0]);
+        state.selectedPredio = ficPredioForCuartel(ids[0]);
         return;
     }
     if (ids.length > 1) {
         state.selectedCuartel = null;
-        state.selectedWetland = ficWetlandForCuartel(ids[0]);
+        state.selectedPredio = ficPredioForCuartel(ids[0]);
         return;
     }
     state.selectedCuartel = null;
-    state.selectedWetland = pickDefaultWetland();
+    state.selectedPredio = pickDefaultPredio();
 }
 
 function buildCuartelSelect() {
@@ -1865,16 +1880,16 @@ function buildCuartelSelect() {
     var sel = document.getElementById('ficCuartelSelect');
     if (!block || !sel) return;
     var ids = cuartelesForCurrentContext();
-    var multiWetland = needsMultiWetlandCuartelLabels();
+    var multiPredio = needsMultiPredioCuartelLabels();
     sel.innerHTML = '';
     if (!ids.length) {
         block.hidden = true;
         state.selectedCuartel = null;
-        state.selectedWetland = null;
+        state.selectedPredio = null;
         return;
     }
     block.hidden = false;
-    if (ids.length > 1 && !multiWetland) {
+    if (ids.length > 1 && !multiPredio) {
         var optAll = document.createElement('option');
         optAll.value = '';
         optAll.textContent = 'Todo el predio (' + ids.length + ' cuarteles)';
@@ -1883,9 +1898,9 @@ function buildCuartelSelect() {
     ids.forEach(function (cid) {
         var opt = document.createElement('option');
         opt.value = cid;
-        opt.textContent = cuartelSelectOptionLabel(cid, multiWetland);
+        opt.textContent = cuartelSelectOptionLabel(cid, multiPredio);
         var ha = cuartelSuperficieHa(cid);
-        if (ha != null) opt.title = cuartelSelectOptionLabel(cid, multiWetland) + ' · ' + ha.toFixed(2) + ' ha';
+        if (ha != null) opt.title = cuartelSelectOptionLabel(cid, multiPredio) + ' · ' + ha.toFixed(2) + ' ha';
         sel.appendChild(opt);
     });
     if (state.selectedCuartel && ids.indexOf(state.selectedCuartel) < 0) {
@@ -1894,9 +1909,9 @@ function buildCuartelSelect() {
         state.selectedCuartel = ids[0];
     }
     if (state.selectedCuartel) {
-        state.selectedWetland = ficWetlandForCuartel(state.selectedCuartel);
+        state.selectedPredio = ficPredioForCuartel(state.selectedCuartel);
     } else if (ids.length) {
-        state.selectedWetland = ficWetlandForCuartel(ids[0]);
+        state.selectedPredio = ficPredioForCuartel(ids[0]);
     }
     sel.value = state.selectedCuartel || '';
     if (!sel.dataset.ficBound) {
@@ -1914,36 +1929,43 @@ function ficCuartelWeightHa(cid) {
 
 function ficDroneCuartelIdsForTimeseries(wid) {
     if (state.selectedCuartel) return [state.selectedCuartel];
-    var ids = cuartelesForWetland(wid);
-    var base = satTimeseriesForPredio(wid);
-    if (!base || !base.cuarteles) return [];
+    var ids = cuartelesForPredio(wid);
+    var base = ficTimeseriesForPredio(wid, 'drone');
+    if (!base || !base.cuarteles) return ids.slice();
     return ids.filter(function (cid) { return !!base.cuarteles[cid]; });
+}
+
+function ficMedianOfNumbers(nums) {
+    var arr = (nums || []).filter(function (v) { return v != null && isFinite(Number(v)); })
+        .map(function (v) { return Number(v); })
+        .sort(function (a, b) { return a - b; });
+    if (!arr.length) return null;
+    var mid = Math.floor(arr.length / 2);
+    return arr.length % 2 ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2;
 }
 
 function ficAggregateDroneIndexFromCuarteles(base, cuartelIds, indexKey) {
     if (!base || !base.cuarteles || !cuartelIds.length) return null;
     var ix = String(indexKey || 'ndvi').toLowerCase();
-    var byPeriod = {};
-    var byPeriodWeight = {};
+    var byPeriodVals = {};
     var labelByPk = {};
     cuartelIds.forEach(function (cid) {
         var cu = base.cuarteles[cid];
         if (!cu || !cu.indices || !cu.indices[ix]) return;
-        var w = ficCuartelWeightHa(cid);
         (cu.indices[ix].points || []).forEach(function (p) {
-            var pk = p.period_key || p.date;
+            var pk = ficDronePeriodKeyFromPoint(p);
             if (!pk) return;
             var v = Number(p.value);
             if (!isFinite(v)) return;
-            byPeriod[pk] = (byPeriod[pk] || 0) + v * w;
-            byPeriodWeight[pk] = (byPeriodWeight[pk] || 0) + w;
+            if (!byPeriodVals[pk]) byPeriodVals[pk] = [];
+            byPeriodVals[pk].push(v);
             if (!labelByPk[pk]) labelByPk[pk] = p.label || pk;
         });
     });
-    var pks = Object.keys(byPeriod).sort();
+    var pks = Object.keys(byPeriodVals).sort();
     if (!pks.length) return null;
     var points = pks.map(function (pk) {
-        var wsum = byPeriodWeight[pk] || 1;
+        var med = ficMedianOfNumbers(byPeriodVals[pk]);
         var label = labelByPk[pk] || pk;
         return {
             date: pk,
@@ -1952,35 +1974,36 @@ function ficAggregateDroneIndexFromCuarteles(base, cuartelIds, indexKey) {
             season_key: 'vuelo',
             season_label: label,
             period_key: pk,
-            value: Math.round((byPeriod[pk] / wsum) * 10000) / 10000
+            value: med != null ? Math.round(med * 10000) / 10000 : null
         };
     });
-    var values = points.map(function (p) { return p.value; });
-    var histMean = values.length
-        ? Math.round((values.reduce(function (a, b) { return a + b; }, 0) / values.length) * 10000) / 10000
-        : null;
+    var flightMeds = points.map(function (p) { return p.value; });
+    var histMed = ficMedianOfNumbers(flightMeds);
+    if (histMed != null) histMed = Math.round(histMed * 10000) / 10000;
     return {
         points: points,
-        metrics: { historical_mean: histMean }
+        metrics: { historical_mean: histMed, historical_median: histMed }
     };
 }
 
 function ficTsEntryForSelection(predio) {
-    var base = satTimeseriesForPredio(predio);
+    var isDrone = state.selectedSource === 'drone';
+    var base = ficTimeseriesForPredio(predio, isDrone ? 'drone' : state.selectedSource);
     if (!base) return null;
     var cid = state.selectedCuartel;
     if (cid && base.cuarteles && base.cuarteles[cid]) {
         var cu = base.cuarteles[cid];
-        if (state.selectedSource !== 'drone') {
+        if (!isDrone) {
             var chartBand = satChartBand();
             if (cu[chartBand] || cu[String(chartBand).toUpperCase()]) return cu;
             return base;
         }
         return cu;
     }
-    if (state.selectedSource !== 'drone') return base;
+    if (!isDrone) return base;
     var cids = ficDroneCuartelIdsForTimeseries(predio);
-    if (cids.length > 1 && base.cuarteles) {
+    var predioCuCount = cuartelesForPredio(predio).length;
+    if (cids.length && base.cuarteles && (cids.length > 1 || (cids.length === 1 && predioCuCount > 1))) {
         var indices = {};
         var ixKeys = {};
         cids.forEach(function (id) {
@@ -1999,6 +2022,9 @@ function ficTsEntryForSelection(predio) {
                 indices: indices
             };
         }
+    }
+    if (cids.length === 1 && base.cuarteles && base.cuarteles[cids[0]]) {
+        return base.cuarteles[cids[0]];
     }
     return base;
 }
@@ -2219,12 +2245,12 @@ let rasterDroneRgb = null;
 let rasterDroneIndex = null;
 const state = {
     manifest: null,
-    /** Geometrías maestras de cuarteles (``data/shapefiles/predios.geojson`` → ``data_static``). */
+    /** Geometrías maestras de cuarteles (``data/vectors/cuarteles/cuarteles.geojson`` → ``data_static``). */
     aoi: null,
     datasets: {},
     metadata: {},
     selectedSource: null,
-    selectedWetland: null,
+    selectedPredio: null,
     hierarchyLevel: null,
     authSession: null,
     selectedAgricultorName: null,
@@ -2233,7 +2259,7 @@ const state = {
     ficDbByPredio: {},
     ficDbByCuartel: {},
     cuartelesIndex: {},
-    cuartelesByWetland: {},
+    cuartelesByPredio: {},
     selectedCuartel: null,
     // Comparativa satelital (un mapa, divisor)
     satViewMode: 'monthly',
@@ -2252,7 +2278,9 @@ const state = {
     /** Último contexto predio|fuente|periodKey para el que se hizo fitBounds al WebP en el mapa principal. */
     _lastMapFitContextKey: null,
     /** Firma predio|modo|leftCK|rightCK del último fitBounds en el mapa comparativo satelital. */
-    _satMapFitSig: null
+    _satMapFitSig: null,
+    /** Firma del último par de overlays satélite aplicado (evita saltos de fit sin repintar). */
+    _satOverlaySig: null
 };
 
 window.addEventListener('resize', function () {
@@ -2283,8 +2311,8 @@ function syncAgricultorPickBlockVisibility() {
 function agricultorNamesInAdvisorPortfolio() {
     var seen = {};
     var names = [];
-    wetlandsListedForSelect().forEach(function (wid) {
-        var n = agricultorNameForWetland(wid);
+    prediosListedForSelect().forEach(function (wid) {
+        var n = agricultorNameForPredio(wid);
         if (!n) return;
         var key = n.toLocaleLowerCase('es');
         if (seen[key]) return;
@@ -2297,9 +2325,15 @@ function agricultorNamesInAdvisorPortfolio() {
     return names;
 }
 
-function agricultorNameForWetland(wid) {
+function agricultorNameForPredio(wid) {
     var row = getFicDbRow(wid);
-    return row && ficTrim(row.nombre_agricultor) ? ficTrim(row.nombre_agricultor) : '';
+    if (row && ficTrim(row.nombre_agricultor)) return ficTrim(row.nombre_agricultor);
+    var cids = cuartelesForPredio(wid);
+    if (cids.length) {
+        var m = cuartelMetaForCuartel(cids[0], null);
+        if (m && ficTrim(m.propietario)) return ficTrim(m.propietario);
+    }
+    return '';
 }
 
 function ficEscapeHtml(s) {
@@ -2335,13 +2369,13 @@ function advisorNameForPortfolioFilter() {
     if (state.authSession && (state.authSession.rol === 'asesor' || state.authSession.rol === 'sat')) {
         return ficTrim(state.authSession.nombre);
     }
-    var rowSel = getFicDbRow(state.selectedWetland);
+    var rowSel = getFicDbRow(state.selectedPredio);
     var fromSel = rowSel && ficTrim(rowSel.nombre_sat_asesor);
     if (fromSel) return fromSel;
     return firstAsesorNameFromDb();
 }
 
-function wetlandMatchesAdvisorFilter(wid, advisorName) {
+function predioMatchesAdvisorFilter(wid, advisorName) {
     if (!ficTrim(advisorName)) return true;
     var row = getFicDbRow(wid);
     var a = row && ficTrim(row.nombre_sat_asesor);
@@ -2350,7 +2384,8 @@ function wetlandMatchesAdvisorFilter(wid, advisorName) {
 }
 
 async function applyCuartelSelection(cid) {
-    var prevWid = state.selectedWetland;
+    var myGen = ++_ficCuartelApplyGen;
+    var prevWid = state.selectedPredio;
     var prevCid = state.selectedCuartel;
     var ids = cuartelesForCurrentContext();
     var raw = cid == null ? '' : String(cid);
@@ -2358,25 +2393,28 @@ async function applyCuartelSelection(cid) {
 
     if (newCid && ids.indexOf(newCid) >= 0) {
         state.selectedCuartel = newCid;
-        state.selectedWetland = ficWetlandForCuartel(newCid);
+        state.selectedPredio = ficPredioForCuartel(newCid);
         var m = cuartelMetaForCuartel(newCid, null);
         if (m.propietario) state.selectedAgricultorName = m.propietario;
     } else if (!newCid && ids.length > 1) {
         state.selectedCuartel = null;
-        state.selectedWetland = ficWetlandForCuartel(ids[0]);
+        state.selectedPredio = ficPredioForCuartel(ids[0]);
     } else if (ids.length === 1) {
         state.selectedCuartel = ids[0];
-        state.selectedWetland = ficWetlandForCuartel(ids[0]);
+        state.selectedPredio = ficPredioForCuartel(ids[0]);
     } else {
         syncSelectionFromContext();
     }
 
-    if (prevWid !== state.selectedWetland) {
+    if (prevWid !== state.selectedPredio) {
+        state.mapPeriodKey = null;
+    } else if (prevCid !== state.selectedCuartel) {
         state.mapPeriodKey = null;
     }
-    if (prevWid !== state.selectedWetland || prevCid !== state.selectedCuartel) {
+    if (prevWid !== state.selectedPredio || prevCid !== state.selectedCuartel) {
         state._lastMapFitContextKey = null;
         state._satMapFitSig = null;
+        state._satOverlaySig = null;
         if (typeof FicLidar3d !== 'undefined' && FicLidar3d.las3d) {
             FicLidar3d.las3d.pcdCache = null;
             FicLidar3d.las3d.lastViewKey = null;
@@ -2388,12 +2426,15 @@ async function applyCuartelSelection(cid) {
     if (cuartelSel) cuartelSel.value = state.selectedCuartel || '';
 
     buildCuartelSelect();
-    if (await ensureMapSourceMatchesPillsPolicy()) return;
-    renderAOI();
+    if (await ensureMapSourceMatchesPillsPolicy()) {
+        if (myGen !== _ficCuartelApplyGen) return;
+        return;
+    }
+    if (myGen !== _ficCuartelApplyGen) return;
     refreshMapLayerState();
     updateWelcomeBanner();
     syncSourcePillsDom();
-    renderAll();
+    renderAll({ forceMapRefresh: true });
     ficSyncMetricsChartChrome(true);
     if (isSatSplitMode()) updateSatSplitOverlays();
 }
@@ -2403,8 +2444,8 @@ async function ensureDroneDatasetLoaded() {
     if (state.datasets.drone && state.metadata.drone) return true;
     var sd = state.manifest.sources.drone;
     try {
-        state.datasets.drone = await fetchJson(BASE + '/' + sd.timeseries_path);
-        state.metadata.drone = await fetchJson(BASE + '/' + sd.metadata_path);
+        state.datasets.drone = normalizeSourcePayload(await fetchJson(BASE + '/' + sd.timeseries_path));
+        state.metadata.drone = normalizeSourcePayload(await fetchJson(BASE + '/' + sd.metadata_path));
         return true;
     } catch (e) {
         console.warn('No se cargó timeseries/metadata dron:', e.message || e);
@@ -2413,29 +2454,29 @@ async function ensureDroneDatasetLoaded() {
 }
 
 /** Excluye predios solo demostración de la UI (p. ej. ``lote_demo`` / capa Demo). */
-function isUiSelectableWetland(wid) {
+function isUiSelectablePredio(wid) {
     return String(wid || '').toLowerCase() !== 'lote_demo';
 }
 
-function wetlandsListedForMeta(meta) {
-    if (!meta || !meta.wetlands) return [];
-    return Object.keys(meta.wetlands).filter(isUiSelectableWetland);
+function prediosListedForMeta(meta) {
+    if (!meta || !meta.predios) return [];
+    return Object.keys(meta.predios).filter(isUiSelectablePredio);
 }
 
 /** Claves de predio del desplegable (misma metadata, sin demostración). */
-function wetlandsListedForSelect() {
-    var list = currentWetlands().filter(isUiSelectableWetland);
+function prediosListedForSelect() {
+    var list = currentPredios().filter(isUiSelectablePredio);
     var auth = state.authSession;
     if (!auth || !auth.nombre) return list;
     if (auth.rol === 'agricultor') {
         return list.filter(function (wid) {
-            var a = agricultorNameForWetland(wid);
+            var a = agricultorNameForPredio(wid);
             return a && a.localeCompare(auth.nombre, 'es', { sensitivity: 'base' }) === 0;
         });
     }
     if (auth.rol === 'asesor' || auth.rol === 'sat') {
         return list.filter(function (wid) {
-            return wetlandMatchesAdvisorFilter(wid, auth.nombre);
+            return predioMatchesAdvisorFilter(wid, auth.nombre);
         });
     }
     return list;
@@ -2471,10 +2512,10 @@ function manifestDroneAvailable() {
     return !!(d && d.has_data && state.metadata && state.metadata.drone);
 }
 
-function wetlandHasDroneData(wid) {
+function predioHasDroneData(wid) {
     var dm = state.metadata.drone;
-    if (!dm || !dm.wetlands) return false;
-    var info = dm.wetlands[String(wid || '').toLowerCase()];
+    if (!dm || !dm.predios) return false;
+    var info = dm.predios[String(wid || '').toLowerCase()];
     if (!info) return false;
     if ((info.n_periods || 0) > 0) return true;
     if (info.status === 'ready') return true;
@@ -2482,12 +2523,12 @@ function wetlandHasDroneData(wid) {
 }
 
 /** Predios usados para saber si el pill Dron aplica (satélite si hay; si no, respaldo dron). */
-function contextScopeWetlandsForDronePill() {
+function contextScopePrediosForDronePill() {
     var satKey = getSatelliteSourceKey();
     var sm = satKey && state.metadata[satKey];
-    var list = wetlandsListedForMeta(sm || {});
+    var list = prediosListedForMeta(sm || {});
     if (!list.length && state.metadata.drone) {
-        list = wetlandsListedForMeta(state.metadata.drone);
+        list = prediosListedForMeta(state.metadata.drone);
     }
     return list;
 }
@@ -2502,15 +2543,15 @@ function contextShowsDronePill() {
     var satKey = getSatelliteSourceKey();
     if (!satKey || !state.metadata[satKey]) return false;
     var h = state.hierarchyLevel;
-    var list = contextScopeWetlandsForDronePill();
+    var list = contextScopePrediosForDronePill();
     var scopeWids = [];
     if (h === 'asesor' || h === 'sat') {
         var adv = advisorNameForPortfolioFilter();
         list.forEach(function (w) {
-            if (wetlandMatchesAdvisorFilter(w, adv)) scopeWids.push(w);
+            if (predioMatchesAdvisorFilter(w, adv)) scopeWids.push(w);
         });
     } else if (h === 'agricultor') {
-        var anchor = state.selectedWetland;
+        var anchor = state.selectedPredio;
         var rowA = anchor && getFicDbRow(anchor);
         var nm = rowA && ficTrim(rowA.nombre_agricultor);
         if (nm) {
@@ -2530,7 +2571,7 @@ function contextShowsDronePill() {
         scopeWids = list.slice();
     }
     for (var i = 0; i < scopeWids.length; i++) {
-        if (wetlandHasDroneData(scopeWids[i])) return true;
+        if (predioHasDroneData(scopeWids[i])) return true;
     }
     return false;
 }
@@ -2585,9 +2626,9 @@ function ficBindSourcePills() {
 /** Promedio espacial del último vuelo en series dron para un índice numérico (NDVI, NDWI…). */
 function latestSpatialMeanFromTimeseries(wid, indexKey, cidOpt) {
     var ik = String(indexKey || 'ndvi').toLowerCase();
-    var wkey = String(wid || state.selectedWetland || '').toLowerCase();
-    var wl = state.datasets.drone && state.datasets.drone.wetlands
-        ? state.datasets.drone.wetlands[wkey]
+    var wkey = String(wid || state.selectedPredio || '').toLowerCase();
+    var wl = state.datasets.drone && state.datasets.drone.predios
+        ? state.datasets.drone.predios[wkey]
         : null;
     if (!wl) return null;
     var tsEntry = wl;
@@ -2638,7 +2679,7 @@ function buildCuartelPopupHtml(cid, featureProps) {
     return html;
 }
 
-function buildPolygonTooltipHtml(widLower, nomeMeta, metaWetlandInfo) {
+function buildPolygonTooltipHtml(widLower, nomeMeta, metaPredioInfo) {
     var row = getFicDbRow(widLower);
     var agr = row && ficTrim(row.nombre_agricultor) !== '' ? ficEscapeHtml(row.nombre_agricultor) : '—';
     var ases = row && ficTrim(row.nombre_sat_asesor) !== '' ? ficEscapeHtml(row.nombre_sat_asesor) : '—';
@@ -2657,9 +2698,9 @@ function buildPolygonTooltipHtml(widLower, nomeMeta, metaWetlandInfo) {
         '</b><br>Asesor: <b>' +
         ases +
         '</b><br>Superficie: <b>' +
-        fmtHa(metaWetlandInfo.area_ha) +
+        fmtHa(metaPredioInfo.area_ha) +
         '</b><br>Última capa disponible: <b>' +
-        ficEscapeHtml(metaWetlandInfo.last_period || '—') +
+        ficEscapeHtml(metaPredioInfo.last_period || '—') +
         '</b>' +
         meanStr +
         '</div>'
@@ -2690,7 +2731,11 @@ function parseAndStoreFicDatabaseCsv(text) {
         'FIC-B-DEVOTO-X': ['B_DEVOTO'],
         'FIC-C-ALVARADO-X': ['C_ALVARADO'],
         'FIC-B-PORFIRI-X': ['R_PORFIRI'],
-        'FIC-V-SIEBENTHAL': ['V_SIEBENTHAL']
+        'FIC-V-SIEBENTHAL-X': ['V_SIEBENTHAL'],
+        'FIC-V-SIEBENTHAL2-X': ['V_SIEBENTHAL2'],
+        'FIC-V-SIEBENTHAL3-X': ['V_SIEBENTHAL3'],
+        'FIC-A-INGUERZON-X': ['A_INGUERZON'],
+        'FIC-V-FERNANDEZ-X': ['V_FERNANDEZ']
     };
     var i = 1;
     for (; i < lines.length; i++) {
@@ -2728,7 +2773,7 @@ function parseAndStoreFicDatabaseCsv(text) {
                 superficie: sup,
                 asesor: asesor,
                 poligono_vuelo: pv,
-                wetland_id: widGuess
+                predio_id: widGuess
             };
         }
         var codes = poligonoToCodes[pv] || [];
@@ -2775,7 +2820,7 @@ function updateWelcomeBanner() {
         return;
     }
     el.hidden = false;
-    var row = getFicDbRow(state.selectedWetland);
+    var row = getFicDbRow(state.selectedPredio);
     if (k === 'agricultor') {
         var na = row && ficTrim(row.nombre_agricultor) !== '' ? ficTrim(row.nombre_agricultor) : '';
         el.textContent = na ? 'Hola, ' + na + '.' : 'Hola.';
@@ -2873,8 +2918,15 @@ function isSatSplitMode() {
     return !!(sm && sm.view_modes);
 }
 
+function normalizeSourcePayload(payload) {
+    if (!payload || typeof payload !== 'object') return payload;
+    if (!payload.predios && payload.wetlands) payload.predios = payload.wetlands;
+    if (!payload.wetlands && payload.predios) payload.wetlands = payload.predios;
+    return payload;
+}
+
 function getSatMeta() {
-    return state.metadata[state.selectedSource] || {};
+    return normalizeSourcePayload(state.metadata[state.selectedSource] || {});
 }
 
 /** Devuelve la banda activa para el side-by-side (sigue al selector ``mapIndex`` cuando aplica). */
@@ -2889,7 +2941,7 @@ function satBand() {
 }
 
 /** Construye un descriptor de raster: ``{visual: {path, bounds, opacity}, label, n}``.
- *  La metadata compacta solo guarda ``{p,l,n}``; bounds vienen de ``wetlands[predio]``. */
+ *  La metadata compacta solo guarda ``{p,l,n}``; bounds vienen de ``predios[predio]``. */
 function satFindRaster(predio, compositeKey, band) {
     if (!compositeKey || !predio || !band) return null;
     var sm = getSatMeta();
@@ -2897,7 +2949,7 @@ function satFindRaster(predio, compositeKey, band) {
     var key = (predio + '_' + compositeKey + '_' + band).toLowerCase();
     var entry = rasters[key];
     if (!entry) return null;
-    var wl = (sm.wetlands || {})[String(predio).toLowerCase()] || {};
+    var wl = (sm.predios || sm.wetlands || {})[String(predio).toLowerCase()] || {};
     var bounds = wl.leaflet_bounds;
     if (!bounds || bounds.length !== 2) return null;
     var defaults = sm.raster_defaults || {};
@@ -2936,25 +2988,88 @@ function satFormatComposite(template, vars) {
         .replace('{week}', vars.week != null ? String(vars.week) : '');
 }
 
-/** Composite key del panel ``side`` ('left' | 'right'): izquierda histórico, derecha actual (misma ventana temporal). */
-function satCompositeKeyForSide(side, viewMode) {
+/** Composite key del panel ``side`` para un mes/semana concreto (sin leer ``state``). */
+function satCompositeKeyForPill(side, viewMode, pillValue) {
     var vm = satViewModeMeta(viewMode);
-    var pill = satCurrentPillValue(viewMode);
     if (viewMode === 'monthly') {
-        var m = pill || 1;
+        var m = pillValue != null ? pillValue : 1;
         if (side === 'left') {
             return satFormatComposite(vm.left_composite_template || 'monthly_hist_{month:02d}', { month: m });
         }
         return satFormatComposite(vm.right_composite_template || 'monthly_current_{month:02d}', { month: m });
     }
     if (viewMode === 'weekly') {
-        var w = pill || 1;
+        var w = pillValue != null ? pillValue : 1;
         if (side === 'left') {
             return satFormatComposite(vm.left_composite_template || 'weekly_hist_W{week:02d}', { week: w });
         }
         return satFormatComposite(vm.right_composite_template || 'weekly_current_W{week:02d}', { week: w });
     }
     return null;
+}
+
+/** Composite key del panel ``side`` ('left' | 'right'): izquierda histórico, derecha actual (misma ventana temporal). */
+function satCompositeKeyForSide(side, viewMode) {
+    return satCompositeKeyForPill(side, viewMode, satCurrentPillValue(viewMode));
+}
+
+/** ¿Hay al menos un ráster satélite (histórico o actual) para mes/semana ``pillValue``? */
+function predioHasSatRasterForPill(wid, viewMode, pillValue, band) {
+    if (!wid || pillValue == null) return false;
+    var b = band || satBand();
+    return !!(satFindRaster(wid, satCompositeKeyForPill('left', viewMode, pillValue), b) ||
+        satFindRaster(wid, satCompositeKeyForPill('right', viewMode, pillValue), b));
+}
+
+/** Meses/semanas del selector temporal que tienen imagen para el predio y banda activos. */
+function satTemporalItemsWithRaster(viewMode, band, predio) {
+    var vm = satViewModeMeta(viewMode);
+    var raw = viewMode === 'weekly' ? (vm.weeks || []) : (vm.months || []);
+    var wid = predio || state.selectedPredio;
+    if (!wid) return raw.slice();
+    var b = band || satBand();
+    var filtered = raw.filter(function (v) {
+        return predioHasSatRasterForPill(wid, viewMode, v, b);
+    });
+    return filtered.length ? filtered : raw.slice();
+}
+
+/** Si el mes/semana activo no tiene imagen, salta al más cercano que sí tenga. */
+function ensureSatMapPeriodHasRaster() {
+    if (!isSatSplitMode() || !state.selectedPredio) return;
+    var viewMode = state.satViewMode || 'monthly';
+    ensureSatLeftDefaults();
+    clampSatPillToViewModeItems(viewMode);
+    var band = satBand();
+    var wid = state.selectedPredio;
+    var pill = satCurrentPillValue(viewMode);
+    if (predioHasSatRasterForPill(wid, viewMode, pill, band)) return;
+    var items = satTemporalItemsWithRaster(viewMode, band, wid);
+    if (!items.length) return;
+    var allItems = viewMode === 'weekly'
+        ? (satViewModeMeta(viewMode).weeks || [])
+        : (satViewModeMeta(viewMode).months || []);
+    var idx = allItems.indexOf(pill);
+    if (idx < 0) idx = 0;
+    var pick = null;
+    for (var d = 0; d < allItems.length && !pick; d++) {
+        var candIdx = [];
+        if (d === 0) candIdx.push(idx);
+        else {
+            if (idx - d >= 0) candIdx.push(idx - d);
+            if (idx + d < allItems.length) candIdx.push(idx + d);
+        }
+        for (var ci = 0; ci < candIdx.length; ci++) {
+            var v = allItems[candIdx[ci]];
+            if (items.indexOf(v) >= 0) {
+                pick = v;
+                break;
+            }
+        }
+    }
+    if (pick == null) pick = items[items.length - 1];
+    if (viewMode === 'monthly') state.satLeftMonth = pick;
+    else state.satLeftWeek = pick;
 }
 
 /** Garantiza que ``state.satLeftMonth/Week`` tengan defaults razonables (a partir de metadata). */
@@ -2978,7 +3093,7 @@ function ensureSatLeftDefaults() {
 }
 
 function mapFitContextKey() {
-    return String(state.selectedWetland || '') + '|' + String(state.selectedSource || '')
+    return String(state.selectedPredio || '') + '|' + String(state.selectedSource || '')
         + '|' + String(state.mapLayerKind || '') + '|' + String(state.mapPeriodKey || '')
         + '|' + String(state.selectedCuartel || '');
 }
@@ -3057,6 +3172,14 @@ function applySatSwipeClip() {
     }
     if (grip) grip.setAttribute('aria-valuenow', String(Math.round(ratio * 100)));
 
+    if (!satOverlayLeft && satOverlayRight) {
+        ficApplyCuartelClipToOverlay(satOverlayRight, mapaSat);
+        return;
+    }
+    if (satOverlayLeft && !satOverlayRight) {
+        ficApplyCuartelClipToOverlay(satOverlayLeft, mapaSat);
+        return;
+    }
     if (!mapaSat || !satOverlayLeft) {
         if (mapaSat && satOverlayRight) ficApplyCuartelClipToOverlay(satOverlayRight, mapaSat);
         return;
@@ -3298,13 +3421,109 @@ function droneChartBandKey() {
 }
 
 /** ¿Existe ráster dron del predio para ``periodKey`` y capa ``indexKey``? */
-function wetlandHasDroneRasterForPeriod(wid, periodKey, indexKey) {
+function predioHasDroneRasterForPeriod(wid, periodKey, indexKey) {
     if (!wid || !periodKey) return false;
     var ix = String(indexKey || 'ndvi').toLowerCase();
-    if (ix === 'lidar') return wetlandHasLidarData(wid, periodKey);
-    var dm = state.metadata.drone || {};
+    if (ix === 'lidar') return predioHasLidarData(wid, periodKey);
+    var dm = state.metadata.drone || currentMeta();
     var rk = (String(wid).toLowerCase() + '_' + String(periodKey) + '_' + ix).toLowerCase();
     return !!(dm.rasters && dm.rasters[rk]);
+}
+
+/** ¿Hay algún producto dron (índice, RGB, térmica o LiDAR) para este vuelo? */
+function predioHasDroneFlightForPeriod(wid, periodKey) {
+    if (!wid || !periodKey) return false;
+    if (predioHasLidarData(wid, periodKey)) return true;
+    var indices = ['ndvi', 'ndwi', 'rgb', 'thermal'];
+    for (var fi = 0; fi < indices.length; fi++) {
+        if (predioHasDroneRasterForPeriod(wid, periodKey, indices[fi])) return true;
+    }
+    return false;
+}
+
+function ficDronePeriodKeyFromPoint(p) {
+    if (!p) return '';
+    var pk = ficTrim(p.period_key || '');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(pk)) return pk.replace(/-/g, '');
+    if (/^\d{8}$/.test(pk)) return pk;
+    if (pk) return pk;
+    var d = ficTrim(p.date || '');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d.replace(/-/g, '');
+    if (/^\d{8}$/.test(d)) return d;
+    return d;
+}
+
+/** ¿Hay datos dron del vuelo para la capa activa (índice, RGB, térmica o LiDAR)? */
+function predioHasDroneLayerForPeriod(wid, periodKey, layerKind) {
+    if (!wid || !periodKey) return false;
+    var ix = String(layerKind || state.mapLayerKind || 'ndvi').toLowerCase();
+    if (ix === 'lidar') return predioHasLidarData(wid, periodKey);
+    return predioHasDroneRasterForPeriod(wid, periodKey, ix);
+}
+
+function ficDronePeriodKeysFromTimeseriesEntry(tsEntry, indexKey) {
+    var seen = {};
+    var keys = [];
+    function addPk(pk, label) {
+        pk = ficTrim(pk);
+        if (!pk || seen[pk]) return;
+        seen[pk] = true;
+        keys.push({ period_key: pk, label: label || dronePeriodMetaLabel(pk) });
+    }
+    if (!tsEntry) return keys;
+    var ix = String(indexKey || 'ndvi').toLowerCase();
+    var series = ficChartSeriesForBand(tsEntry, ix, 'drone');
+    (series && series.points ? series.points : []).forEach(function (p) {
+        addPk(ficDronePeriodKeyFromPoint(p), p.label);
+    });
+    if (tsEntry.indices) {
+        Object.keys(tsEntry.indices).forEach(function (k) {
+            var slot = tsEntry.indices[k];
+            (slot && slot.points ? slot.points : []).forEach(function (p) {
+                addPk(ficDronePeriodKeyFromPoint(p), p.label);
+            });
+        });
+    }
+    return keys;
+}
+
+/** Fechas de vuelo visibles según cuartel/predio seleccionado (serie + metadata). */
+function ficDronePeriodKeysForContext(wid) {
+    if (!wid) return [];
+    var seen = {};
+    var out = [];
+    function addItem(it) {
+        if (!it || !it.period_key || seen[it.period_key]) return;
+        seen[it.period_key] = true;
+        out.push({
+            period_key: it.period_key,
+            label: it.label || dronePeriodMetaLabel(it.period_key)
+        });
+    }
+    var tsEntry = ficTsEntryForSelection(wid);
+    ['ndvi', 'ndwi'].forEach(function (ix) {
+        ficDronePeriodKeysFromTimeseriesEntry(tsEntry, ix).forEach(addItem);
+    });
+    var base = ficTimeseriesForPredio(wid, 'drone');
+    if (base && base.cuarteles) {
+        var cids = ficDroneCuartelIdsForTimeseries(wid);
+        cids.forEach(function (cid) {
+            var cu = base.cuarteles[cid];
+            if (!cu) return;
+            ['ndvi', 'ndwi'].forEach(function (ix) {
+                ficDronePeriodKeysFromTimeseriesEntry(cu, ix).forEach(addItem);
+            });
+        });
+    }
+    droneFlightPeriodKeysForPredio(wid).slice().reverse().forEach(function (pk) {
+        addItem({ period_key: pk, label: dronePeriodMetaLabel(pk) });
+    });
+    out.sort(function (a, b) {
+        return String(a.period_key).localeCompare(String(b.period_key));
+    });
+    return out.filter(function (it) {
+        return predioHasDroneFlightForPeriod(wid, it.period_key);
+    });
 }
 
 /** Mensaje claro cuando la capa o el vuelo no tienen datos dron. */
@@ -3328,60 +3547,21 @@ function ficDroneUnavailableMessage(layerKind, periodKey) {
 }
 
 function droneTemporalItems(layerKind) {
-    var wid = state.selectedWetland;
+    var wid = state.selectedPredio;
     if (!wid) return [];
     var band = String(layerKind || state.mapLayerKind || 'ndvi').toLowerCase();
-    function itemForPk(pk) {
-        return { period_key: pk, label: dronePeriodMetaLabel(pk) };
-    }
-    function filterAvailable(items) {
-        return items.filter(function (it) {
-            return wetlandHasDroneRasterForPeriod(wid, it.period_key, band);
-        });
-    }
-    if (band === 'lidar') {
-        return filterAvailable(
-            droneFlightPeriodKeysForWetland(wid).slice().reverse().map(itemForPk)
-        );
-    }
-    var tsEntry = ficTsEntryForSelection(wid);
-    var series = ficChartSeriesForBand(tsEntry, band === 'rgb' || band === 'thermal' ? 'ndvi' : band, 'drone');
-    var pts = (series && series.points) ? series.points.slice() : [];
-    pts.sort(function (a, b) {
-        return String(a.date || a.period_key || '').localeCompare(String(b.date || b.period_key || ''));
+    var items = ficDronePeriodKeysForContext(wid);
+    return items.filter(function (it) {
+        return predioHasDroneLayerForPeriod(wid, it.period_key, band);
     });
-    if (pts.length) {
-        var fromPts = filterAvailable(pts.map(function (p) {
-            return { period_key: p.period_key, label: p.label || dronePeriodMetaLabel(p.period_key) };
-        }));
-        var fromFlights = filterAvailable(
-            droneFlightPeriodKeysForWetland(wid).slice().reverse().map(itemForPk)
-        );
-        if (fromPts.length) {
-            var seenPk = {};
-            fromPts.forEach(function (it) { seenPk[it.period_key] = true; });
-            fromFlights.forEach(function (it) {
-                if (!seenPk[it.period_key]) {
-                    seenPk[it.period_key] = true;
-                    fromPts.push(it);
-                }
-            });
-            fromPts.sort(function (a, b) {
-                return String(a.period_key).localeCompare(String(b.period_key));
-            });
-            return fromPts;
-        }
-    }
-    return filterAvailable(
-        droneFlightPeriodKeysForWetland(wid).slice().reverse().map(itemForPk)
-    );
 }
 
 function ensureDroneMapPeriodKey(layerKind) {
+    if (state.selectedSource !== 'drone') return;
     var items = droneTemporalItems(layerKind);
     if (!items.length) {
-        state.mapPeriodKey = state.selectedWetland
-            ? findLatestPeriodKey(state.selectedWetland, layerKind || state.mapLayerKind)
+        state.mapPeriodKey = state.selectedPredio
+            ? findLatestPeriodKey(state.selectedPredio, layerKind || state.mapLayerKind)
             : null;
         return;
     }
@@ -3405,7 +3585,8 @@ function applyDroneFlightPeriod(periodKey) {
     state._lastMapFitContextKey = null;
     ensureDroneMapPeriodKey(state.mapLayerKind);
     updateMapLayerHint();
-    updateMapOverlay();
+    ficRefreshMainMapOverlays({ forceFit: true });
+    ficSyncBottomTimeseriesChrome();
     if (satChartIsOpen()) {
         if (!ficDroneTryRefreshMapPeriodLineOnly()) updateSatChartDock(true);
     }
@@ -3414,9 +3595,9 @@ function applyDroneFlightPeriod(periodKey) {
 function ficDroneTryRefreshMapPeriodLineOnly() {
     if (!ficSatMonthChart || !ficSatMonthChart._ficDroneDock) return false;
     var band = activeDroneChartBand();
-    var sig = String(state.selectedWetland || '') + '|' + band + '|' + String(state.selectedCuartel || '');
+    var sig = String(state.selectedPredio || '') + '|' + band + '|' + String(state.selectedCuartel || '');
     if (ficSatMonthChart._ficDroneDockSig !== sig) return false;
-    var items = droneTemporalItems();
+    var items = droneTemporalItems(band);
     var idx = ficDroneMapPeriodAxisIndex(items, state.mapPeriodKey);
     var pl = ficSatMonthChart.options.plugins && ficSatMonthChart.options.plugins.ficSatMapPeriodLine;
     if (!pl) return false;
@@ -3437,7 +3618,7 @@ function buildDronePeriodToolbar() {
         container.hidden = true;
         container.innerHTML = '';
     }
-    if (state.selectedSource !== 'drone' || !state.selectedWetland || isSatSplitMode()) {
+    if (state.selectedSource !== 'drone' || !state.selectedPredio || isSatSplitMode()) {
         toolbar.hidden = true;
         toolbar.innerHTML = '';
         return;
@@ -3581,7 +3762,7 @@ function ficSyncBottomTimeseriesChrome() {
     var toggle = document.getElementById('ficSatChartToggle');
     if (!floatWrap || !stack) return;
 
-    var isDroneMain = state.selectedSource === 'drone' && !!state.selectedWetland && !isSatSplitMode();
+    var isDroneMain = state.selectedSource === 'drone' && !!state.selectedPredio && !isSatSplitMode();
     if (isDroneMain) {
         buildDronePeriodToolbar();
         var tbD = document.getElementById('ficSatPeriodToolbar');
@@ -3628,9 +3809,11 @@ function buildSatPeriodPills() {
 
     var items = [];
     if (viewMode === 'monthly') {
-        items = (vm.months || []).slice();
+        items = satTemporalItemsWithRaster('monthly', satBand(), state.selectedPredio);
+        if (!items.length) items = (vm.months || []).slice();
     } else if (viewMode === 'weekly') {
-        items = (vm.weeks || []).slice();
+        items = satTemporalItemsWithRaster('weekly', satBand(), state.selectedPredio);
+        if (!items.length) items = (vm.weeks || []).slice();
     }
 
     var monthLong = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -3874,12 +4057,16 @@ function updateSatSplitOverlays() {
     ensureSatLeftDefaults();
     var viewMode = state.satViewMode || 'monthly';
     clampSatPillToViewModeItems(viewMode);
-    var predio = state.selectedWetland;
+    var predio = state.selectedPredio;
     var band = satBand();
+    ensureSatMapPeriodHasRaster();
     var sm = getSatMeta();
-    var vm = (sm.view_modes || {})[viewMode] || {};
+    var overlaySig = String(predio || '') + '|' + String(viewMode || '') + '|' + String(band || '')
+        + '|' + String(state.satLeftMonth || '') + '|' + String(state.satLeftWeek || '')
+        + '|' + String(state.selectedCuartel || '');
     var satSig = satTemporalFitSignature(predio, viewMode);
-    var skipSatFit = state._satMapFitSig != null && state._satMapFitSig === satSig;
+    var skipSatFit = state._satMapFitSig != null && state._satMapFitSig === satSig
+        && state._satOverlaySig === overlaySig;
 
     var leftCK = satCompositeKeyForSide('left', viewMode);
     var leftRaster = predio ? satFindRaster(predio, leftCK, band) : null;
@@ -3888,6 +4075,11 @@ function updateSatSplitOverlays() {
     var rightCK = satCompositeKeyForSide('right', viewMode);
     var rightRaster = predio ? satFindRaster(predio, rightCK, band) : null;
     _setSatOverlay('right', rightRaster);
+    state._satOverlaySig = overlaySig;
+
+    if (predio && (leftCK || rightCK)) {
+        state.mapPeriodKey = rightRaster ? rightCK : (leftRaster ? leftCK : state.mapPeriodKey);
+    }
 
     var fitRaster = leftRaster || rightRaster;
     if (fitRaster && fitRaster.visual && fitRaster.visual.bounds) {
@@ -4089,8 +4281,13 @@ function ficSyncSatPlotChromeVisibility() {
 }
 
 function satTimeseriesForPredio(predio) {
-    var ds = state.datasets[state.selectedSource] || {};
-    var wls = ds.wetlands || {};
+    return ficTimeseriesForPredio(predio, state.selectedSource);
+}
+
+function ficTimeseriesForPredio(predio, sourceKey) {
+    var src = sourceKey || state.selectedSource || 'sentinel2';
+    var ds = normalizeSourcePayload(state.datasets[src] || {});
+    var wls = ds.predios || ds.wetlands || {};
     return wls[String(predio || '').toLowerCase()] || null;
 }
 
@@ -4172,8 +4369,8 @@ function ficSyncMapLayerKindFromSatChartBand(bandKey) {
     _ficSyncingMapChartBand = true;
     state.mapLayerKind = bandKey;
     mapIndexSel.value = bandKey;
-    if (state.selectedWetland) {
-        state.mapPeriodKey = findLatestPeriodKey(state.selectedWetland, state.mapLayerKind);
+    if (state.selectedPredio) {
+        state.mapPeriodKey = findLatestPeriodKey(state.selectedPredio, state.mapLayerKind);
     }
     updateMapLayerHint();
     updateSatSplitOverlays();
@@ -4229,9 +4426,9 @@ function bindSatChartControls() {
                     mapIndexSel.value = ix;
                     state.mapLayerKind = ix;
                     state._lastMapFitContextKey = null;
-                    if (state.selectedWetland) {
+                    if (state.selectedPredio) {
                         state.mapPeriodKey = resolveMapPeriodKeyForContext(
-                            state.selectedWetland, ix, state.mapPeriodKey
+                            state.selectedPredio, ix, state.mapPeriodKey
                         );
                         ensureDroneMapPeriodKey(ix);
                     }
@@ -4255,6 +4452,7 @@ function bindSatChartControls() {
 
     document.querySelectorAll('.fic-sat-chart-series-pill').forEach(function (btn) {
         btn.addEventListener('click', function () {
+            if (state.selectedSource === 'drone') return;
             var m = btn.dataset.satseries;
             if (m !== 'week' && m !== 'month') return;
             state.satChartSeries = m;
@@ -4273,7 +4471,7 @@ function renderSatChartCanvas() {
     var canvas = document.getElementById('ficSatChartCanvas');
     if (!canvas || typeof Chart === 'undefined') return;
 
-    var predio = state.selectedWetland;
+    var predio = state.selectedPredio;
     var ts = ficTsEntryForSelection(predio);
     var band = satChartBand();
     var series = ts && ts[band];
@@ -4394,7 +4592,7 @@ function renderSatMonthChartCanvas() {
     var canvas = document.getElementById('ficSatChartMonthCanvas');
     if (!canvas || typeof Chart === 'undefined') return;
 
-    var predio = state.selectedWetland;
+    var predio = state.selectedPredio;
     var ts = ficTsEntryForSelection(predio);
     var band = satChartBand();
     var series = ts && ts[band];
@@ -4571,7 +4769,7 @@ function ficHexToRgba(hex, alpha) {
 function ficDroneSeriesValuesByPeriod(series, periodKeys) {
     var byPk = {};
     (series && series.points ? series.points : []).forEach(function (p) {
-        var pk = p.period_key || p.date;
+        var pk = ficDronePeriodKeyFromPoint(p);
         if (pk) byPk[pk] = p.value;
     });
     return periodKeys.map(function (pk) {
@@ -4580,13 +4778,27 @@ function ficDroneSeriesValuesByPeriod(series, periodKeys) {
 }
 
 function ficBuildDroneChartDatasets(predio, band, items) {
+    var bandLab = chartBandOptionLabel(band);
     var periodKeys = items.map(function (it) { return it.period_key; });
     var labels = items.map(function (it) { return it.label; });
     var tsEntry = ficTsEntryForSelection(predio);
-    var base = satTimeseriesForPredio(predio);
+    var base = ficTimeseriesForPredio(predio, 'drone');
     var ds = [];
 
-    if (tsEntry && tsEntry._aggregated && tsEntry._cuartelIds && tsEntry._cuartelIds.length > 1 && base && base.cuarteles) {
+    function histRefValue(series) {
+        if (!series) return null;
+        var m = series.metrics || {};
+        if (m.historical_median != null && isFinite(Number(m.historical_median))) {
+            return Number(m.historical_median);
+        }
+        if (m.historical_mean != null && isFinite(Number(m.historical_mean))) {
+            return Number(m.historical_mean);
+        }
+        var pts = series.points || [];
+        return ficMedianOfNumbers(pts.map(function (p) { return p.value; }));
+    }
+
+    if (tsEntry && tsEntry._aggregated && tsEntry._cuartelIds && tsEntry._cuartelIds.length && base && base.cuarteles) {
         var palette = ficDroneChartPalette();
         tsEntry._cuartelIds.forEach(function (cid, ci) {
             var cu = base.cuarteles[cid];
@@ -4607,23 +4819,26 @@ function ficBuildDroneChartDatasets(predio, band, items) {
         });
         var aggSeries = ficChartSeriesForBand(tsEntry, band, 'drone');
         if (aggSeries && aggSeries.points && aggSeries.points.length) {
+            var nAgg = tsEntry._cuartelIds.length;
             ds.push({
-                label: 'Prom. predio (' + tsEntry._cuartelIds.length + ' cuarteles)',
+                label: nAgg > 1
+                    ? ('Mediana predio (' + nAgg + ' cuarteles)')
+                    : ('Mediana predio · ' + bandLab),
                 data: ficDroneSeriesValuesByPeriod(aggSeries, periodKeys),
                 borderColor: 'rgba(18, 42, 28, 0.92)',
                 backgroundColor: 'rgba(29, 107, 74, 0.12)',
                 borderWidth: 3,
-                borderDash: [8, 4],
+                borderDash: nAgg > 1 ? [8, 4] : [],
                 pointRadius: 5,
                 pointHoverRadius: 7,
                 fill: false,
                 tension: 0.2,
             });
-            var histMean = aggSeries.metrics ? aggSeries.metrics.historical_mean : null;
-            if (histMean != null && isFinite(histMean)) {
+            var histMed = histRefValue(aggSeries);
+            if (histMed != null && isFinite(histMed)) {
                 ds.push({
-                    label: 'Media histórica (prom. predio)',
-                    data: labels.map(function () { return histMean; }),
+                    label: 'Mediana histórica (predio)',
+                    data: labels.map(function () { return histMed; }),
                     borderColor: 'rgba(196, 80, 53, 0.85)',
                     borderDash: [6, 4],
                     borderWidth: 1.5,
@@ -4632,22 +4847,16 @@ function ficBuildDroneChartDatasets(predio, band, items) {
                 });
             }
         }
-        return { labels: labels, datasets: ds };
+        if (ds.length) return { labels: labels, datasets: ds };
     }
 
     var series = ficChartSeriesForBand(tsEntry, band, 'drone');
-    var pts = (series && series.points) ? series.points.slice() : [];
-    pts.sort(function (a, b) { return String(a.date || '').localeCompare(String(b.date || '')); });
-    if (pts.length) {
-        labels = pts.map(function (p) { return p.label || p.period_key || p.date; });
-        periodKeys = pts.map(function (p) { return p.period_key || p.date; });
-    }
-    var vals = pts.length
-        ? pts.map(function (p) { return p.value; })
-        : items.map(function () { return null; });
-    var cuLabel = state.selectedCuartel ? cuartelDisplayLabel(state.selectedCuartel) : String(bandLab).toUpperCase();
+    periodKeys = items.map(function (it) { return it.period_key; });
+    labels = items.map(function (it) { return it.label; });
+    var vals = ficDroneSeriesValuesByPeriod(series, periodKeys);
+    var cuLabel = state.selectedCuartel ? cuartelDisplayLabel(state.selectedCuartel) : bandLab;
     ds.push({
-        label: state.selectedCuartel ? (bandLab + ' · ' + cuLabel) : bandLab,
+        label: state.selectedCuartel ? (bandLab + ' · ' + cuLabel) : ('Mediana espacial · ' + bandLab),
         data: vals,
         borderColor: 'rgba(29,107,74,0.92)',
         backgroundColor: 'rgba(29,107,74,0.15)',
@@ -4657,11 +4866,11 @@ function ficBuildDroneChartDatasets(predio, band, items) {
         fill: true,
         tension: 0.2,
     });
-    var histMeanOne = series && series.metrics ? series.metrics.historical_mean : null;
-    if (histMeanOne != null && isFinite(histMeanOne)) {
+    var histMedOne = histRefValue(series);
+    if (histMedOne != null && isFinite(histMedOne)) {
         ds.push({
-            label: 'Media histórica',
-            data: labels.map(function () { return histMeanOne; }),
+            label: 'Mediana histórica',
+            data: labels.map(function () { return histMedOne; }),
             borderColor: 'rgba(196, 80, 53, 0.85)',
             borderDash: [6, 4],
             borderWidth: 1.5,
@@ -4675,19 +4884,22 @@ function ficBuildDroneChartDatasets(predio, band, items) {
 function renderDroneChartCanvas() {
     var canvas = document.getElementById('ficSatChartMonthCanvas');
     if (!canvas || typeof Chart === 'undefined') return;
-    var predio = state.selectedWetland;
+    var predio = state.selectedPredio;
     var band = syncSatChartBandSelect();
     var bandLab = chartBandOptionLabel(band);
-    var items = droneTemporalItems();
+    var chartBand = activeDroneChartBand();
+    var items = droneTemporalItems(chartBand);
     var built = ficBuildDroneChartDatasets(predio, band, items);
-    var labels = built.labels;
-    var ds = built.datasets;
+    var labels = built.labels || [];
+    var ds = built.datasets || [];
     var mapLineIdx = ficDroneMapPeriodAxisIndex(items, state.mapPeriodKey);
     if (ficSatMonthChart) { ficSatMonthChart.destroy(); ficSatMonthChart = null; }
     if (ficSatChart) { ficSatChart.destroy(); ficSatChart = null; }
+    if (!labels.length || !ds.length) return;
     var ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ficSatMonthChart = new Chart(ctx, {
+    try {
+        ficSatMonthChart = new Chart(ctx, {
         type: 'line',
         data: { labels: labels, datasets: ds },
         plugins: [ficSatMapPeriodLinePlugin],
@@ -4724,9 +4936,13 @@ function renderDroneChartCanvas() {
                 y: { title: { display: true, text: bandLab, font: { size: 10 } }, grid: { color: 'rgba(0,0,0,0.05)' } },
             },
         },
-    });
-    ficSatMonthChart._ficDroneDock = true;
-    ficSatMonthChart._ficDroneDockSig = String(predio || '') + '|' + band + '|' + String(state.selectedCuartel || '');
+        });
+        ficSatMonthChart._ficDroneDock = true;
+        ficSatMonthChart._ficDroneDockSig = String(predio || '') + '|' + band + '|' + String(state.selectedCuartel || '');
+    } catch (chartErr) {
+        console.warn('Gráfico dron no pudo renderizarse:', chartErr);
+        ficSatMonthChart = null;
+    }
 }
 
 function updateSatChartDock(forceRedraw) {
@@ -4747,8 +4963,13 @@ function updateSatChartDock(forceRedraw) {
     var chartControls = document.getElementById('ficSatChartControls');
     if (chartControls) {
         chartControls.hidden = false;
+        chartControls.classList.toggle('fic-sat-chart-controls--drone', isDrone);
         var seriesPills = chartControls.querySelector('.fic-sat-chart-series-pills');
-        if (seriesPills) seriesPills.hidden = isDrone;
+        if (seriesPills) {
+            seriesPills.hidden = isDrone;
+            seriesPills.style.display = isDrone ? 'none' : '';
+            seriesPills.setAttribute('aria-hidden', isDrone ? 'true' : 'false');
+        }
         var bandLabel = chartControls.querySelector('.fic-sat-chart-bandlabel');
         if (bandLabel) bandLabel.textContent = isDrone ? 'Índice' : 'Banda';
     }
@@ -4764,20 +4985,23 @@ function updateSatChartDock(forceRedraw) {
             return;
         }
         var cuLabel = state.selectedCuartel ? cuartelDisplayLabel(state.selectedCuartel) : 'predio completo';
-        var tsDrone = ficTsEntryForSelection(state.selectedWetland);
+        var tsDrone = ficTsEntryForSelection(state.selectedPredio);
         var nCu = (tsDrone && tsDrone._cuartelIds) ? tsDrone._cuartelIds.length : 0;
+        var totalCu = cuartelesForPredio(state.selectedPredio).length;
         if (titleEl) {
             titleEl.textContent = state.selectedCuartel
                 ? ('Métricas dron · ' + cuLabel)
-                : ('Métricas dron · predio (' + (nCu || cuartelesForWetland(state.selectedWetland).length) + ' cuarteles)');
+                : ('Métricas dron · predio (' + (nCu || totalCu) + ' cuarteles con serie)');
         }
         if (subtitle) {
             if (state.selectedCuartel) {
-                subtitle.textContent = 'Media espacial del índice por vuelo en el cuartel seleccionado. Usa el selector inferior o haz clic en un punto del gráfico.';
+                subtitle.textContent = 'Mediana espacial del índice por vuelo en el cuartel seleccionado. Usa el selector inferior o haz clic en un punto del gráfico.';
             } else if (nCu > 1) {
-                subtitle.textContent = 'Una línea por cuartel y otra con el promedio ponderado por superficie del predio (línea discontinua). Usa el selector inferior o haz clic en el gráfico.';
+                subtitle.textContent = 'Mediana espacial por cuartel y mediana del predio (línea discontinua). Usa el selector inferior o haz clic en el gráfico.';
+            } else if (nCu === 1 && totalCu > 1) {
+                subtitle.textContent = 'Mediana espacial por vuelo (1 de ' + totalCu + ' cuarteles con serie en este predio). Usa el selector inferior o haz clic en el gráfico.';
             } else {
-                subtitle.textContent = 'Media espacial del índice por vuelo agregada al predio. Usa el selector inferior o haz clic en un punto del gráfico.';
+                subtitle.textContent = 'Mediana espacial del índice por vuelo en el predio. Usa el selector inferior o haz clic en un punto del gráfico.';
             }
         }
         if (!forceRedraw && ficDroneTryRefreshMapPeriodLineOnly()) {
@@ -4799,7 +5023,7 @@ function updateSatChartDock(forceRedraw) {
         return;
     }
     var band = syncSatChartBandSelect();
-    var predio = state.selectedWetland;
+    var predio = state.selectedPredio;
     var ts = ficTsEntryForSelection(predio);
     var series = ts && ts[band];
     if (titleEl) titleEl.textContent = 'Serie temporal';
@@ -4876,6 +5100,7 @@ function applySatSplitVisibility() {
         var splitEl = document.getElementById('ficSatSplitStage');
         if (splitEl) splitEl.style.removeProperty('--fic-sat-period-float-measured');
         ficSyncColorbarBottomOffset();
+        if (mapa) mapa.invalidateSize({ animate: false });
     }
     if (isSplit) {
         ensureSatLeftDefaults();
@@ -4898,6 +5123,82 @@ function applySatSplitVisibility() {
     syncSatCompareYearSubtitles();
     ficSyncLidarAttrPanelVisibility();
     ficSyncBottomTimeseriesChrome();
+}
+
+var _ficMapLayoutRefreshGen = 0;
+var _ficMapClipTimer = null;
+var _ficCuartelApplyGen = 0;
+
+function ficRestoreMainMapVisibility() {
+    var mapEl = document.getElementById('mapa');
+    var isLidar = state.selectedSource === 'drone' &&
+        String(state.mapLayerKind || '').toLowerCase() === 'lidar';
+    if (!isLidar) {
+        if (typeof FicLidar3d !== 'undefined') FicLidar3d.showView(false);
+        if (mapEl) {
+            mapEl.style.visibility = '';
+            mapEl.style.opacity = '';
+            mapEl.style.pointerEvents = '';
+        }
+        document.body.classList.remove('fic-mode-lidar-3d');
+    }
+}
+
+/** Repinta overlays del mapa principal de forma síncrona; recortes en diferido (evita mapa en blanco). */
+function ficRefreshMainMapOverlays(opts) {
+    opts = opts || {};
+    if (isSatSplitMode()) {
+        if (mapaSat) mapaSat.invalidateSize({ animate: false });
+        updateSatSplitOverlays();
+        renderAOI();
+        ficSyncRasterCuartelClips(true);
+        return;
+    }
+    if (!mapa) return;
+    ficRestoreMainMapVisibility();
+    if (opts.forceFit) state._lastMapFitContextKey = null;
+    if (state.selectedPredio && !state.mapPeriodKey) {
+        if (state.selectedSource === 'drone') {
+            ensureDroneMapPeriodKey(state.mapLayerKind);
+        } else {
+            state.mapPeriodKey = findLatestPeriodKey(state.selectedPredio, state.mapLayerKind);
+        }
+    }
+    mapa.invalidateSize({ animate: false });
+    renderAOI();
+    updateMapOverlay();
+    var gen = ++_ficMapLayoutRefreshGen;
+    function syncClipsLater() {
+        if (gen !== _ficMapLayoutRefreshGen || !mapa || isSatSplitMode()) return;
+        mapa.invalidateSize({ animate: false });
+        ficSyncRasterCuartelClips(true);
+    }
+    requestAnimationFrame(syncClipsLater);
+    if (_ficMapClipTimer) clearTimeout(_ficMapClipTimer);
+    _ficMapClipTimer = setTimeout(syncClipsLater, 180);
+    setTimeout(syncClipsLater, 400);
+}
+
+function ficClearMainMapRasterOverlays() {
+    if (!mapa) return;
+    [rasterOverlay, rasterDroneRgb, rasterDroneIndex].forEach(function (ov) {
+        if (!ov) return;
+        var el = ov.getElement && ov.getElement();
+        if (el) {
+            el.style.clipPath = '';
+            var img = el.tagName === 'IMG' ? el : el.querySelector('img');
+            if (img) img.style.clipPath = '';
+        }
+        mapa.removeLayer(ov);
+    });
+    rasterOverlay = null;
+    rasterDroneRgb = null;
+    rasterDroneIndex = null;
+}
+
+/** Tras satélite ↔ dron el contenedor pudo estar oculto; Leaflet necesita layout antes de overlays y clips. */
+function ficRefreshMapLayoutAfterVisibilityChange(forceFit) {
+    ficRefreshMainMapOverlays({ forceFit: !!forceFit });
 }
 
 /** Capas base del mapa principal (referencias para alternar relieve / Esri imagen). */
@@ -4978,27 +5279,20 @@ function ficCurrentAoiGeojson() {
     return state.aoi;
 }
 
-async function loadWetlandsAoiGeojson() {
-    const staticPredios = BASE + '/shapefiles/predios.geojson';
-    const sourcePredios = SOURCE_DATA_ROOT + '/shapefiles/predios.geojson';
-    const fallback = state.manifest && state.manifest.aoi_path
-        ? BASE + '/' + state.manifest.aoi_path
-        : null;
+async function loadPrediosAoiGeojson() {
+    const staticCuarteles = BASE + '/vectors/cuarteles/cuarteles.geojson';
+    const sourceCuarteles = SOURCE_DATA_ROOT + '/vectors/cuarteles/cuarteles.geojson';
     state.aoi = null;
-    for (const url of [staticPredios, sourcePredios]) {
+    for (const url of [staticCuarteles, sourceCuarteles]) {
         try {
             state.aoi = ficNormalizeAoiFeatureCollection(await fetchJson(url));
             break;
         } catch (e1) {
-            console.warn('AOI predios no disponible (' + url + '):', e1.message || e1);
+            console.warn('cuarteles.geojson no disponible (' + url + '):', e1.message || e1);
         }
     }
-    if (!state.aoi && fallback) {
-        try {
-            state.aoi = ficNormalizeAoiFeatureCollection(await fetchJson(fallback));
-        } catch (e2) {
-            console.warn('AOI fallback desde static no disponible (' + fallback + '):', e2.message || e2);
-        }
+    if (!state.aoi) {
+        console.error('No se pudo cargar cuarteles.geojson; el recorte del mapa no funcionará.');
     }
 }
 
@@ -5021,7 +5315,7 @@ async function loadManifest() {
         return;
     }
 
-    await loadWetlandsAoiGeojson();
+    await loadPrediosAoiGeojson();
     await loadFicDatabaseCsv();
     await loadCuartelesIndex();
     await ensureDroneDatasetLoaded();
@@ -5051,9 +5345,22 @@ async function loadManifest() {
 }
 
 async function setSource(sourceKey) {
+    var prevSource = state.selectedSource;
     state.selectedSource = sourceKey;
-    state._lastMapFitContextKey = null;
-    state._satMapFitSig = null;
+    if (prevSource !== sourceKey) {
+        state.mapPeriodKey = null;
+        state._lastMapFitContextKey = null;
+        state._satMapFitSig = null;
+        state._satOverlaySig = null;
+        if (_ficClipDebounceTimer) {
+            clearTimeout(_ficClipDebounceTimer);
+            _ficClipDebounceTimer = null;
+        }
+    } else {
+        state._lastMapFitContextKey = null;
+        state._satMapFitSig = null;
+        state._satOverlaySig = null;
+    }
     var bandSel = document.getElementById('ficSatChartBand');
     if (bandSel) delete bandSel.dataset.ficBandSig;
     if (state.selectedSource !== 'drone' || String(state.mapLayerKind || '').toLowerCase() !== 'lidar') {
@@ -5064,14 +5371,13 @@ async function setSource(sourceKey) {
         const source = state.manifest.sources[sourceKey];
         const hasMeta = source.metadata_path;
         const hasTs   = source.timeseries_path;
-        state.datasets[sourceKey] = hasTs ? await fetchJson(BASE + '/' + source.timeseries_path) : {};
-        state.metadata[sourceKey] = hasMeta ? await fetchJson(BASE + '/' + source.metadata_path) : {};
+        state.datasets[sourceKey] = normalizeSourcePayload(hasTs ? await fetchJson(BASE + '/' + source.timeseries_path) : {});
+        state.metadata[sourceKey] = normalizeSourcePayload(hasMeta ? await fetchJson(BASE + '/' + source.metadata_path) : {});
     }
     if (isSatSplitMode()) ensureSatLeftDefaults();
     buildSelectors();
     buildCuartelSelect();
-    renderAOI();
-    renderAll();
+    renderAll({ forceMapRefresh: prevSource !== sourceKey });
     syncSourcePillsDom();
     ficEnsureDroneOpacityControl();
     ficSyncMetricsChartChrome(false);
@@ -5088,9 +5394,45 @@ async function ensureMapSourceMatchesPillsPolicy() {
 }
 
 function currentSource() { return state.manifest.sources[state.selectedSource] || {}; }
-function currentData() { return state.datasets[state.selectedSource] || { wetlands: {} }; }
-function currentMeta() { return state.metadata[state.selectedSource] || { wetlands: {}, indices: {}, periods: [], rasters: {}, summary: {} }; }
-function currentWetlands() { return Object.keys(currentMeta().wetlands || {}); }
+function currentMeta() {
+    return normalizeSourcePayload(state.metadata[state.selectedSource] || { predios: {}, indices: {}, periods: [], rasters: {}, summary: {} });
+}
+function currentData() {
+    return normalizeSourcePayload(state.datasets[state.selectedSource] || { predios: {} });
+}
+function currentPredios() { return Object.keys(currentMeta().predios || {}); }
+
+function ficParseCompactRasterKey(rk, meta) {
+    rk = String(rk || '').toLowerCase();
+    if (!rk) return null;
+    var indices = (meta && meta.indices) || {};
+    var ixKeys = Object.keys(indices).map(function (k) { return String(k).toLowerCase(); });
+    ixKeys.sort(function (a, b) { return b.length - a.length; });
+    for (var ii = 0; ii < ixKeys.length; ii++) {
+        var ix = ixKeys[ii];
+        var suf = '_' + ix;
+        if (!rk.endsWith(suf)) continue;
+        var rest = rk.slice(0, -suf.length);
+        var m = rest.match(/^(.+?)_((?:monthly|weekly)_.+|\d{8})$/);
+        if (!m) continue;
+        return { predio_id: m[1], period_key: m[2], index: ix };
+    }
+    return null;
+}
+
+function predioHasRasterForMapPeriod(wid, periodKey, indexKey) {
+    if (!wid || !periodKey) return false;
+    var meta = currentMeta();
+    var ix = String(indexKey || 'ndvi').toLowerCase();
+    var rk = (String(wid).toLowerCase() + '_' + String(periodKey) + '_' + ix).toLowerCase();
+    if (meta.rasters && meta.rasters[rk]) return true;
+    var band = satBand();
+    if (String(band).toLowerCase() !== ix) {
+        rk = (String(wid).toLowerCase() + '_' + String(periodKey) + '_' + String(band).toLowerCase()).toLowerCase();
+        if (meta.rasters && meta.rasters[rk]) return true;
+    }
+    return false;
+}
 
 function findLatestPeriodKey(wid, indexKey) {
     var ix = String(indexKey || '').toLowerCase();
@@ -5113,20 +5455,31 @@ function findLatestPeriodKey(wid, indexKey) {
             return lidarKeys[0];
         }
     }
-    const rasters = currentMeta().rasters || {};
-    const keys = [];
+    var meta = currentMeta();
+    var rasters = meta.rasters || {};
+    var keys = [];
+    var widLow = String(wid).toLowerCase();
     Object.keys(rasters).forEach(function (rk) {
-        const r = rasters[rk];
+        var r = rasters[rk];
         if (!r) return;
-        if (String(r.wetland_id).toLowerCase() !== String(wid).toLowerCase()) return;
-        if (String(r.index).toLowerCase() !== String(indexKey).toLowerCase()) return;
-        if (r.period_key) keys.push(r.period_key);
+        if (r.period_key && String(r.predio_id || '').toLowerCase() === widLow &&
+            String(r.index || '').toLowerCase() === ix) {
+            keys.push(r.period_key);
+            return;
+        }
+        var parsed = ficParseCompactRasterKey(rk, meta);
+        if (!parsed || parsed.predio_id !== widLow || parsed.index !== ix) return;
+        keys.push(parsed.period_key);
     });
     if (!keys.length) return null;
-    const order = (currentMeta().periods || []).map(function (p) { return p.key; });
+    var order = (meta.periods || []).map(function (p) { return p.key; });
     function score(pk) {
         var s = String(pk).trim();
         if (/^\d{8}$/.test(s)) return parseInt(s, 10);
+        var mMonth = s.match(/_(?:hist|current)_(\d{2})$/i);
+        if (mMonth) return parseInt(mMonth[1], 10);
+        var mWeek = s.match(/_w(\d{2})$/i);
+        if (mWeek) return parseInt(mWeek[1], 10);
         var m = s.match(/^(\d{4})_/);
         var y = m ? parseInt(m[1], 10) : 0;
         var si = order.indexOf(pk);
@@ -5156,7 +5509,7 @@ function dronePeriodMetaLabel(pk) {
 }
 
 /** Todas las fechas de vuelo del predio (rasters + LiDAR), más reciente primero. */
-function droneFlightPeriodKeysForWetland(wid) {
+function droneFlightPeriodKeysForPredio(wid) {
     if (!wid) return [];
     var keys = {};
     var dm = state.metadata.drone || {};
@@ -5164,7 +5517,7 @@ function droneFlightPeriodKeysForWetland(wid) {
     Object.keys(rasters).forEach(function (rk) {
         var r = rasters[rk];
         if (!r) return;
-        if (String(r.wetland_id).toLowerCase() !== String(wid).toLowerCase()) return;
+        if (String(r.predio_id).toLowerCase() !== String(wid).toLowerCase()) return;
         if (r.period_key) keys[r.period_key] = true;
     });
     var pcs = dm.pointclouds || {};
@@ -5187,6 +5540,18 @@ function droneFlightPeriodKeysForWetland(wid) {
 function resolveMapPeriodKeyForContext(wid, layerKind, previousKey) {
     if (!wid) return null;
     if (state.selectedSource !== 'drone') {
+        if (previousKey && predioHasRasterForMapPeriod(wid, previousKey, layerKind)) {
+            return previousKey;
+        }
+        if (isSatSplitMode()) {
+            ensureSatMapPeriodHasRaster();
+            var viewMode = state.satViewMode || 'monthly';
+            var pill = satCurrentPillValue(viewMode);
+            var rightCk = satCompositeKeyForPill('right', viewMode, pill);
+            var leftCk = satCompositeKeyForPill('left', viewMode, pill);
+            if (rightCk && predioHasRasterForMapPeriod(wid, rightCk, layerKind)) return rightCk;
+            if (leftCk && predioHasRasterForMapPeriod(wid, leftCk, layerKind)) return leftCk;
+        }
         return findLatestPeriodKey(wid, layerKind);
     }
     var items = droneTemporalItems(layerKind);
@@ -5280,7 +5645,7 @@ function ficUpdateLidarAttrDescription() {
     var labelEl = document.getElementById('ficLidarAttrDescLabel');
     var textEl = document.getElementById('ficLidarAttrDescText');
     if (!box || !labelEl || !textEl) return;
-    if (!ficIsLidarAttrPanelActive() || !state.selectedWetland) {
+    if (!ficIsLidarAttrPanelActive() || !state.selectedPredio) {
         box.hidden = true;
         return;
     }
@@ -5341,7 +5706,7 @@ function ficUpdateIndexDescription() {
     var labelEl = document.getElementById('ficIndexDescLabel');
     var textEl = document.getElementById('ficIndexDescText');
     if (!box || !labelEl || !textEl) return;
-    if (!state.selectedWetland || !state.mapLayerKind) {
+    if (!state.selectedPredio || !state.mapLayerKind) {
         box.hidden = true;
         return;
     }
@@ -5353,7 +5718,7 @@ function ficUpdateIndexDescription() {
     box.hidden = false;
 }
 
-function wetlandHasAnyLidarData(wid) {
+function predioHasAnyLidarData(wid) {
     if (!wid) return false;
     var pcs = (state.metadata.drone || {}).pointclouds || {};
     var prefix = String(wid).toLowerCase() + '_';
@@ -5362,8 +5727,8 @@ function wetlandHasAnyLidarData(wid) {
     });
 }
 
-function wetlandHasLidarData(wid, periodKey) {
-    if (!wid || !periodKey) return wetlandHasAnyLidarData(wid);
+function predioHasLidarData(wid, periodKey) {
+    if (!wid || !periodKey) return predioHasAnyLidarData(wid);
     var dm = state.metadata.drone || {};
     var pcs = dm.pointclouds || {};
     var stem = String(wid).toLowerCase() + '_' + String(periodKey || '');
@@ -5372,7 +5737,7 @@ function wetlandHasLidarData(wid, periodKey) {
 
 function droneIndicesForSelect() {
     var indices = Object.assign({}, (currentMeta().indices || {}));
-    if (state.selectedSource === 'drone' && state.selectedWetland && wetlandHasAnyLidarData(state.selectedWetland)) {
+    if (state.selectedSource === 'drone' && state.selectedPredio && predioHasAnyLidarData(state.selectedPredio)) {
         indices.lidar = {
             label: 'LiDAR',
             description: 'Nube de puntos 3D del vuelo',
@@ -5384,7 +5749,7 @@ function droneIndicesForSelect() {
 
 /** Título flotante sobre el mapa dron (capa + vuelo o atributo LiDAR). */
 function ficDroneMapTitleText() {
-    if (state.selectedSource !== 'drone' || !state.selectedWetland) return '';
+    if (state.selectedSource !== 'drone' || !state.selectedPredio) return '';
     var meta = currentMeta();
     var ixKind = String(state.mapLayerKind || 'ndvi').toLowerCase();
     var indices = droneIndicesForSelect();
@@ -5456,7 +5821,7 @@ function ficRefreshLidarView() {
 function refreshMapLayerState() {
     var mapIndexSel = document.getElementById('mapIndex');
     if (!mapIndexSel) return;
-    var wid = state.selectedWetland;
+    var wid = state.selectedPredio;
     var prevPeriod = state.mapPeriodKey;
     var prevKind = state.mapLayerKind;
     var indices = droneIndicesForSelect();
@@ -5473,8 +5838,15 @@ function refreshMapLayerState() {
         mapIndexSel.appendChild(opt);
     });
     if (!idxKeys.length) {
-        state.mapLayerKind = 'ndvi';
-        state.mapPeriodKey = null;
+        state.mapLayerKind = state.mapLayerKind || 'ndvi';
+        if (state.selectedPredio) {
+            state.mapPeriodKey = resolveMapPeriodKeyForContext(
+                state.selectedPredio, state.mapLayerKind, prevPeriod
+            );
+            if (state.selectedSource === 'drone') ensureDroneMapPeriodKey(state.mapLayerKind);
+        } else {
+            state.mapPeriodKey = null;
+        }
         updateMapLayerHint();
         ficSyncLidarAttrPanelVisibility();
         ficRefreshLidarView();
@@ -5494,13 +5866,13 @@ function refreshMapLayerState() {
         mapIndexSel.addEventListener('change', function () {
             state.mapLayerKind = mapIndexSel.value;
             state._lastMapFitContextKey = null;
-            if (state.selectedWetland) {
+            if (state.selectedPredio) {
                 state.mapPeriodKey = resolveMapPeriodKeyForContext(
-                    state.selectedWetland,
+                    state.selectedPredio,
                     state.mapLayerKind,
                     state.mapPeriodKey
                 );
-                ensureDroneMapPeriodKey(state.mapLayerKind);
+                if (state.selectedSource === 'drone') ensureDroneMapPeriodKey(state.mapLayerKind);
             } else {
                 state.mapPeriodKey = null;
             }
@@ -5510,10 +5882,13 @@ function refreshMapLayerState() {
             var isLidar = state.selectedSource === 'drone' &&
                 String(state.mapLayerKind || '').toLowerCase() === 'lidar';
             if (isSatSplitMode()) {
+                ensureSatMapPeriodHasRaster();
+                state._satOverlaySig = null;
+                state._satMapFitSig = null;
                 updateSatSplitOverlays();
                 updateSatChartDock(true);
             } else {
-                updateMapOverlay();
+                ficRefreshMainMapOverlays({ forceFit: true });
             }
             ficEnsureDroneOpacityControl();
             if (isLidar) ficRefreshLidarView();
@@ -5521,12 +5896,12 @@ function refreshMapLayerState() {
         });
     }
 
-    var wid2 = state.selectedWetland;
+    var wid2 = state.selectedPredio;
     if (!wid2) {
         state.mapPeriodKey = null;
     } else {
         state.mapPeriodKey = resolveMapPeriodKeyForContext(wid2, state.mapLayerKind, prevPeriod);
-        ensureDroneMapPeriodKey(state.mapLayerKind);
+        if (state.selectedSource === 'drone') ensureDroneMapPeriodKey(state.mapLayerKind);
     }
     if (prevPeriod !== state.mapPeriodKey || prevKind !== state.mapLayerKind) {
         state._lastMapFitContextKey = null;
@@ -5539,8 +5914,8 @@ function refreshMapLayerState() {
     ficSyncBottomTimeseriesChrome();
 }
 
-function pickDefaultWetland() {
-    return pickDefaultWetlandFromList(wetlandsListedForSelect());
+function pickDefaultPredio() {
+    return pickDefaultPredioFromList(prediosListedForSelect());
 }
 
 function buildSelectors() {
@@ -5588,32 +5963,27 @@ function buildSelectors() {
     updateWelcomeBanner();
 }
 
-function pickDefaultWetlandFromList(wetlands) {
-    if (!wetlands || !wetlands.length) return null;
-    const withData = wetlands.filter(function (wid) {
-        const info = currentMeta().wetlands[wid] || {};
+function pickDefaultPredioFromList(predios) {
+    if (!predios || !predios.length) return null;
+    const withData = predios.filter(function (wid) {
+        const info = currentMeta().predios[wid] || {};
         return (info.n_periods || 0) > 0 || info.status === 'ready';
     });
-    const candidates = withData.length ? withData : wetlands;
-    return state.selectedWetland && candidates.indexOf(state.selectedWetland) >= 0
-        ? state.selectedWetland
+    const candidates = withData.length ? withData : predios;
+    return state.selectedPredio && candidates.indexOf(state.selectedPredio) >= 0
+        ? state.selectedPredio
         : candidates[0];
 }
 
-function renderAll() {
+function renderAll(opts) {
+    opts = opts || {};
     ficSyncLidarAttrPanelVisibility();
     ficSyncMapChromeInset();
     applySatSplitVisibility();
     ficSyncMapNoteVisibility();
     ficSyncMetricsChartChrome(false);
-    if (!isSatSplitMode()) {
-        updateMapOverlay();
-    }
+    ficRefreshMainMapOverlays({ forceFit: !!(opts && opts.forceMapRefresh) });
     updateWelcomeBanner();
-    if (mapa && !isSatSplitMode()) {
-        mapa.invalidateSize({ animate: false });
-        setTimeout(function () { if (mapa) mapa.invalidateSize({ animate: false }); }, 200);
-    }
     ficSyncMetricsChartChrome(false);
     ficSyncMapChromeInset();
 }
@@ -5623,14 +5993,11 @@ var aoiLayerSat = null;
 function ficGetCuartelFeature(cid) {
     var id = ficTrim(cid);
     if (!id) return null;
-    var sources = [ficCurrentAoiGeojson(), state.aoi];
-    var si, fi, feats;
-    for (si = 0; si < sources.length; si++) {
-        if (!sources[si]) continue;
-        feats = sources[si].features || [];
-        for (fi = 0; fi < feats.length; fi++) {
-            if (ficTrim((feats[fi].properties || {}).id_cuartel || '') === id) return feats[fi];
-        }
+    var fc = ficCurrentAoiGeojson();
+    if (!fc || !fc.features) return null;
+    for (var fi = 0; fi < fc.features.length; fi++) {
+        var feat = fc.features[fi];
+        if (ficTrim((feat.properties || {}).id_cuartel || '') === id) return feat;
     }
     return null;
 }
@@ -5638,9 +6005,11 @@ function ficGetCuartelFeature(cid) {
 function ficCuartelIdsForClip() {
     var cid = ficTrim(state.selectedCuartel || '');
     if (cid) return [cid];
-    var wid = ficTrim(state.selectedWetland || '');
+    var wid = ficTrim(state.selectedPredio || '');
     if (!wid) return [];
-    return cuartelesForWetland(wid);
+    var ids = cuartelesForPredio(wid);
+    if (ids.length) return ids;
+    return ficDroneCuartelIdsForTimeseries(wid);
 }
 
 function ficBoundsFromCuartelFeature(cid) {
@@ -5837,7 +6206,7 @@ function ficApplyCuartelClipToOverlay(overlay, map, opts) {
     if (!el || !map) return;
     var cids = ficCuartelIdsForClip();
     if (!cids.length) {
-        el.style.clipPath = opts.fallbackClip || '';
+        el.style.clipPath = '';
         return;
     }
     if (!ficOverlayImageReady(el)) {
@@ -5898,7 +6267,7 @@ function ficSyncRasterCuartelClips(retryPass) {
 function ficDronePickRaster(indexKey) {
     var meta = currentMeta();
     var period = selectedPeriod();
-    var wid = String(state.selectedWetland || '').toLowerCase();
+    var wid = String(state.selectedPredio || '').toLowerCase();
     if (!wid || !period) return null;
     var rk = (wid + '_' + period + '_' + String(indexKey).toLowerCase()).toLowerCase();
     return meta.rasters && meta.rasters[rk] ? meta.rasters[rk] : null;
@@ -5907,19 +6276,19 @@ function ficDronePickRaster(indexKey) {
 function _buildAoiLayer(targetMap, idCol, paneName) {
     var aoiFc = ficCurrentAoiGeojson();
     if (!aoiFc || !targetMap) return null;
-    var widSel = String(state.selectedWetland || '').toLowerCase();
+    var widSel = String(state.selectedPredio || '').toLowerCase();
     var gjOpts = {
         coordsToLatLng: function (coords) {
             return L.latLng(coords[1], coords[0]);
         },
         filter: function (feature) {
             var cid = ficTrim((feature.properties || {}).id_cuartel || '');
-            if (!cid) return !!widSel;
+            if (!cid) return false;
             if (!ficAoiFeaturePassesCuartelFilter(feature)) return false;
             if (!widSel) return true;
-            var widFeat = ficTrim((feature.properties || {}).wetland_id || '').toLowerCase();
+            var widFeat = ficTrim((feature.properties || {}).predio_id || '').toLowerCase();
             if (widFeat) return widFeat === widSel;
-            return ficWetlandForCuartel(cid) === widSel;
+            return ficPredioForCuartel(cid) === widSel;
         },
         style: function (feature) {
             var cidVis = ficTrim((feature.properties || {}).id_cuartel || '');
@@ -5935,7 +6304,7 @@ function _buildAoiLayer(targetMap, idCol, paneName) {
                     interactive: true
                 };
             }
-            var widVis = ficWetlandForCuartel(cidVis);
+            var widVis = ficPredioForCuartel(cidVis);
             var inPredio = widVis && widVis === widSel;
             if (!inPredio) {
                 return { color: '#b0bab4', weight: 1, fillColor: '#b0bab4', fillOpacity: 0, dashArray: '4 6', opacity: 0.35 };
@@ -5973,7 +6342,7 @@ function _buildAoiLayer(targetMap, idCol, paneName) {
                 return;
             }
             const wid = String((feature.properties || {})[idCol] || '').toLowerCase();
-            const info = currentMeta().wetlands[wid] || {};
+            const info = currentMeta().predios[wid] || {};
             const name = info.name || feature.properties.nombre || wid;
             const html = buildPolygonTooltipHtml(wid, name, info);
             layer.bindTooltip(html, { sticky: true, opacity: 0.95 });
@@ -6001,16 +6370,14 @@ function renderAOI() {
 
 function updateMapOverlay() {
     if (!mapa) return;
-    if (rasterOverlay) { mapa.removeLayer(rasterOverlay); rasterOverlay = null; }
-    if (rasterDroneRgb) { mapa.removeLayer(rasterDroneRgb); rasterDroneRgb = null; }
-    if (rasterDroneIndex) { mapa.removeLayer(rasterDroneIndex); rasterDroneIndex = null; }
+    ficClearMainMapRasterOverlays();
     const note = document.getElementById('mapNote');
     const colorbar = document.getElementById('colorbarBox');
     colorbar.style.display = 'none';
     if (state.selectedSource === 'drone' && state.mapLayerKind === 'lidar') {
         renderAOI();
         ficEnsureMainMapBasemapForRaster(false);
-        if (!state.selectedWetland) {
+        if (!state.selectedPredio) {
             ficSyncDroneMapTitle('LiDAR — sin predio seleccionado');
             ficRefreshLidarView();
             return;
@@ -6023,7 +6390,7 @@ function updateMapOverlay() {
             ficRefreshLidarView();
             return;
         }
-        if (!wetlandHasLidarData(state.selectedWetland, state.mapPeriodKey)) {
+        if (!predioHasLidarData(state.selectedPredio, state.mapPeriodKey)) {
             ficSyncDroneMapTitle(ficDroneUnavailableMessage('lidar', state.mapPeriodKey));
             if (typeof FicLidar3d !== 'undefined') FicLidar3d.showView(false);
             ficRefreshLidarView();
@@ -6043,7 +6410,7 @@ function updateMapOverlay() {
         rgbLegend.hidden = true;
         rgbLegend.style.display = 'none';
     }
-    if (!state.selectedWetland) {
+    if (!state.selectedPredio) {
         state._lastMapFitContextKey = null;
         if (state.selectedSource === 'drone') {
             ficSyncDroneMapTitle();
@@ -6078,7 +6445,7 @@ function updateMapOverlay() {
     var meta = currentMeta();
     var isDrone = state.selectedSource === 'drone';
     var period = selectedPeriod();
-    var wid = String(state.selectedWetland);
+    var wid = String(state.selectedPredio);
     var rkBase = (wid + '_' + period + '_').toLowerCase();
     var ixKind = String(state.mapLayerKind || 'ndvi').toLowerCase();
 
@@ -6088,6 +6455,9 @@ function updateMapOverlay() {
     }
 
     var raster = pickRaster(selectedIndex());
+    if (!raster && !isDrone && period) {
+        raster = satFindRaster(wid, period, selectedIndex());
+    }
     if (!raster) {
         if (isDrone) {
             ficSyncDroneMapTitle(ficDroneUnavailableMessage(ixKind, state.mapPeriodKey));
@@ -6101,7 +6471,7 @@ function updateMapOverlay() {
 
     var cornerBounds = normalizeLeafletCornerPairs(raster.visual.bounds);
     if (!leafletBoundsCornersValid(cornerBounds)) {
-        var u = unionRasterBoundsForWetland(meta, state.selectedWetland);
+        var u = unionRasterBoundsForPredio(meta, state.selectedPredio);
         if (u && u.isValid()) {
             cornerBounds = [[u.getSouth(), u.getWest()], [u.getNorth(), u.getEast()]];
         }
@@ -6216,8 +6586,8 @@ function fmtHa(value) { return value === null || value === undefined ? '—' : N
 /** Código de predio para la UI (nomenclatura imágenes dron / S2). */
 function predioCodeLabel(wetlandId) {
     const w = String(wetlandId || '').toLowerCase();
-    const meta = (state.metadata.drone && state.metadata.drone.wetlands && state.metadata.drone.wetlands[w]) ||
-        (state.metadata.sentinel2 && state.metadata.sentinel2.wetlands && state.metadata.sentinel2.wetlands[w]) ||
+    const meta = (state.metadata.drone && state.metadata.drone.predios && state.metadata.drone.predios[w]) ||
+        (state.metadata.sentinel2 && state.metadata.sentinel2.predios && state.metadata.sentinel2.predios[w]) ||
         null;
     if (meta && meta.drone_code) return String(meta.drone_code).toUpperCase();
     const legacy = {
@@ -6283,13 +6653,13 @@ function boundsLatLngBoundsFromCorners(cornerPairs) {
 }
 
 /** Envuelve extents de ráster en metadata por predio (zoom al vuelo real, no repetir AOI demo). */
-function unionRasterBoundsForWetland(meta, wetlandId) {
+function unionRasterBoundsForPredio(meta, wetlandId) {
     var rz = meta.rasters || {};
     var want = String(wetlandId || '').toLowerCase();
     var acc = null;
     Object.keys(rz).forEach(function (rk) {
         var r = rz[rk];
-        if (!r || String(r.wetland_id || '').toLowerCase() !== want) return;
+        if (!r || String(r.predio_id || '').toLowerCase() !== want) return;
         var lb = boundsLatLngBoundsFromCorners(r.visual && r.visual.bounds);
         if (!lb || !lb.isValid()) return;
         acc = acc ? acc.extend(lb) : lb;
@@ -6299,15 +6669,15 @@ function unionRasterBoundsForWetland(meta, wetlandId) {
 
 /** Si no hay WebP o bounds corruptos: zoom a la huella agregada de los GeoTIFF; si no, al AOI del GeoJSON maestro. */
 function fitMapToPredioAOI() {
-    if (!mapa || !state.selectedWetland) return;
+    if (!mapa || !state.selectedPredio) return;
     state._lastMapFitContextKey = null;
-    var fromRasters = unionRasterBoundsForWetland(currentMeta(), state.selectedWetland);
+    var fromRasters = unionRasterBoundsForPredio(currentMeta(), state.selectedPredio);
     if (fromRasters && fromRasters.isValid()) {
         mapa.fitBounds(fromRasters.pad(0.06), ficMainMapRasterFitBoundsOpts());
         return;
     }
     if (!state.aoi) return;
-    const wantWid = String(state.selectedWetland || '').toLowerCase();
+    const wantWid = String(state.selectedPredio || '').toLowerCase();
     const wantCid = ficTrim(state.selectedCuartel || '');
     if (wantCid) {
         const features = (state.aoi.features || []);
@@ -6329,7 +6699,7 @@ function fitMapToPredioAOI() {
         var f = features[i];
         var cid = ficTrim((f.properties || {}).id_cuartel || '');
         if (cid) {
-            if (ficWetlandForCuartel(cid) !== wantWid) continue;
+            if (ficPredioForCuartel(cid) !== wantWid) continue;
         } else {
             var wid = String((f.properties || {})[idCol] || '').toLowerCase();
             if (wid !== wantWid) continue;
@@ -6342,12 +6712,14 @@ function fitMapToPredioAOI() {
 }
 
 window.ficRefreshMapOverlay = updateMapOverlay;
+window.ficRefreshMainMapOverlays = ficRefreshMainMapOverlays;
 window.ficApplyLidarLegends = ficApplyLidarLegends;
 window.ficIsLidarAttrPanelActive = ficIsLidarAttrPanelActive;
 window.ficSyncDroneMapTitle = ficSyncDroneMapTitle;
 window.ficDroneUnavailableMessage = ficDroneUnavailableMessage;
 window.ficUpdateLidarAttrDescription = ficUpdateLidarAttrDescription;
 window.ficGetCuartelFeature = ficGetCuartelFeature;
+window.ficCuartelIdsForClip = ficCuartelIdsForClip;
 </script>
 </body>
 </html>

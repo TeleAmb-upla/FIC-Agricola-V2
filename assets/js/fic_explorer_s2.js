@@ -53,6 +53,12 @@
       return tpl.replace('{week:02d}', String(period).padStart(2, '0'));
     },
 
+    selectedPredioId: function () {
+      var s = api.state;
+      if (!s) return null;
+      return s.selectedPredio || s.selectedWetland || null;
+    },
+
     resolveRasterForSide: function (wid, side) {
       var ck = api.compositeKeyForSide(side);
       if (!ck) return null;
@@ -71,7 +77,8 @@
     },
 
     wetlandBounds: function (wid) {
-      var w = (api.meta().wetlands || {})[String(wid || '').toLowerCase()];
+      var block = api.meta().predios || api.meta().wetlands || {};
+      var w = block[String(wid || '').toLowerCase()];
       return w && w.leaflet_bounds ? w.leaflet_bounds : null;
     },
 
@@ -248,12 +255,13 @@
       var m = api.meta();
       var vm = (m.view_modes || {})[api.state.s2ViewMode || 'weekly'] || {};
       if (api.state.s2SideBySide) {
-        var lh = api.resolveRasterForSide(api.state.selectedWetland, 'left');
-        var rh = api.resolveRasterForSide(api.state.selectedWetland, 'right');
+        var wid = api.selectedPredioId();
+        var lh = api.resolveRasterForSide(wid, 'left');
+        var rh = api.resolveRasterForSide(wid, 'right');
         return String(api.state.s2Band) + ' · ' + (vm.left_label || 'Histórico') + ' | ' + (vm.right_label || 'Actual')
           + (lh && rh ? ' (desliza el control central)' : '');
       }
-      var r = api.resolveRaster(api.state.selectedWetland);
+      var r = api.resolveRaster(api.selectedPredioId());
       var ck = api.compositeKey();
       var sideLab = api.state.s2CompareSide === 'left' ? (vm.left_label || 'Histórico') : (vm.right_label || 'Año actual');
       if (r && r.l) return String(api.state.s2Band) + ' · ' + sideLab + ' · ' + r.l;
@@ -286,8 +294,8 @@
     createOverlays: function (mapa) {
       var out = [];
       api.clearSideBySide(mapa);
-      if (!mapa || !api.isActive() || !api.state.selectedWetland) return out;
-      var wid = api.state.selectedWetland;
+      if (!mapa || !api.isActive() || !api.selectedPredioId()) return out;
+      var wid = api.selectedPredioId();
       var bounds = api.wetlandBounds(wid);
       if (!bounds || bounds.length !== 2) return out;
 
@@ -329,10 +337,11 @@
       var canvas = document.getElementById('ficS2ChartCanvas');
       var card = document.getElementById('ficS2ChartCard');
       if (!canvas || !card || card.classList.contains('fic-asesor-chart-card--collapsed')) return;
-      var wid = api.state.selectedWetland;
+      var wid = api.selectedPredioId();
       if (!wid) return;
       var band = api.state.s2Band || 'NDVI';
-      var wl = (api.ts().wetlands || {})[String(wid).toLowerCase()] || {};
+      var tsBlock = api.ts().predios || api.ts().wetlands || {};
+      var wl = tsBlock[String(wid).toLowerCase()] || {};
       var series = wl[band];
       if (!series || !series.weeks || !series.weeks.length) return;
       api.destroyChart();

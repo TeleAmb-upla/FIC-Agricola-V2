@@ -11,7 +11,7 @@
         "nom_predio": "Agr. Rivarola",
         "propietario": "Bruno Devoto",
         "superficie": "1.58594",
-        "wetland_id": "b_devoto",
+        "predio_id": "b_devoto",
         "raster_key": "b_devoto_20260529_rgb",
         "fuente": "drone_webp_alpha"
       },
@@ -30076,7 +30076,7 @@
         "nom_predio": "Agr. Rivarola",
         "propietario": "Bruno Devoto",
         "superficie": "1.75524",
-        "wetland_id": "b_devoto",
+        "predio_id": "b_devoto",
         "raster_key": "b_devoto_20260529_rgb",
         "fuente": "drone_webp_alpha"
       },
@@ -63269,7 +63269,7 @@
         "nom_predio": "Agr. Rivarola",
         "propietario": "Bruno Devoto",
         "superficie": "5.05378",
-        "wetland_id": "b_devoto",
+        "predio_id": "b_devoto",
         "raster_key": "b_devoto_20260529_rgb",
         "fuente": "drone_webp_alpha"
       },

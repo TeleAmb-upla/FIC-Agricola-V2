@@ -22,8 +22,7 @@ import sys
 from pathlib import Path
 
 import ee
-import geopandas as gpd
-from shapely.geometry import mapping as shp_mapping
+from shapely.geometry import mapping as shp_mapping, shape
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = REPO_ROOT / "scripts"
@@ -33,7 +32,7 @@ for p in (str(REPO_ROOT), str(SCRIPTS_DIR), str(STATIC_SITE_DIR), str(GEE_DIR)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-from pipeline_utils import load_config, ensure_master_aoi
+from pipeline_utils import load_config, ensure_master_aoi, predios_config, load_wetland_clip_geometries
 from export_s2 import COMPOSED_INDEX_BANDS
 from paths import DEFAULT_S2_WEEKLY_COLLECTION, resolve_ee_cloud_project
 
@@ -111,24 +110,21 @@ def predios_needing_export(
 
 
 def load_predio_geoms(config: dict) -> dict[str, dict]:
-    master = ensure_master_aoi(config)
-    gdf = gpd.read_file(master).to_crs("EPSG:4326")
-    id_col = config.get("export_aoi_id_col", "wetland_id")
-    if id_col not in gdf.columns and "wetland_id" in gdf.columns:
-        id_col = "wetland_id"
+    """Geometría de exportación: unión de cuarteles por predio (no filas sueltas del AOI)."""
+    ensure_master_aoi(config)
+    clip_geoms = load_wetland_clip_geometries(config)
     out: dict[str, dict] = {}
-    for _, row in gdf.iterrows():
-        wid = str(row[id_col]).strip().lower()
-        wcfg = config.get("wetlands", {}).get(wid, {})
-        code = str(wcfg.get("s2_code") or wid).strip().upper()
+    for pid, geom_geojson in clip_geoms.items():
+        pcfg = predios_config(config).get(pid, {})
+        code = str(pcfg.get("s2_code") or pid).strip().upper()
         if code in SKIP_PREDIO_CODES:
             continue
-        geom = row.geometry
+        geom = shape(geom_geojson)
         if geom is None or geom.is_empty:
             continue
         minx, miny, maxx, maxy = geom.bounds
         out[code] = {
-            "wetland_id": wid,
+            "predio_id": pid,
             "geometry": geom,
             "bounds": (minx, miny, maxx, maxy),
         }
