@@ -3687,8 +3687,11 @@ function buildDronePeriodToolbar() {
         toolbar.innerHTML = '';
         return;
     }
-    var items = droneTemporalItems();
-    ensureDroneMapPeriodKey();
+    var layerForToolbar = state.mapLayerKind || 'ndvi';
+    var items = droneTemporalItems(layerForToolbar);
+    var layerHasPeriods = items.length > 0;
+    if (!layerHasPeriods) items = droneTemporalItems();
+    ensureDroneMapPeriodKey(layerHasPeriods ? layerForToolbar : undefined);
     if (!items.length) {
         toolbar.hidden = true;
         toolbar.innerHTML = '';
@@ -6232,7 +6235,7 @@ function ficLocalRingsToClipPath(ringsLocal, w, h) {
             return Math.round(p.x) + ' ' + Math.round(p.y);
         }).join(' L ') + ' Z');
     });
-    return parts.length ? 'path(evenodd, "' + parts.join(' ') + '")' : '';
+    return parts.length ? 'path("' + parts.join(' ') + '")' : '';
 }
 
 function ficLocalPointsToClipPath(points, w, h) {
