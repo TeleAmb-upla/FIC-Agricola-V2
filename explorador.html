@@ -6272,12 +6272,6 @@ function ficApplyCuartelClipToOverlay(overlay, map, opts) {
         el.style.clipPath = opts.fallbackClip || '';
         return;
     }
-    // Los WebP satélite/dron ya vienen recortados al AOI del predio en el build.
-    // Solo recortar en el mapa cuando el usuario eligió un cuartel concreto.
-    if (!ficTrim(state.selectedCuartel || '') && cids.length > 1) {
-        el.style.clipPath = opts.fallbackClip || '';
-        return;
-    }
     if (!ficOverlayImageReady(el)) {
         el.style.clipPath = '';
         var imgWait = el.tagName === 'IMG' ? el : el.querySelector('img');
