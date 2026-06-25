@@ -3194,6 +3194,60 @@ function initSatCompareMap() {
     bindSatSwipeDivider();
 }
 
+function ficSwipeClipPxForOverlay(overlay, splitScreenX) {
+    var el = overlay && overlay.getElement && overlay.getElement();
+    if (!el) return null;
+    var ir = el.getBoundingClientRect();
+    if (ir.width <= 0) return null;
+    var frac = (splitScreenX - ir.left) / ir.width;
+    if (!isFinite(frac)) return null;
+    frac = Math.max(0, Math.min(1, frac));
+    var lw = el.offsetWidth;
+    if (!lw || lw < 1) lw = ir.width;
+    return { clipPx: frac * lw, lw: lw, el: el };
+}
+
+function ficApplySatSwipeSideClip(overlay, map, splitScreenX, side) {
+    if (!overlay || !map) return;
+    var info = ficSwipeClipPxForOverlay(overlay, splitScreenX);
+    if (!info || info.lw < 8) {
+        ficApplyCuartelClipToOverlay(overlay, map);
+        return;
+    }
+    var el = info.el;
+    var clipPx = info.clipPx;
+    var lw = info.lw;
+    var useCuartel = ficCuartelIdsForClip().length > 0;
+    var hideClip = 'inset(0 100% 0 0)';
+
+    if (side === 'left') {
+        if (clipPx <= 0.5) {
+            if (useCuartel) ficApplyCuartelClipToOverlay(overlay, map, { maxLocalX: 0, fallbackClip: hideClip });
+            else el.style.clipPath = hideClip;
+        } else if (clipPx >= lw - 0.5) {
+            if (useCuartel) ficApplyCuartelClipToOverlay(overlay, map);
+            else el.style.clipPath = '';
+        } else if (useCuartel) {
+            ficApplyCuartelClipToOverlay(overlay, map, { maxLocalX: clipPx, fallbackClip: hideClip });
+        } else {
+            el.style.clipPath = 'polygon(0 0, ' + clipPx + 'px 0, ' + clipPx + 'px 100%, 0 100%)';
+        }
+        return;
+    }
+
+    if (clipPx <= 0.5) {
+        if (useCuartel) ficApplyCuartelClipToOverlay(overlay, map);
+        else el.style.clipPath = '';
+    } else if (clipPx >= lw - 0.5) {
+        if (useCuartel) ficApplyCuartelClipToOverlay(overlay, map, { minLocalX: lw, fallbackClip: hideClip });
+        else el.style.clipPath = hideClip;
+    } else if (useCuartel) {
+        ficApplyCuartelClipToOverlay(overlay, map, { minLocalX: clipPx, fallbackClip: hideClip });
+    } else {
+        el.style.clipPath = 'polygon(' + clipPx + 'px 0, ' + lw + 'px 0, ' + lw + 'px 100%, ' + clipPx + 'px 100%)';
+    }
+}
+
 function applySatSwipeClip() {
     var ratio = state.satSwipeRatio;
     if (ratio == null || !isFinite(ratio)) ratio = 0.5;
@@ -3247,47 +3301,9 @@ function applySatSwipeClip() {
 
     var usableMapW = Math.max(1, mr.width - insetPx);
     var splitScreenX = mr.left + insetPx + ratio * usableMapW;
-    var ir = el.getBoundingClientRect();
-    var cid = ficTrim(state.selectedCuartel || '');
-    var swipeFallback = '';
 
-    if (ir.width > 0) {
-        var frac = (splitScreenX - ir.left) / ir.width;
-        if (isFinite(frac)) {
-            frac = Math.max(0, Math.min(1, frac));
-            var lw = el.offsetWidth;
-            if (!lw || lw < 1) lw = ir.width;
-            if (lw < 8) {
-                el.style.clipPath = '';
-                if (satOverlayRight) ficApplyCuartelClipToOverlay(satOverlayRight, mapaSat);
-                return;
-            }
-            var clipPx = frac * lw;
-            if (clipPx <= 0.5) {
-                swipeFallback = 'inset(0 100% 0 0)';
-            } else if (clipPx < lw - 0.5) {
-                if (!cid) {
-                    swipeFallback = 'polygon(0 0, ' + clipPx + 'px 0, ' + clipPx + 'px 100%, 0 100%)';
-                } else {
-                    ficApplyCuartelClipToOverlay(satOverlayLeft, mapaSat, {
-                        maxLocalX: clipPx,
-                        fallbackClip: 'inset(0 100% 0 0)'
-                    });
-                    if (satOverlayRight) ficApplyCuartelClipToOverlay(satOverlayRight, mapaSat);
-                    return;
-                }
-            } else {
-                swipeFallback = '';
-            }
-        }
-    }
-
-    if (cid) {
-        ficApplyCuartelClipToOverlay(satOverlayLeft, mapaSat, { fallbackClip: swipeFallback });
-    } else {
-        el.style.clipPath = swipeFallback;
-    }
-    if (satOverlayRight) ficApplyCuartelClipToOverlay(satOverlayRight, mapaSat);
+    ficApplySatSwipeSideClip(satOverlayLeft, mapaSat, splitScreenX, 'left');
+    if (satOverlayRight) ficApplySatSwipeSideClip(satOverlayRight, mapaSat, splitScreenX, 'right');
 }
 
 function bindSatSwipeDivider() {
@@ -6223,6 +6239,30 @@ function ficClipLocalPolygonToMaxX(points, maxX) {
     return output;
 }
 
+function ficClipLocalPolygonToMinX(points, minX) {
+    if (minX == null || !isFinite(minX) || !points || !points.length) return points || [];
+    var output = [];
+    for (var i = 0; i < points.length; i++) {
+        var cur = points[i];
+        var prev = points[(i + points.length - 1) % points.length];
+        var curIn = cur.x >= minX - 0.5;
+        var prevIn = prev.x >= minX - 0.5;
+        if (curIn) {
+            if (!prevIn) {
+                var dx = cur.x - prev.x;
+                var t = Math.abs(dx) > 1e-9 ? (minX - prev.x) / dx : 0;
+                output.push(L.point(minX, prev.y + t * (cur.y - prev.y)));
+            }
+            output.push(cur);
+        } else if (prevIn) {
+            var dx2 = cur.x - prev.x;
+            var t2 = Math.abs(dx2) > 1e-9 ? (minX - prev.x) / dx2 : 0;
+            output.push(L.point(minX, prev.y + t2 * (cur.y - prev.y)));
+        }
+    }
+    return output;
+}
+
 function ficLocalRingsToClipPath(ringsLocal, w, h) {
     if (!ringsLocal || !ringsLocal.length) return '';
     if (ringsLocal.length === 1) {
@@ -6293,6 +6333,9 @@ function ficApplyCuartelClipToOverlay(overlay, map, opts) {
             var pts = ficLatLngRingToOverlayLocalPoints(ring, overlay, map);
             if (opts.maxLocalX != null && isFinite(opts.maxLocalX)) {
                 pts = ficClipLocalPolygonToMaxX(pts, opts.maxLocalX);
+            }
+            if (opts.minLocalX != null && isFinite(opts.minLocalX)) {
+                pts = ficClipLocalPolygonToMinX(pts, opts.minLocalX);
             }
             if (pts.length >= 3) ringsLocal.push(pts);
         });
