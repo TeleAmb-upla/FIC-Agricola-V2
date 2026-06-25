@@ -3194,58 +3194,37 @@ function initSatCompareMap() {
     bindSatSwipeDivider();
 }
 
-function ficSwipeClipPxForOverlay(overlay, splitScreenX) {
-    var el = overlay && overlay.getElement && overlay.getElement();
-    if (!el) return null;
-    var ir = el.getBoundingClientRect();
-    if (ir.width <= 0) return null;
-    var frac = (splitScreenX - ir.left) / ir.width;
-    if (!isFinite(frac)) return null;
-    frac = Math.max(0, Math.min(1, frac));
-    var lw = el.offsetWidth;
-    if (!lw || lw < 1) lw = ir.width;
-    return { clipPx: frac * lw, lw: lw, el: el };
+function ficClearRasterSwipeMask(el) {
+    if (!el) return;
+    el.style.maskImage = '';
+    el.style.webkitMaskImage = '';
+    el.style.maskSize = '';
+    el.style.webkitMaskSize = '';
 }
 
-function ficApplySatSwipeSideClip(overlay, map, splitScreenX, side) {
-    if (!overlay || !map) return;
-    var info = ficSwipeClipPxForOverlay(overlay, splitScreenX);
-    if (!info || info.lw < 8) {
-        ficApplyCuartelClipToOverlay(overlay, map);
+/** Máscara rectangular del swipe: histórico visible a la izquierda, actual a la derecha. */
+function ficApplyRasterSwipeMask(overlay, splitScreenX, side) {
+    var el = overlay && overlay.getElement && overlay.getElement();
+    if (!el) return;
+    if (!ficOverlayImageReady(el)) {
+        ficClearRasterSwipeMask(el);
         return;
     }
-    var el = info.el;
-    var clipPx = info.clipPx;
-    var lw = info.lw;
-    var useCuartel = ficCuartelIdsForClip().length > 0;
-    var hideClip = 'inset(0 100% 0 0)';
-
-    if (side === 'left') {
-        if (clipPx <= 0.5) {
-            if (useCuartel) ficApplyCuartelClipToOverlay(overlay, map, { maxLocalX: 0, fallbackClip: hideClip });
-            else el.style.clipPath = hideClip;
-        } else if (clipPx >= lw - 0.5) {
-            if (useCuartel) ficApplyCuartelClipToOverlay(overlay, map);
-            else el.style.clipPath = '';
-        } else if (useCuartel) {
-            ficApplyCuartelClipToOverlay(overlay, map, { maxLocalX: clipPx, fallbackClip: hideClip });
-        } else {
-            el.style.clipPath = 'polygon(0 0, ' + clipPx + 'px 0, ' + clipPx + 'px 100%, 0 100%)';
-        }
+    var ir = el.getBoundingClientRect();
+    if (ir.width <= 0) {
+        ficClearRasterSwipeMask(el);
         return;
     }
-
-    if (clipPx <= 0.5) {
-        if (useCuartel) ficApplyCuartelClipToOverlay(overlay, map);
-        else el.style.clipPath = '';
-    } else if (clipPx >= lw - 0.5) {
-        if (useCuartel) ficApplyCuartelClipToOverlay(overlay, map, { minLocalX: lw, fallbackClip: hideClip });
-        else el.style.clipPath = hideClip;
-    } else if (useCuartel) {
-        ficApplyCuartelClipToOverlay(overlay, map, { minLocalX: clipPx, fallbackClip: hideClip });
-    } else {
-        el.style.clipPath = 'polygon(' + clipPx + 'px 0, ' + lw + 'px 0, ' + lw + 'px 100%, ' + clipPx + 'px 100%)';
-    }
+    var stop = ((splitScreenX - ir.left) / ir.width) * 100;
+    stop = Math.max(0, Math.min(100, stop));
+    var s = stop.toFixed(2) + '%';
+    var mask = side === 'left'
+        ? ('linear-gradient(to right, #000 0, #000 ' + s + ', transparent ' + s + ')')
+        : ('linear-gradient(to right, transparent 0, transparent ' + s + ', #000 ' + s + ')');
+    el.style.maskImage = mask;
+    el.style.webkitMaskImage = mask;
+    el.style.maskSize = '100% 100%';
+    el.style.webkitMaskSize = '100% 100%';
 }
 
 function applySatSwipeClip() {
@@ -3268,28 +3247,33 @@ function applySatSwipeClip() {
 
     if (!satOverlayLeft && satOverlayRight) {
         ficApplyCuartelClipToOverlay(satOverlayRight, mapaSat);
+        ficClearRasterSwipeMask(satOverlayRight.getElement && satOverlayRight.getElement());
         return;
     }
     if (satOverlayLeft && !satOverlayRight) {
         ficApplyCuartelClipToOverlay(satOverlayLeft, mapaSat);
+        ficClearRasterSwipeMask(satOverlayLeft.getElement && satOverlayLeft.getElement());
         return;
     }
     if (!mapaSat || !satOverlayLeft) {
-        if (mapaSat && satOverlayRight) ficApplyCuartelClipToOverlay(satOverlayRight, mapaSat);
+        if (mapaSat && satOverlayRight) {
+            ficApplyCuartelClipToOverlay(satOverlayRight, mapaSat);
+            ficClearRasterSwipeMask(satOverlayRight.getElement && satOverlayRight.getElement());
+        }
         return;
     }
     var el = typeof satOverlayLeft.getElement === 'function' ? satOverlayLeft.getElement() : null;
     if (!el) return;
 
     if (!ficOverlayImageReady(el)) {
-        el.style.clipPath = '';
+        ficClearRasterSwipeMask(el);
         var imgWaitSwipe = el.tagName === 'IMG' ? el : el.querySelector('img');
         if (imgWaitSwipe && imgWaitSwipe.complete) {
             setTimeout(function () { ficScheduleRasterCuartelClips(); }, 80);
         }
         if (satOverlayRight) {
             var elR = satOverlayRight.getElement && satOverlayRight.getElement();
-            if (elR && !ficOverlayImageReady(elR)) elR.style.clipPath = '';
+            if (elR) ficClearRasterSwipeMask(elR);
         }
         return;
     }
@@ -3302,8 +3286,13 @@ function applySatSwipeClip() {
     var usableMapW = Math.max(1, mr.width - insetPx);
     var splitScreenX = mr.left + insetPx + ratio * usableMapW;
 
-    ficApplySatSwipeSideClip(satOverlayLeft, mapaSat, splitScreenX, 'left');
-    if (satOverlayRight) ficApplySatSwipeSideClip(satOverlayRight, mapaSat, splitScreenX, 'right');
+    // Cada lado mantiene su WebP fijo; el slider solo revela izquierda (hist) o derecha (actual).
+    ficApplyCuartelClipToOverlay(satOverlayLeft, mapaSat);
+    ficApplyRasterSwipeMask(satOverlayLeft, splitScreenX, 'left');
+    if (satOverlayRight) {
+        ficApplyCuartelClipToOverlay(satOverlayRight, mapaSat);
+        ficApplyRasterSwipeMask(satOverlayRight, splitScreenX, 'right');
+    }
 }
 
 function bindSatSwipeDivider() {
@@ -6215,54 +6204,6 @@ function ficLatLngRingToOverlayLocalPoints(ring, overlay, map) {
     });
 }
 
-function ficClipLocalPolygonToMaxX(points, maxX) {
-    if (maxX == null || !isFinite(maxX) || !points || !points.length) return points || [];
-    var output = [];
-    for (var i = 0; i < points.length; i++) {
-        var cur = points[i];
-        var prev = points[(i + points.length - 1) % points.length];
-        var curIn = cur.x <= maxX + 0.5;
-        var prevIn = prev.x <= maxX + 0.5;
-        if (curIn) {
-            if (!prevIn) {
-                var dx = cur.x - prev.x;
-                var t = Math.abs(dx) > 1e-9 ? (maxX - prev.x) / dx : 0;
-                output.push(L.point(maxX, prev.y + t * (cur.y - prev.y)));
-            }
-            output.push(cur);
-        } else if (prevIn) {
-            var dx2 = cur.x - prev.x;
-            var t2 = Math.abs(dx2) > 1e-9 ? (maxX - prev.x) / dx2 : 0;
-            output.push(L.point(maxX, prev.y + t2 * (cur.y - prev.y)));
-        }
-    }
-    return output;
-}
-
-function ficClipLocalPolygonToMinX(points, minX) {
-    if (minX == null || !isFinite(minX) || !points || !points.length) return points || [];
-    var output = [];
-    for (var i = 0; i < points.length; i++) {
-        var cur = points[i];
-        var prev = points[(i + points.length - 1) % points.length];
-        var curIn = cur.x >= minX - 0.5;
-        var prevIn = prev.x >= minX - 0.5;
-        if (curIn) {
-            if (!prevIn) {
-                var dx = cur.x - prev.x;
-                var t = Math.abs(dx) > 1e-9 ? (minX - prev.x) / dx : 0;
-                output.push(L.point(minX, prev.y + t * (cur.y - prev.y)));
-            }
-            output.push(cur);
-        } else if (prevIn) {
-            var dx2 = cur.x - prev.x;
-            var t2 = Math.abs(dx2) > 1e-9 ? (minX - prev.x) / dx2 : 0;
-            output.push(L.point(minX, prev.y + t2 * (cur.y - prev.y)));
-        }
-    }
-    return output;
-}
-
 function ficLocalRingsToClipPath(ringsLocal, w, h) {
     if (!ringsLocal || !ringsLocal.length) return '';
     if (ringsLocal.length === 1) {
@@ -6331,12 +6272,6 @@ function ficApplyCuartelClipToOverlay(overlay, map, opts) {
         var feat = ficGetCuartelFeature(cuCid);
         ficGeometryExteriorRings(feat && feat.geometry).forEach(function (ring) {
             var pts = ficLatLngRingToOverlayLocalPoints(ring, overlay, map);
-            if (opts.maxLocalX != null && isFinite(opts.maxLocalX)) {
-                pts = ficClipLocalPolygonToMaxX(pts, opts.maxLocalX);
-            }
-            if (opts.minLocalX != null && isFinite(opts.minLocalX)) {
-                pts = ficClipLocalPolygonToMinX(pts, opts.minLocalX);
-            }
             if (pts.length >= 3) ringsLocal.push(pts);
         });
     });
@@ -6352,8 +6287,12 @@ function ficApplyCuartelClipToOverlay(overlay, map, opts) {
 
 function ficSyncRasterCuartelClips(retryPass) {
     if (mapaSat && isSatSplitMode()) {
-        if (satOverlayRight) ficApplyCuartelClipToOverlay(satOverlayRight, mapaSat);
-        if (satOverlayLeft) applySatSwipeClip();
+        applySatSwipeClip();
+    } else {
+        [satOverlayLeft, satOverlayRight].forEach(function (ov) {
+            if (!ov || !ov.getElement) return;
+            ficClearRasterSwipeMask(ov.getElement());
+        });
     }
     if (mapa) {
         [rasterOverlay, rasterDroneRgb, rasterDroneIndex].forEach(function (ov) {
