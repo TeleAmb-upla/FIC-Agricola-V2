@@ -81,11 +81,11 @@ STATIC_SITE_DIR = REPO_ROOT / "scripts" / "static_site"
 if str(STATIC_SITE_DIR) not in sys.path:
     sys.path.insert(0, str(STATIC_SITE_DIR))
 
-from pipeline_utils import build_s2_file_to_wetland_map, load_config, load_wetland_clip_geometries
+from pipeline_utils import build_s2_file_to_predio_map, load_config, load_predio_clip_geometries
 
 DEFAULT_TIF_DIR = REPO_ROOT / "data" / "sentinel2"
 DEFAULT_STATIC_DIR = REPO_ROOT / "data_static" / "sentinel2"
-DEFAULT_AOI_GEOJSON = REPO_ROOT / "data" / "shapefiles" / "wetlands_export_aoi.geojson"
+DEFAULT_AOI_GEOJSON = REPO_ROOT / "data_static" / "predios_aoi.geojson"
 DEFAULT_DB_CSV = REPO_ROOT / "data" / "fic_database.csv"
 
 _STEM_RE = re.compile(r"^S2_(?P<predio>[A-Za-z0-9_]+)_Y(?P<year>\d{4})_W(?P<week>\d{2})$")
@@ -421,6 +421,88 @@ def _spatial_mean(raster_3d: np.ndarray) -> np.ndarray:
     flat = raster_3d.reshape(raster_3d.shape[0], -1)
     with np.errstate(invalid="ignore"):
         return np.nanmean(flat, axis=1).astype(np.float32, copy=False)
+
+
+def _is_map_composite_key(comp_key: str) -> bool:
+    """Composites usados en el mapa comparativo (semanal/mensual)."""
+    return comp_key.startswith("weekly_") or comp_key.startswith("monthly_")
+
+
+# Bandas sin escala conjunta semanal/mensual (metadatos o sin comparación visual).
+BAND_STATS_SKIP: set[str] = set(SKIP_BANDS) | {"CLEAR_PIXEL_COUNT", "REDEDGE_POSITION"}
+
+
+def _accumulate_map_composite_stats(
+    band_stats: dict[str, dict[str, float]],
+    aggregates: dict[str, dict],
+    band_names: list[str],
+    band_idx_filter: list[int],
+) -> None:
+    """Acumula min/max por banda sobre todos los rasters semanales y mensuales."""
+    for comp_key, agg in aggregates.items():
+        if not _is_map_composite_key(comp_key):
+            continue
+        raster_3d = agg["raster"]
+        for b_idx in band_idx_filter:
+            if b_idx >= raster_3d.shape[0]:
+                continue
+            band = band_names[b_idx]
+            if band in BAND_STATS_SKIP:
+                continue
+            arr = raster_3d[b_idx]
+            valid = arr[np.isfinite(arr)]
+            if valid.size == 0:
+                continue
+            lo = float(np.nanmin(valid))
+            hi = float(np.nanmax(valid))
+            slot = band_stats.setdefault(band, {"min": float("inf"), "max": float("-inf")})
+            slot["min"] = min(slot["min"], lo)
+            slot["max"] = max(slot["max"], hi)
+
+
+def _round_viz_limit(value: float) -> float:
+    av = abs(value)
+    if av >= 100:
+        return round(value, 1)
+    if av >= 10:
+        return round(value, 2)
+    if av >= 1:
+        return round(value, 3)
+    return round(value, 4)
+
+
+def _resolve_band_viz_ranges(
+    band_stats: dict[str, dict[str, float]],
+) -> dict[str, dict[str, float]]:
+    """``vmin``/``vmax`` compartidos por índice (histórico semanal + mensual)."""
+    out: dict[str, dict[str, float]] = {}
+    for band, stats in band_stats.items():
+        lo, hi = stats.get("min"), stats.get("max")
+        base = BAND_VIZ.get(band, DEFAULT_VIZ)
+        if lo is None or hi is None or not np.isfinite(lo) or not np.isfinite(hi) or lo >= hi:
+            out[band] = {"vmin": float(base["vmin"]), "vmax": float(base["vmax"])}
+        else:
+            out[band] = {
+                "vmin": _round_viz_limit(lo),
+                "vmax": _round_viz_limit(hi),
+            }
+    return out
+
+
+def _band_viz_ranges_changed(
+    new_ranges: dict[str, dict[str, float]],
+    existing_meta: dict,
+) -> bool:
+    prev = (existing_meta or {}).get("indices") or {}
+    for band, lim in new_ranges.items():
+        old = prev.get(band) or {}
+        if old.get("vmin") is None or old.get("vmax") is None:
+            return True
+        if abs(float(old["vmin"]) - lim["vmin"]) > 1e-6:
+            return True
+        if abs(float(old["vmax"]) - lim["vmax"]) > 1e-6:
+            return True
+    return False
 
 
 def compute_aggregates(
@@ -1050,7 +1132,7 @@ def build(
     rasters_dir.mkdir(parents=True, exist_ok=True)
     csv_dir.mkdir(parents=True, exist_ok=True)
 
-    s2_map = build_s2_file_to_wetland_map(load_config())
+    s2_map = build_s2_file_to_predio_map(load_config())
     grouped = discover_tifs(tif_dir, s2_map)
     if not grouped:
         print(f"No se encontraron TIFs en {tif_dir}. Nada que hacer.", file=sys.stderr)
@@ -1067,7 +1149,7 @@ def build(
     print(f"Años detectados: {sorted(all_years)} | actual={current_year} | hist={historic_years}")
 
     predios_info = load_predios_info(aoi_geojson, db_csv)
-    predio_geoms = load_wetland_clip_geometries(load_config())
+    predio_geoms = load_predio_clip_geometries(load_config())
     aoi_mtime_ns = 0
     if aoi_geojson and aoi_geojson.is_file():
         try:
@@ -1093,6 +1175,9 @@ def build(
     existing_wetlands: dict = (existing_ts_doc or {}).get("wetlands") or {}
     existing_meta: dict = _load_json(static_dir / "metadata.json") or {} if incremental else {}
 
+    band_stats: dict[str, dict[str, float]] = {}
+    predio_render_jobs: list[dict] = []
+
     for predio, records in grouped.items():
         print(f"\n=== {predio} ({len(records)} TIFs) ===")
         pl = predio.lower()
@@ -1103,42 +1188,7 @@ def build(
         fp_path = _predio_fp_path(csv_dir, pl)
         mcsv = csv_dir / f"{pl}_timeseries_monthly.csv"
         wcsv = csv_dir / f"{pl}_timeseries.csv"
-
-        if incremental and not force:
-            prev_fp = fp_path.read_text(encoding="utf-8").strip() if fp_path.is_file() else None
-            fp_ok = prev_fp == fp
-            ts_existing = existing_wetlands.get(pl)
-            has_monthly = _timeseries_predio_has_monthly(ts_existing)
-            wl_meta = (existing_meta.get("wetlands") or {}).get(pl) if isinstance(existing_meta, dict) else None
-
-            def _merge_skipped_predio() -> None:
-                assert ts_existing is not None
-                timeseries_all[pl] = copy.deepcopy(ts_existing)
-                if wl_meta:
-                    wetlands_meta[pl] = copy.deepcopy(wl_meta)
-                for rk, rv in (existing_meta.get("rasters") or {}).items():
-                    if rk.startswith(f"{pl}_"):
-                        rasters_meta[rk] = copy.deepcopy(rv)
-                for b in ts_existing:
-                    if b not in SKIP_BANDS:
-                        band_set.add(b)
-
-            if fp_ok and ts_existing and wcsv.is_file() and has_monthly and mcsv.is_file() and wl_meta:
-                _merge_skipped_predio()
-                print(
-                    f"  [incremental] Sin cambios en TIFs ni calendario; se reutilizan series y CSV "
-                    f"({wcsv.name}, {mcsv.name})."
-                )
-                continue
-
-            if fp_ok and ts_existing and wcsv.is_file() and has_monthly and not mcsv.is_file() and wl_meta:
-                _merge_skipped_predio()
-                write_predio_monthly_csv(csv_dir, predio, timeseries_all[pl], current_year=current_year)
-                print(
-                    f"  [incremental] Solo faltaba {mcsv.name}; generado desde series en caché "
-                    f"(sin releer GeoTIFFs)."
-                )
-                continue
+        skip_render = False
 
         try:
             stack, band_names, geo = read_stack(records)
@@ -1166,77 +1216,159 @@ def build(
             continue
 
         aggregates = compute_aggregates(stack, records, current_year)
-        timeseries = compute_weekly_timeseries(stack, records, band_names, current_year)
-        augment_timeseries_with_monthly(
-            timeseries, stack, records, band_names, current_year, lm_year, lm_month
+        _accumulate_map_composite_stats(band_stats, aggregates, band_names, band_idx_filter)
+
+        if incremental and not force:
+            prev_fp = fp_path.read_text(encoding="utf-8").strip() if fp_path.is_file() else None
+            fp_ok = prev_fp == fp
+            ts_existing = existing_wetlands.get(pl)
+            has_monthly = _timeseries_predio_has_monthly(ts_existing)
+            wl_meta = (existing_meta.get("wetlands") or {}).get(pl) if isinstance(existing_meta, dict) else None
+
+            def _merge_skipped_predio() -> None:
+                assert ts_existing is not None
+                timeseries_all[pl] = copy.deepcopy(ts_existing)
+                if wl_meta:
+                    wetlands_meta[pl] = copy.deepcopy(wl_meta)
+                for rk, rv in (existing_meta.get("rasters") or {}).items():
+                    if rk.startswith(f"{pl}_"):
+                        rasters_meta[rk] = copy.deepcopy(rv)
+                for b in ts_existing:
+                    if b not in SKIP_BANDS:
+                        band_set.add(b)
+
+            if fp_ok and ts_existing and wcsv.is_file() and has_monthly and mcsv.is_file() and wl_meta:
+                _merge_skipped_predio()
+                skip_render = True
+                print(
+                    f"  [incremental] Sin cambios en TIFs ni calendario; se reutilizan series y CSV "
+                    f"({wcsv.name}, {mcsv.name})."
+                )
+
+            elif fp_ok and ts_existing and wcsv.is_file() and has_monthly and not mcsv.is_file() and wl_meta:
+                _merge_skipped_predio()
+                write_predio_monthly_csv(csv_dir, predio, timeseries_all[pl], current_year=current_year)
+                skip_render = True
+                print(
+                    f"  [incremental] Solo faltaba {mcsv.name}; generado desde series en caché "
+                    f"(sin releer GeoTIFFs)."
+                )
+
+        if not skip_render:
+            timeseries = compute_weekly_timeseries(stack, records, band_names, current_year)
+            augment_timeseries_with_monthly(
+                timeseries, stack, records, band_names, current_year, lm_year, lm_month
+            )
+            timeseries_all[predio.lower()] = timeseries
+
+            wetlands_meta[predio.lower()] = {
+                "name": predios_info.get(predio.lower(), {}).get("name") or predio.upper(),
+                "codigo_predio": predios_info.get(predio.lower(), {}).get("codigo_predio") or predio.upper(),
+                "center": predios_info.get(predio.lower(), {}).get("center", [0.0, 0.0]),
+                "area_ha": predios_info.get(predio.lower(), {}).get("area_ha"),
+                "available_years": sorted({r["year"] for r in records}),
+                "historic_years": historic_years,
+                "current_year": current_year,
+                "n_weeks_current": sum(1 for r in records if r["year"] == current_year),
+                "n_weeks_total": len(records),
+                "leaflet_bounds": geo["leaflet_bounds"],
+            }
+
+            write_predio_csv(csv_dir, predio, timeseries, current_year=current_year)
+            write_predio_monthly_csv(csv_dir, predio, timeseries, current_year=current_year)
+            try:
+                fp_path.write_text(fp, encoding="utf-8")
+            except OSError as exc:
+                print(f"  [aviso] no se pudo escribir huella incremental {fp_path}: {exc}", file=sys.stderr)
+
+        predio_render_jobs.append({
+            "predio": predio,
+            "aggregates": aggregates,
+            "band_names": band_names,
+            "band_idx_filter": band_idx_filter,
+            "skip_render": skip_render,
+        })
+
+    band_viz_ranges = _resolve_band_viz_ranges(band_stats)
+    ranges_changed = _band_viz_ranges_changed(band_viz_ranges, existing_meta)
+    if ranges_changed and incremental and not force:
+        print(
+            "\n[aviso] Rangos de leyenda (vmin/vmax) actualizados; "
+            "se regeneran WebPs con escala conjunta semanal/mensual."
         )
-        timeseries_all[predio.lower()] = timeseries
+    if band_viz_ranges:
+        sample = ", ".join(
+            f"{b}=[{lim['vmin']},{lim['vmax']}]"
+            for b, lim in sorted(band_viz_ranges.items())[:6]
+        )
+        print(f"\nEscala conjunta mapa (muestra): {sample}{'…' if len(band_viz_ranges) > 6 else ''}")
 
-        wetlands_meta[predio.lower()] = {
-            "name": predios_info.get(predio.lower(), {}).get("name") or predio.upper(),
-            "codigo_predio": predios_info.get(predio.lower(), {}).get("codigo_predio") or predio.upper(),
-            "center": predios_info.get(predio.lower(), {}).get("center", [0.0, 0.0]),
-            "area_ha": predios_info.get(predio.lower(), {}).get("area_ha"),
-            "available_years": sorted({r["year"] for r in records}),
-            "historic_years": historic_years,
-            "current_year": current_year,
-            "n_weeks_current": sum(1 for r in records if r["year"] == current_year),
-            "n_weeks_total": len(records),
-            "leaflet_bounds": geo["leaflet_bounds"],
-        }
-
-        write_predio_csv(csv_dir, predio, timeseries, current_year=current_year)
-        write_predio_monthly_csv(csv_dir, predio, timeseries, current_year=current_year)
-        try:
-            fp_path.write_text(fp, encoding="utf-8")
-        except OSError as exc:
-            print(f"  [aviso] no se pudo escribir huella incremental {fp_path}: {exc}", file=sys.stderr)
-
+    for job in predio_render_jobs:
+        if job["skip_render"] and not force and not ranges_changed:
+            continue
+        predio = job["predio"]
+        aggregates = job["aggregates"]
+        band_names = job["band_names"]
+        band_idx_filter = job["band_idx_filter"]
+        n_written = 0
         for comp_key, agg in aggregates.items():
-            raster_3d = agg["raster"]  # (n_bands, H, W)
+            if not _is_map_composite_key(comp_key):
+                continue
+            raster_3d = agg["raster"]
             for b_idx in band_idx_filter:
                 if b_idx >= raster_3d.shape[0]:
                     continue
                 band = band_names[b_idx]
-                viz = BAND_VIZ.get(band, DEFAULT_VIZ)
+                base_viz = BAND_VIZ.get(band, DEFAULT_VIZ)
+                lim = band_viz_ranges.get(
+                    band,
+                    {"vmin": base_viz["vmin"], "vmax": base_viz["vmax"]},
+                )
                 stem = f"S2_{predio.upper()}_{comp_key}_{band}"
                 webp_path = rasters_dir / f"{stem}.webp"
 
-                if not (webp_path.exists() and not force):
+                if not (webp_path.exists() and not force and not ranges_changed):
                     try:
                         render_band_to_webp(
                             raster_3d[b_idx],
                             webp_path,
-                            vmin=viz["vmin"],
-                            vmax=viz["vmax"],
-                            colormap=viz["colormap"],
+                            vmin=lim["vmin"],
+                            vmax=lim["vmax"],
+                            colormap=base_viz["colormap"],
                             upscale_min_side=upscale_min_side,
                             quality=webp_quality,
                         )
+                        n_written += 1
                     except (OSError, ValueError) as exc:
                         print(f"  [error] {stem}: {exc}", file=sys.stderr)
                         continue
 
                 raster_key = f"{predio.lower()}_{comp_key.lower()}_{band.lower()}"
-                # Compactamos al máximo: solo path + label + n_inputs (bounds y opciones de
-                # render se reconstruyen en el front desde ``wetlands[predio]`` + ``indices``).
                 rasters_meta[raster_key] = {
                     "p": f"sentinel2/rasters/{stem}.webp",
                     "l": agg["label"],
                     "n": agg["n_inputs"],
                 }
-        print(f"  Rasters: agregados={len(aggregates)} bandas={len(band_idx_filter)}")
+        print(
+            f"  Rasters {predio}: agregados mapa="
+            f"{sum(1 for k in aggregates if _is_map_composite_key(k))} "
+            f"webp_regenerados={n_written}"
+        )
 
-    # Indices catalog para el frontend.
+    # Indices catalog para el frontend (misma escala que los WebPs del mapa).
     indices_out: dict[str, dict] = {}
     band_order = [b for b in DEFAULT_CHART_BAND_ORDER if b in band_set]
     band_order.extend(sorted(b for b in band_set if b not in band_order))
     for band in band_order:
         viz = BAND_VIZ.get(band, DEFAULT_VIZ)
+        lim = band_viz_ranges.get(
+            band,
+            {"vmin": viz["vmin"], "vmax": viz["vmax"]},
+        )
         indices_out[band] = {
             "label": viz.get("label") or band,
-            "vmin": viz["vmin"],
-            "vmax": viz["vmax"],
+            "vmin": lim["vmin"],
+            "vmax": lim["vmax"],
             "colormap": viz["colormap"],
             "visual_only": False,
         }
@@ -1244,7 +1376,7 @@ def build(
     # Último completo (a partir de records globales).
     metadata = {
         "generated_at": datetime.now(tz=timezone.utc).isoformat(),
-        "aoi_id_column": "wetland_id",
+        "aoi_id_column": "predio_id",
         "current_year": current_year,
         "historic_years": historic_years,
         "available_years": sorted(all_years),
@@ -1284,6 +1416,7 @@ def build(
                 "default_week": lc_week_w,
             },
         },
+        "predios": wetlands_meta,
         "wetlands": wetlands_meta,
         "rasters": rasters_meta,
         "summary": {
@@ -1306,6 +1439,7 @@ def build(
         "generated_at": datetime.now(tz=timezone.utc).isoformat(),
         "current_year": current_year,
         "default_band": metadata["default_chart_band"],
+        "predios": timeseries_all,
         "wetlands": timeseries_all,
     }
     timeseries_path.write_text(
