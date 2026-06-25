@@ -3099,6 +3099,46 @@ function mapFitContextKey() {
 }
 
 var _ficClipDebounceTimer = null;
+var _ficClipRetryCount = 0;
+
+function ficSatRasterImageUrl(raster) {
+    if (!raster || !raster.visual || !raster.visual.path) return '';
+    return BASE + '/' + raster.visual.path;
+}
+
+function ficSatOverlayForSide(side) {
+    return side === 'left' ? satOverlayLeft : satOverlayRight;
+}
+
+function ficSetSatOverlayRef(side, overlay) {
+    if (side === 'left') satOverlayLeft = overlay;
+    else satOverlayRight = overlay;
+}
+
+function ficBindRasterOverlayRecovery(overlay, map) {
+    if (!overlay || overlay._ficRecoveryBound) return;
+    overlay._ficRecoveryBound = true;
+    overlay._ficLoadRetries = 0;
+    function tryBindImg() {
+        var el = overlay.getElement && overlay.getElement();
+        var img = el ? (el.tagName === 'IMG' ? el : el.querySelector('img')) : null;
+        if (!img || img._ficRecoveryBound) return;
+        img._ficRecoveryBound = true;
+        img.addEventListener('error', function onErr() {
+            if (overlay._ficLoadRetries >= 3) return;
+            overlay._ficLoadRetries += 1;
+            var base = String(img.src || '').split('?')[0];
+            if (!base) return;
+            setTimeout(function () {
+                if (!map || !overlay._map) return;
+                img.removeEventListener('error', onErr);
+                img.src = base + '?_r=' + Date.now();
+            }, 300 * overlay._ficLoadRetries);
+        });
+    }
+    overlay.on('add', tryBindImg);
+    tryBindImg();
+}
 
 /** Aplica recortes tras el mapa e imágenes terminar de reposicionarse (evita mapa en blanco al cambiar fecha/capa). */
 function ficScheduleRasterCuartelClips() {
@@ -3189,6 +3229,10 @@ function applySatSwipeClip() {
 
     if (!ficOverlayImageReady(el)) {
         el.style.clipPath = '';
+        var imgWaitSwipe = el.tagName === 'IMG' ? el : el.querySelector('img');
+        if (imgWaitSwipe && imgWaitSwipe.complete) {
+            setTimeout(function () { ficScheduleRasterCuartelClips(); }, 80);
+        }
         if (satOverlayRight) {
             var elR = satOverlayRight.getElement && satOverlayRight.getElement();
             if (elR && !ficOverlayImageReady(elR)) elR.style.clipPath = '';
@@ -3305,29 +3349,53 @@ function bindSatSwipeDivider() {
 
 function _setSatOverlay(side, raster) {
     if (!mapaSat) return null;
-    if (side === 'left') {
-        if (satOverlayLeft) { mapaSat.removeLayer(satOverlayLeft); satOverlayLeft = null; }
-    } else {
-        if (satOverlayRight) { mapaSat.removeLayer(satOverlayRight); satOverlayRight = null; }
+    var existing = ficSatOverlayForSide(side);
+    if (!raster) {
+        if (existing) {
+            mapaSat.removeLayer(existing);
+            ficSetSatOverlayRef(side, null);
+        }
+        return null;
     }
-    if (!raster) return null;
+    var url = ficSatRasterImageUrl(raster);
     var bounds = normalizeLeafletCornerPairs(raster.visual && raster.visual.bounds);
-    if (!leafletBoundsCornersValid(bounds)) return null;
+    if (!leafletBoundsCornersValid(bounds)) {
+        if (existing) {
+            mapaSat.removeLayer(existing);
+            ficSetSatOverlayRef(side, null);
+        }
+        return null;
+    }
+    var boundsKey = JSON.stringify(bounds);
+    if (existing && existing._ficRasterPath === url && existing._ficRasterBoundsKey === boundsKey) {
+        var opReuse = raster.visual.opacity != null ? raster.visual.opacity : 0.85;
+        if (existing.setOpacity) existing.setOpacity(opReuse);
+        ficScheduleRasterCuartelClips();
+        return existing;
+    }
+    if (existing) {
+        mapaSat.removeLayer(existing);
+        ficSetSatOverlayRef(side, null);
+    }
+    _ficClipRetryCount = 0;
     var llb = boundsLatLngBoundsFromCorners(bounds);
     if (!llb) return null;
     var imgClass = raster.visual.render_mode === 'smooth' ? '' : 'preview-raster';
     var opacity = raster.visual.opacity != null ? raster.visual.opacity : 0.85;
     var pane = side === 'left' ? 'ficSatRasterLeft' : 'ficSatRasterRight';
-    var overlay = L.imageOverlay(BASE + '/' + raster.visual.path, llb, {
+    var overlay = L.imageOverlay(url, llb, {
         opacity: opacity,
         className: imgClass,
         interactive: false,
         pane: pane,
     }).addTo(mapaSat);
+    overlay._ficRasterPath = url;
+    overlay._ficRasterBoundsKey = boundsKey;
     function syncSatOverlayClips() {
         ficScheduleRasterCuartelClips();
     }
     overlay.on('load', syncSatOverlayClips);
+    ficBindRasterOverlayRecovery(overlay, mapaSat);
     var el0 = overlay.getElement && overlay.getElement();
     if (el0) {
         var img0 = el0.tagName === 'IMG' ? el0 : el0.querySelector('img');
@@ -3335,11 +3403,7 @@ function _setSatOverlay(side, raster) {
             requestAnimationFrame(syncSatOverlayClips);
         }
     }
-    if (side === 'left') {
-        satOverlayLeft = overlay;
-    } else {
-        satOverlayRight = overlay;
-    }
+    ficSetSatOverlayRef(side, overlay);
     return overlay;
 }
 
@@ -5114,7 +5178,7 @@ function applySatSplitVisibility() {
             updateSatSplitOverlays();
             renderAOI();
             updateSatChartDock(true);
-        }, 80);
+        }, 120);
     }
     ficSyncMapChromeInset();
     ficSyncSatPlotChromeVisibility();
@@ -5356,10 +5420,6 @@ async function setSource(sourceKey) {
             clearTimeout(_ficClipDebounceTimer);
             _ficClipDebounceTimer = null;
         }
-    } else {
-        state._lastMapFitContextKey = null;
-        state._satMapFitSig = null;
-        state._satOverlaySig = null;
     }
     var bandSel = document.getElementById('ficSatChartBand');
     if (bandSel) delete bandSel.dataset.ficBandSig;
@@ -6211,12 +6271,15 @@ function ficApplyCuartelClipToOverlay(overlay, map, opts) {
     }
     if (!ficOverlayImageReady(el)) {
         el.style.clipPath = '';
-        el._ficClipRetryBound = false;
         var imgWait = el.tagName === 'IMG' ? el : el.querySelector('img');
-        if (imgWait) {
+        if (imgWait && !imgWait.complete) {
+            // Image still loading – fire when it arrives
             imgWait.addEventListener('load', function () {
                 ficScheduleRasterCuartelClips();
             }, { once: true });
+        } else {
+            // Image loaded but Leaflet hasn't positioned it yet – retry after layout tick
+            setTimeout(function () { ficScheduleRasterCuartelClips(); }, 80);
         }
         return;
     }
@@ -6258,8 +6321,12 @@ function ficSyncRasterCuartelClips(retryPass) {
             var el = ov.getElement();
             if (el && !ficOverlayImageReady(el)) needRetry = true;
         });
-        if (needRetry) {
-            setTimeout(function () { ficSyncRasterCuartelClips(true); }, 250);
+        if (needRetry && _ficClipRetryCount < 8) {
+            _ficClipRetryCount += 1;
+            var retryDelay = _ficClipRetryCount <= 2 ? 120 : 280;
+            setTimeout(function () { ficSyncRasterCuartelClips(true); }, retryDelay);
+        } else if (!needRetry) {
+            _ficClipRetryCount = 0;
         }
     }
 }
@@ -6503,6 +6570,7 @@ function updateMapOverlay() {
             crossOrigin: true
         }).addTo(mapa);
         ov.on('load', function () { ficScheduleRasterCuartelClips(); });
+        ficBindRasterOverlayRecovery(ov, mapa);
         var el0 = ov.getElement && ov.getElement();
         if (el0) {
             el0.style.clipPath = '';
