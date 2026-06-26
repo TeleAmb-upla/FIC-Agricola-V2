@@ -2942,13 +2942,17 @@ function satBand() {
 
 /** Construye un descriptor de raster: ``{visual: {path, bounds, opacity}, label, n}``.
  *  La metadata compacta solo guarda ``{p,l,n}``; bounds vienen de ``predios[predio]``. */
+function satRasterEntryValid(entry) {
+    return !!(entry && entry.p && Number(entry.n) > 0);
+}
+
 function satFindRaster(predio, compositeKey, band) {
     if (!compositeKey || !predio || !band) return null;
     var sm = getSatMeta();
     var rasters = sm.rasters || {};
     var key = (predio + '_' + compositeKey + '_' + band).toLowerCase();
     var entry = rasters[key];
-    if (!entry) return null;
+    if (!satRasterEntryValid(entry)) return null;
     var wl = (sm.predios || sm.wetlands || {})[String(predio).toLowerCase()] || {};
     var bounds = wl.leaflet_bounds;
     if (!bounds || bounds.length !== 2) return null;
@@ -3019,6 +3023,33 @@ function predioHasSatRasterForPill(wid, viewMode, pillValue, band) {
     var b = band || satBand();
     return !!(satFindRaster(wid, satCompositeKeyForPill('left', viewMode, pillValue), b) ||
         satFindRaster(wid, satCompositeKeyForPill('right', viewMode, pillValue), b));
+}
+
+/** ¿Hay dato del año actual para mes/semana ``pillValue`` (serie + raster válido)? */
+function ficSatHasCurrentDataForPill(wid, viewMode, pillValue, band) {
+    if (!wid || pillValue == null) return false;
+    var b = band || satBand();
+    var ck = satCompositeKeyForPill('right', viewMode, pillValue);
+    var ts = ficTsEntryForSelection(wid);
+    var bandKey = String(b || '').toUpperCase();
+    var series = ts && (ts[bandKey] || ts[b] || ts[String(b).toLowerCase()]);
+    if (series) {
+        var cy = series.current_year;
+        if (viewMode === 'weekly') {
+            var weeks = series.weeks || [];
+            var wi = weeks.indexOf(pillValue);
+            if (wi < 0) wi = Number(pillValue) - 1;
+            var vals = (cy && cy.values_by_week) || [];
+            var v = wi >= 0 && wi < vals.length ? vals[wi] : null;
+            if (v == null || !isFinite(Number(v))) return false;
+        } else if (viewMode === 'monthly') {
+            var mi = Number(pillValue) - 1;
+            var mvals = (cy && cy.values_by_month) || [];
+            var mv = mi >= 0 && mi < mvals.length ? mvals[mi] : null;
+            if (mv == null || !isFinite(Number(mv))) return false;
+        }
+    }
+    return !!satFindRaster(wid, ck, b);
 }
 
 /** Meses/semanas del selector temporal que tienen imagen para el predio y banda activos. */
@@ -3227,10 +3258,29 @@ function ficApplyRasterSwipeMask(overlay, splitScreenX, side) {
     el.style.webkitMaskSize = '100% 100%';
 }
 
+function ficRefreshSatMapRasters() {
+    if (!mapaSat || !isSatSplitMode()) return;
+    var viewMode = state.satViewMode || 'monthly';
+    var predio = state.selectedPredio;
+    var band = satBand();
+    var pill = satCurrentPillValue(viewMode);
+    var leftCK = satCompositeKeyForSide('left', viewMode);
+    var leftRaster = predio ? satFindRaster(predio, leftCK, band) : null;
+    _setSatOverlay('left', leftRaster);
+    var rightCK = satCompositeKeyForSide('right', viewMode);
+    var rightRaster = (predio && ficSatHasCurrentDataForPill(predio, viewMode, pill, band))
+        ? satFindRaster(predio, rightCK, band) : null;
+    _setSatOverlay('right', rightRaster);
+    applySatSwipeClip();
+    ficScheduleRasterCuartelClips();
+}
+
 function applySatSwipeClip() {
     var ratio = state.satSwipeRatio;
     if (ratio == null || !isFinite(ratio)) ratio = 0.5;
     ratio = Math.min(1, Math.max(0, ratio));
+    // Sin capa actual: el histórico no debe invadir la mitad «Actual» del comparador.
+    if (!satOverlayRight) ratio = Math.min(ratio, 0.5);
     state.satSwipeRatio = ratio;
 
     var insetPx = ficReadMapChromeInsetLeftPx();
@@ -3252,7 +3302,15 @@ function applySatSwipeClip() {
     }
     if (satOverlayLeft && !satOverlayRight) {
         ficApplyCuartelClipToOverlay(satOverlayLeft, mapaSat);
-        ficClearRasterSwipeMask(satOverlayLeft.getElement && satOverlayLeft.getElement());
+        var mcL = mapaSat && mapaSat.getContainer();
+        if (mcL) {
+            var mrL = mcL.getBoundingClientRect();
+            var usableMapWL = Math.max(1, mrL.width - insetPx);
+            var splitXL = mrL.left + insetPx + ratio * usableMapWL;
+            ficApplyRasterSwipeMask(satOverlayLeft, splitXL, 'left');
+        } else {
+            ficClearRasterSwipeMask(satOverlayLeft.getElement && satOverlayLeft.getElement());
+        }
         return;
     }
     if (!mapaSat || !satOverlayLeft) {
@@ -4005,6 +4063,7 @@ function buildSatPeriodPills() {
                 if (viewMode === 'monthly') state.satLeftMonth = items[i];
                 else state.satLeftWeek = items[i];
                 syncUiFromState();
+                ficRefreshSatMapRasters();
             }
 
             track.addEventListener('pointerdown', function (ev) {
@@ -4145,9 +4204,12 @@ function updateSatSplitOverlays() {
     _setSatOverlay('left', leftRaster);
 
     var rightCK = satCompositeKeyForSide('right', viewMode);
-    var rightRaster = predio ? satFindRaster(predio, rightCK, band) : null;
+    var pill = satCurrentPillValue(viewMode);
+    var rightRaster = (predio && ficSatHasCurrentDataForPill(predio, viewMode, pill, band))
+        ? satFindRaster(predio, rightCK, band) : null;
     _setSatOverlay('right', rightRaster);
     state._satOverlaySig = overlaySig;
+    applySatSwipeClip();
 
     if (predio && (leftCK || rightCK)) {
         state.mapPeriodKey = rightRaster ? rightCK : (leftRaster ? leftCK : state.mapPeriodKey);

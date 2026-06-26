@@ -472,6 +472,23 @@
       const lim = api.stretchForAttr(attrId, data);
       const pos = data.positions;
       const clipRings = opts.skipCuartelClip ? null : cuartelesClipLocalRings(data);
+
+      // Clip Z outliers: positions use canopy height; use per-predio P95 * 3.5 as ceiling
+      // to remove noise/tall-tree outliers that push the camera too high.
+      const canopyAttr = data.attributes && data.attributes.canopy;
+      const canopyVmax = (canopyAttr && canopyAttr.type === 'scalar' &&
+        Number.isFinite(Number(canopyAttr.vmax))) ? Number(canopyAttr.vmax) : null;
+      const zClipMax = canopyVmax != null ? Math.max(canopyVmax * 3.5, 12) : 80;
+
+      // Determine RGB bit depth once for the whole cloud (not per-point) to avoid
+      // dark pixels with values < 256 being misclassified as 8-bit in a 16-bit cloud.
+      const rgbAttr = data.attributes && data.attributes.rgb;
+      let rgbScale = 1 / 255;
+      if (rgbAttr && rgbAttr.type === 'rgb' && rgbAttr.red && rgbAttr.red.length) {
+        const sampleR = Number(rgbAttr.red[0] || 0);
+        rgbScale = sampleR > 255 ? (1 / 65535) : (1 / 255);
+      }
+
       let n = pos.length / 3;
       const step = 1;
       const verts = new Float32Array(n * 3);
@@ -481,17 +498,17 @@
         const pi = i * 3;
         const px = pos[pi];
         const py = pos[pi + 1];
+        const pz = pos[pi + 2];
+        if (pz > zClipMax) continue;
         if (clipRings && clipRings.length && !pointInAnyRing(px, py, clipRings)) continue;
-        verts[oi * 3] = pos[pi];
-        verts[oi * 3 + 1] = pos[pi + 1];
-        verts[oi * 3 + 2] = pos[pi + 2];
+        verts[oi * 3] = px;
+        verts[oi * 3 + 1] = py;
+        verts[oi * 3 + 2] = pz;
         let r, g, b;
         if (attr && attr.type === 'rgb') {
-          const rv = Number(attr.red[i] || 0);
-          const scale = rv > 255 ? (1 / 65535) : (1 / 255);
-          r = rv * scale;
-          g = Number(attr.green[i] || 0) * scale;
-          b = Number(attr.blue[i] || 0) * scale;
+          r = Number(attr.red[i] || 0) * rgbScale;
+          g = Number(attr.green[i] || 0) * rgbScale;
+          b = Number(attr.blue[i] || 0) * rgbScale;
         } else if (attr && attr.type === 'categorical') {
           const cls = String(attr.values[i]);
           if (attrId === 'classification' && attr.colors) {
@@ -500,7 +517,7 @@
           const rgb = hexColorTo01((attr.colors && attr.colors[cls]) || '#888888');
           r = rgb[0]; g = rgb[1]; b = rgb[2];
         } else {
-          let val = pos[pi + 2];
+          let val = pz;
           if (attr && attr.type === 'scalar' && attr.values && attr.values.length) {
             val = Number(attr.values[i]);
           }
@@ -556,11 +573,14 @@
       const size = box3.getSize(new THREE.Vector3());
       const spanXY = Math.max(size.x, size.y, 1);
       const spanZ = Math.max(size.z, 0.5);
+      // Position camera to give an oblique 3D view; cap Z contribution so tall trees
+      // don't push the camera straight overhead (and hide the canopy structure below).
+      const zContrib = Math.min(spanZ * 0.45, spanXY * 0.35);
       const dist = spanXY * 1.05;
       L3.camera.position.set(
         center.x,
         center.y - dist,
-        center.z + spanZ * 0.45 + spanXY * 0.12
+        center.z + zContrib + spanXY * 0.12
       );
       L3.controls.target.copy(center);
       L3.controls.minDistance = spanXY * 0.25;
