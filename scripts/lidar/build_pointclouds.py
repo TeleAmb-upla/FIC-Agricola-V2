@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import re
 import sys
 from datetime import datetime, timezone
@@ -30,7 +29,7 @@ for p in (str(REPO_ROOT), str(SCRIPTS_DIR), str(STATIC_SITE_DIR)):
 
 import pipeline_utils  # noqa: F401
 
-from pipeline_utils import load_config, ensure_master_aoi
+from pipeline_utils import load_config, resolve_wetland_id_from_drone_code
 
 try:
     import laspy
@@ -41,12 +40,12 @@ except ImportError as exc:
 from shapely.geometry import mapping
 
 LAS_NAME = re.compile(
-    r"^((?:G\d+)|(?:NOG)|(?:RCI)|(?:RPA)|(?:RIV))_((?:\d{8})|(?:\d{4}[_-]\d{2}[_-]\d{2})).*\.las$",
+    r"^((?:[A-Za-z][A-Za-z0-9_]*))_((?:\d{8})|(?:\d{4}[_-]\d{2}[_-]\d{2})).*\.las$",
     re.I,
 )
-MAX_POINTCLOUD_POINTS = 750_000
+MAX_POINTCLOUD_POINTS = 1_500_000
 GROUND_PERCENTILE = 5.0
-LIDAR_DEFAULT_ATTR = "canopy"
+LIDAR_DEFAULT_ATTR = "rgb"
 DRONE_PROJECTED_CRS = "EPSG:32719"
 REFERENCE_CRS = "EPSG:4326"
 
@@ -94,14 +93,14 @@ def _flat_date_to_key(raw: str) -> str:
     return digits[:8]
 
 
-def discover_las_files(drone_dir: Path) -> list[dict]:
+def discover_las_files(drone_dir: Path, config: dict | None = None) -> list[dict]:
     out: list[dict] = []
     for path in sorted(drone_dir.glob("*.las")):
         m = LAS_NAME.match(path.name)
         if not m:
             continue
         code = m.group(1).upper()
-        wid = code.lower()
+        wid = resolve_wetland_id_from_drone_code(m.group(1), config)
         key = _flat_date_to_key(m.group(2))
         dt = datetime.strptime(key, "%Y%m%d").replace(tzinfo=timezone.utc)
         out.append(
@@ -117,13 +116,21 @@ def discover_las_files(drone_dir: Path) -> list[dict]:
 
 
 def load_wetland_geoms_utm(config: dict) -> dict[str, dict]:
-    master = ensure_master_aoi(config)
-    gdf = gpd.read_file(master).to_crs(DRONE_PROJECTED_CRS)
-    id_col = config["shapefile_id_col"]
+    """Geometrías de recorte por predio: unión de cuarteles en ``cuarteles.geojson``."""
+    from shapely.geometry import shape
+
+    from pipeline_utils import load_wetland_clip_geometries
+
+    clip_geoms = load_wetland_clip_geometries(config)
     parcels: dict[str, dict] = {}
-    for _, row in gdf.iterrows():
-        wid = str(row[id_col]).strip().lower()
-        geom = row.geometry
+    for wid, geom_wgs84 in clip_geoms.items():
+        if not geom_wgs84:
+            continue
+        geom_wgs = shape(geom_wgs84)
+        if geom_wgs.is_empty:
+            continue
+        gdf = gpd.GeoDataFrame(geometry=[geom_wgs], crs="EPSG:4326")
+        geom = gdf.to_crs(DRONE_PROJECTED_CRS).geometry.iloc[0]
         if geom is None or geom.is_empty:
             continue
         minx, miny, maxx, maxy = geom.bounds
@@ -235,49 +242,37 @@ def canopy_heights_m(zs: np.ndarray, z_ground: float) -> np.ndarray:
 
 
 def subsample_pointcloud_indices(xs: np.ndarray, ys: np.ndarray, max_points: int) -> np.ndarray:
+    """Reduce a ``max_points`` preservando la mayor densidad visual posible."""
     n = xs.size
     if n <= max_points:
         return np.arange(n, dtype=np.int64)
-    mx = xs.astype(np.float64, copy=False) - float(np.min(xs))
-    my = ys.astype(np.float64, copy=False) - float(np.min(ys))
-    xmin, xmax = float(mx.min()), float(mx.max())
-    ymin, ymax = float(my.min()), float(my.max())
-    span_x = max(xmax - xmin, 1e-6)
-    span_y = max(ymax - ymin, 1e-6)
-    aspect = span_x / span_y
-    nx = max(1, int(round(math.sqrt(max_points * aspect))))
-    ny = max(1, int(round(max_points / nx)))
-    cell_x = span_x / nx
-    cell_y = span_y / ny
-    ix = np.clip(((mx - xmin) / cell_x).astype(np.int32), 0, nx - 1)
-    iy = np.clip(((my - ymin) / cell_y).astype(np.int32), 0, ny - 1)
-    cell_id = ix * ny + iy
-    order = np.argsort(cell_id, kind="mergesort")
-    sorted_ids = cell_id[order]
-    breaks = np.concatenate(([0], np.flatnonzero(np.diff(sorted_ids)) + 1, [n]))
     rng = np.random.default_rng(42)
-    picks: list[int] = []
-    for a, b in zip(breaks[:-1], breaks[1:]):
-        sl = order[a:b]
-        picks.append(int(sl[0] if sl.size == 1 else rng.choice(sl)))
-    idx = np.asarray(picks, dtype=np.int64)
-    if idx.size > max_points:
-        idx = rng.choice(idx, max_points, replace=False)
-    return idx
+    return np.sort(rng.choice(n, max_points, replace=False))
 
 
-def _predio_boundary_local_ring(parcel_info: dict) -> list[list[float]]:
+def _predio_boundary_local_rings(parcel_info: dict) -> list[list[list[float]]]:
+    """Anillos de contorno en coords locales (un anillo por polígono del predio)."""
     geom = parcel_info["geometry_proj"]
     c = geom.centroid
     e0, n0 = float(c.x), float(c.y)
-    coords = list(geom.exterior.coords) if geom.geom_type == "Polygon" else []
-    if not coords and geom.geom_type == "MultiPolygon":
-        poly = max(geom.geoms, key=lambda g: g.area)
+    polys = [geom] if geom.geom_type == "Polygon" else list(geom.geoms) if geom.geom_type == "MultiPolygon" else []
+    rings: list[list[list[float]]] = []
+    for poly in polys:
+        if poly.is_empty:
+            continue
         coords = list(poly.exterior.coords)
-    ring = [[round(x - e0, 3), round(y - n0, 3), 0.0] for x, y in coords]
-    if ring and ring[0] != ring[-1]:
-        ring.append(ring[0])
-    return ring
+        if len(coords) < 3:
+            continue
+        ring = [[round(x - e0, 3), round(y - n0, 3), 0.0] for x, y in coords]
+        if ring[0] != ring[-1]:
+            ring.append(ring[0])
+        rings.append(ring)
+    return rings
+
+
+def _predio_boundary_local_ring(parcel_info: dict) -> list[list[float]]:
+    rings = _predio_boundary_local_rings(parcel_info)
+    return rings[0] if rings else []
 
 
 def _scalar_attr_payload(values: np.ndarray, spec: dict) -> dict:
@@ -307,11 +302,13 @@ def export_lidar_pointcloud_json(
     out_path: Path,
     *,
     parcel_info: dict,
+    max_points: int = MAX_POINTCLOUD_POINTS,
 ) -> dict:
     xs = fields.get("x", np.array([]))
     ys = fields.get("y", np.array([]))
     zs = fields.get("z", np.array([]))
     if xs.size == 0:
+        empty_rings = _predio_boundary_local_rings(parcel_info)
         payload = {
             "count": 0,
             "ground_z": None,
@@ -319,7 +316,8 @@ def export_lidar_pointcloud_json(
             "coord_frame": "projected",
             "crs": parcel_info.get("crs_proj"),
             "origin": [],
-            "boundary": _predio_boundary_local_ring(parcel_info),
+            "boundary": empty_rings[0] if empty_rings else [],
+            "boundary_rings": empty_rings,
             "positions": [],
             "attributes": {},
         }
@@ -331,7 +329,7 @@ def export_lidar_pointcloud_json(
     geom = parcel_info["geometry_proj"]
     c = geom.centroid
     e0, n0 = float(c.x), float(c.y)
-    idx = subsample_pointcloud_indices(xs, ys, MAX_POINTCLOUD_POINTS)
+    idx = subsample_pointcloud_indices(xs, ys, max_points)
     xs, ys, zs = xs[idx], ys[idx], zs[idx]
     canopy = canopy[idx]
     mx = (xs - e0).astype(np.float32)
@@ -364,6 +362,7 @@ def export_lidar_pointcloud_json(
         if dim and dim in fields:
             attributes[aid] = _scalar_attr_payload(fields[dim][idx], spec)
 
+    boundary_rings = _predio_boundary_local_rings(parcel_info)
     payload = {
         "count": int(mx.size),
         "ground_z": round(z_ground, 4),
@@ -371,7 +370,8 @@ def export_lidar_pointcloud_json(
         "coord_frame": "projected",
         "crs": fields.get("crs") or parcel_info.get("crs_proj"),
         "origin": [round(e0, 3), round(n0, 3)],
-        "boundary": _predio_boundary_local_ring(parcel_info),
+        "boundary": boundary_rings[0] if boundary_rings else [],
+        "boundary_rings": boundary_rings,
         "positions": [round(float(v), 3) for v in positions.tolist()],
         "attributes": attributes,
         "zmin": round(float(np.min(mz)), 4),
@@ -447,7 +447,9 @@ def patch_drone_metadata(static_dir: Path, pointclouds: dict, catalog: list[dict
             lidar_attrs[aid]["type"] = "categorical"
         elif spec.get("type") == "rgb":
             lidar_attrs[aid]["type"] = "rgb"
-    meta["pointclouds"] = {**meta.get("pointclouds", {}), **pointclouds}
+    # Reemplaza (no fusiona) para no conservar claves legacy de ejecuciones previas
+    # con wetland_id antiguos (p. ej. ``rci_…`` en vez de ``a_brito_rci_…``).
+    meta["pointclouds"] = dict(pointclouds)
     meta["lidar_attributes"] = lidar_attrs
     meta["lidar_default_attribute"] = LIDAR_DEFAULT_ATTR
     meta["lidar_stretch"] = _lidar_stretch_from_pointclouds(static_dir, meta["pointclouds"])
@@ -459,14 +461,22 @@ def patch_drone_metadata(static_dir: Path, pointclouds: dict, catalog: list[dict
 def main() -> None:
     ap = argparse.ArgumentParser(description="LAS → JSON pointclouds para explorador FIC.")
     ap.add_argument("--force", action="store_true")
+    ap.add_argument(
+        "--max-points",
+        type=int,
+        default=MAX_POINTCLOUD_POINTS,
+        help=f"Máximo de puntos por nube exportada (default: {MAX_POINTCLOUD_POINTS}).",
+    )
     args = ap.parse_args()
+
+    max_points = max(10_000, int(args.max_points))
 
     config = load_config(REPO_ROOT / "config.yaml")
     drone_dir = (REPO_ROOT / config["sources"]["drone"]["input_root"]).resolve()
     static_dir = (REPO_ROOT / config["sources"]["drone"]["static_root"]).resolve()
     pc_dir = static_dir / "pointclouds"
 
-    flights = discover_las_files(drone_dir)
+    flights = discover_las_files(drone_dir, config)
     if not flights:
         print(f"No hay .las en {drone_dir}", file=sys.stderr)
         sys.exit(0)
@@ -489,9 +499,11 @@ def main() -> None:
         if out_json.is_file() and not args.force:
             print(f"  [omitir] {out_json.name}")
         else:
-            print(f"  Procesando {fl['path'].name} → {out_json.name}")
+            print(f"  Procesando {fl['path'].name} -> {out_json.name}")
             fields = clip_las_fields_to_parcel(fl["path"], pinfo)
-            export_lidar_pointcloud_json(fields, catalog, out_json, parcel_info=pinfo)
+            export_lidar_pointcloud_json(
+                fields, catalog, out_json, parcel_info=pinfo, max_points=max_points
+            )
         rel = f"drone/pointclouds/{stem}.json"
         pointclouds_meta[stem] = {
             "p": rel,

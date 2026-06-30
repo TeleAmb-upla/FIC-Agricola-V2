@@ -387,8 +387,7 @@
       box.setAttribute('aria-hidden', 'false');
     },
 
-    addBoundary: function (data, colorHex, ringOverride) {
-      if (!api.las3d.scene) return;
+    boundaryRingsFromData: function (data, ringOverride) {
       const rings = [];
       if (ringOverride) {
         if (Array.isArray(ringOverride[0]) && Array.isArray(ringOverride[0][0])) {
@@ -398,9 +397,30 @@
         } else if (ringOverride.length >= 2) {
           rings.push(ringOverride);
         }
-      } else if (data && data.boundary && data.boundary.length >= 2) {
+        return rings;
+      }
+      if (!data) return rings;
+      if (data.boundary_rings && data.boundary_rings.length) {
+        data.boundary_rings.forEach(function (r) { if (r && r.length >= 2) rings.push(r); });
+        return rings;
+      }
+      if (data.boundary && data.boundary.length >= 2) {
         rings.push(data.boundary);
       }
+      return rings;
+    },
+
+    expandBox3FromRings: function (box3, rings) {
+      (rings || []).forEach(function (ring) {
+        ring.forEach(function (p) {
+          box3.expandByPoint(new THREE.Vector3(p[0], p[1], p[2] != null ? p[2] : 0));
+        });
+      });
+    },
+
+    addBoundary: function (data, colorHex, ringOverride) {
+      if (!api.las3d.scene) return;
+      const rings = api.boundaryRingsFromData(data, ringOverride);
       if (!rings.length) return;
       if (!api.las3d.boundaries) api.las3d.boundaries = [];
       rings.forEach(function (ring) {
@@ -494,6 +514,7 @@
       const verts = new Float32Array(n * 3);
       const cols = new Float32Array(n * 3);
       let oi = 0;
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
       for (let i = 0; i < n; i += step) {
         const pi = i * 3;
         const px = pos[pi];
@@ -504,6 +525,10 @@
         verts[oi * 3] = px;
         verts[oi * 3 + 1] = py;
         verts[oi * 3 + 2] = pz;
+        if (px < minX) minX = px;
+        if (px > maxX) maxX = px;
+        if (py < minY) minY = py;
+        if (py > maxY) maxY = py;
         let r, g, b;
         if (attr && attr.type === 'rgb') {
           r = Number(attr.red[i] || 0) * rgbScale;
@@ -538,7 +563,8 @@
       geom.setAttribute('position', new THREE.BufferAttribute(verts.subarray(0, oi * 3), 3));
       geom.setAttribute('color', new THREE.BufferAttribute(cols.subarray(0, oi * 3), 3));
       geom.computeBoundingSphere();
-      const pointSize = Math.max(0.03, Math.min(0.07, 220 / Math.sqrt(Math.max(oi, 1))));
+      const spanXY = Math.max(maxX - minX, maxY - minY, 1);
+      const pointSize = Math.max(0.04, Math.min(0.22, spanXY * 0.00045));
       const mat = new THREE.PointsMaterial({
         size: pointSize,
         vertexColors: true,
@@ -550,12 +576,10 @@
     },
 
   fitCameraToBoundary: function (data) {
-      const ring = data && data.boundary;
-      if (!ring || ring.length < 2 || !api.las3d.camera) return false;
+      const rings = api.boundaryRingsFromData(data);
+      if (!rings.length || !api.las3d.camera) return false;
       const box3 = new THREE.Box3();
-      ring.forEach(function (p) {
-        box3.expandByPoint(new THREE.Vector3(p[0], p[1], p[2] != null ? p[2] : 0));
-      });
+      api.expandBox3FromRings(box3, rings);
       if (box3.isEmpty()) return false;
       api.fitCamera(box3, false, null);
       return true;
