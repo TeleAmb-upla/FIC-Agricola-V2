@@ -43,7 +43,8 @@ LAS_NAME = re.compile(
     r"^((?:[A-Za-z][A-Za-z0-9_]*))_((?:\d{8})|(?:\d{4}[_-]\d{2}[_-]\d{2})).*\.las$",
     re.I,
 )
-MAX_POINTCLOUD_POINTS = 1_500_000
+# Techo por nube: ~2M puntos (~100 MB JSON) — equilibrio densidad / memoria del navegador.
+MAX_POINTCLOUD_POINTS = 2_000_000
 GROUND_PERCENTILE = 5.0
 LIDAR_DEFAULT_ATTR = "rgb"
 DRONE_PROJECTED_CRS = "EPSG:32719"
@@ -242,12 +243,35 @@ def canopy_heights_m(zs: np.ndarray, z_ground: float) -> np.ndarray:
 
 
 def subsample_pointcloud_indices(xs: np.ndarray, ys: np.ndarray, max_points: int) -> np.ndarray:
-    """Reduce a ``max_points`` preservando la mayor densidad visual posible."""
+    """Reduce a ``max_points`` con muestreo estratificado (mejor cobertura que azar puro)."""
     n = xs.size
     if n <= max_points:
         return np.arange(n, dtype=np.int64)
     rng = np.random.default_rng(42)
-    return np.sort(rng.choice(n, max_points, replace=False))
+    side = int(np.ceil(np.sqrt(max_points * 1.15)))
+    xmin, xmax = float(xs.min()), float(xs.max())
+    ymin, ymax = float(ys.min()), float(ys.max())
+    span_x = max(xmax - xmin, 1e-6)
+    span_y = max(ymax - ymin, 1e-6)
+    bx = np.clip(((xs - xmin) / span_x * side).astype(np.int32), 0, side - 1)
+    by = np.clip(((ys - ymin) / span_y * side).astype(np.int32), 0, side - 1)
+    cell_id = bx * side + by
+    selected: list[int] = []
+    for cid in np.unique(cell_id):
+        idxs = np.flatnonzero(cell_id == cid)
+        selected.append(int(idxs[rng.integers(0, idxs.size)]))
+    selected_arr = np.asarray(selected, dtype=np.int64)
+    if selected_arr.size < max_points:
+        mask = np.ones(n, dtype=bool)
+        mask[selected_arr] = False
+        remaining = np.flatnonzero(mask)
+        need = min(max_points - selected_arr.size, remaining.size)
+        if need > 0:
+            extra = rng.choice(remaining, need, replace=False)
+            selected_arr = np.concatenate([selected_arr, extra.astype(np.int64)])
+    elif selected_arr.size > max_points:
+        selected_arr = rng.choice(selected_arr, max_points, replace=False)
+    return np.sort(selected_arr)
 
 
 def _predio_boundary_local_rings(parcel_info: dict) -> list[list[list[float]]]:

@@ -9,10 +9,35 @@
     '1': { label: 'No suelo', color: '#808080' }
   };
 
-  /** Grosor de puntos LiDAR (todas las nubes / predios). */
-  const LIDAR_POINT_SIZE_MIN = 0.08;
-  const LIDAR_POINT_SIZE_MAX = 0.34;
-  const LIDAR_POINT_SIZE_SPAN_SCALE = 0.00065;
+  /** Tamaño en píxeles de pantalla (sizeAttenuation=false → siempre visible al hacer zoom). */
+  const LIDAR_POINT_PX_MIN = 7.0;
+  const LIDAR_POINT_PX_MAX = 10.5;
+  /** Techo de puntos a dibujar en el navegador (evita caídas por memoria GPU). */
+  const LIDAR_RENDER_POINT_CAP = 2_000_000;
+  const LIDAR_RENDER_STEP_CAP = 4;
+
+  let _lidarPointSprite = null;
+
+  function lidarPointSpriteTexture() {
+    if (_lidarPointSprite) return _lidarPointSprite;
+    const size = 64;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+      g.addColorStop(0, 'rgba(255,255,255,1)');
+      g.addColorStop(0.35, 'rgba(255,255,255,0.92)');
+      g.addColorStop(0.72, 'rgba(255,255,255,0.45)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, size, size);
+    }
+    _lidarPointSprite = new THREE.CanvasTexture(canvas);
+    _lidarPointSprite.needsUpdate = true;
+    return _lidarPointSprite;
+  }
 
   /** Colormap escalar (misma paleta que fondecyt_puc). */
   function elevationToRgb(t) {
@@ -515,11 +540,13 @@
       }
 
       let n = pos.length / 3;
-      const step = 1;
-      const verts = new Float32Array(n * 3);
-      const cols = new Float32Array(n * 3);
+      let step = 1;
+      if (n > LIDAR_RENDER_POINT_CAP) {
+        step = Math.min(LIDAR_RENDER_STEP_CAP, Math.ceil(n / LIDAR_RENDER_POINT_CAP));
+      }
+      const verts = new Float32Array(Math.ceil(n / step) * 3);
+      const cols = new Float32Array(Math.ceil(n / step) * 3);
       let oi = 0;
-      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
       for (let i = 0; i < n; i += step) {
         const pi = i * 3;
         const px = pos[pi];
@@ -530,10 +557,6 @@
         verts[oi * 3] = px;
         verts[oi * 3 + 1] = py;
         verts[oi * 3 + 2] = pz;
-        if (px < minX) minX = px;
-        if (px > maxX) maxX = px;
-        if (py < minY) minY = py;
-        if (py > maxY) maxY = py;
         let r, g, b;
         if (attr && attr.type === 'rgb') {
           r = Number(attr.red[i] || 0) * rgbScale;
@@ -568,17 +591,20 @@
       geom.setAttribute('position', new THREE.BufferAttribute(verts.subarray(0, oi * 3), 3));
       geom.setAttribute('color', new THREE.BufferAttribute(cols.subarray(0, oi * 3), 3));
       geom.computeBoundingSphere();
-      const spanXY = Math.max(maxX - minX, maxY - minY, 1);
-      const pointSize = Math.max(
-        LIDAR_POINT_SIZE_MIN,
-        Math.min(LIDAR_POINT_SIZE_MAX, spanXY * LIDAR_POINT_SIZE_SPAN_SCALE)
+      const density = oi / Math.max(n, 1);
+      const pointPx = Math.max(
+        LIDAR_POINT_PX_MIN,
+        Math.min(LIDAR_POINT_PX_MAX, LIDAR_POINT_PX_MIN + (1 - density) * 2.2)
       );
       const mat = new THREE.PointsMaterial({
-        size: pointSize,
+        size: pointPx,
+        map: lidarPointSpriteTexture(),
+        alphaTest: 0.08,
         vertexColors: true,
-        sizeAttenuation: true,
+        sizeAttenuation: false,
         transparent: true,
-        opacity: 0.97
+        opacity: 1,
+        depthWrite: false
       });
       return new THREE.Points(geom, mat);
     },
