@@ -9,6 +9,11 @@
     '1': { label: 'No suelo', color: '#808080' }
   };
 
+  /** Grosor de puntos LiDAR (todas las nubes / predios). */
+  const LIDAR_POINT_SIZE_MIN = 0.08;
+  const LIDAR_POINT_SIZE_MAX = 0.34;
+  const LIDAR_POINT_SIZE_SPAN_SCALE = 0.00065;
+
   /** Colormap escalar (misma paleta que fondecyt_puc). */
   function elevationToRgb(t) {
     const x = Math.max(0, Math.min(1, t));
@@ -564,7 +569,10 @@
       geom.setAttribute('color', new THREE.BufferAttribute(cols.subarray(0, oi * 3), 3));
       geom.computeBoundingSphere();
       const spanXY = Math.max(maxX - minX, maxY - minY, 1);
-      const pointSize = Math.max(0.04, Math.min(0.22, spanXY * 0.00045));
+      const pointSize = Math.max(
+        LIDAR_POINT_SIZE_MIN,
+        Math.min(LIDAR_POINT_SIZE_MAX, spanXY * LIDAR_POINT_SIZE_SPAN_SCALE)
+      );
       const mat = new THREE.PointsMaterial({
         size: pointSize,
         vertexColors: true,
