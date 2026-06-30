@@ -10,8 +10,8 @@
   };
 
   /** Tamaño en píxeles de pantalla (sizeAttenuation=false → siempre visible al hacer zoom). */
-  const LIDAR_POINT_PX_MIN = 7.0;
-  const LIDAR_POINT_PX_MAX = 10.5;
+  const LIDAR_POINT_PX_MIN = 3.0;
+  const LIDAR_POINT_PX_MAX = 5.0;
   /** Techo de puntos a dibujar en el navegador (evita caídas por memoria GPU). */
   const LIDAR_RENDER_POINT_CAP = 2_000_000;
   const LIDAR_RENDER_STEP_CAP = 4;
@@ -594,7 +594,7 @@
       const density = oi / Math.max(n, 1);
       const pointPx = Math.max(
         LIDAR_POINT_PX_MIN,
-        Math.min(LIDAR_POINT_PX_MAX, LIDAR_POINT_PX_MIN + (1 - density) * 2.2)
+        Math.min(LIDAR_POINT_PX_MAX, LIDAR_POINT_PX_MIN + (1 - density) * 1.2)
       );
       const mat = new THREE.PointsMaterial({
         size: pointPx,
