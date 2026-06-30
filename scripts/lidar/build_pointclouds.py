@@ -43,8 +43,8 @@ LAS_NAME = re.compile(
     r"^((?:[A-Za-z][A-Za-z0-9_]*))_((?:\d{8})|(?:\d{4}[_-]\d{2}[_-]\d{2})).*\.las$",
     re.I,
 )
-# Techo por nube: ~2M puntos (~100 MB JSON) — equilibrio densidad / memoria del navegador.
-MAX_POINTCLOUD_POINTS = 2_000_000
+# Techo por nube: ~2.25M puntos — más denso sin saturar la memoria del navegador (~115 MB JSON).
+MAX_POINTCLOUD_POINTS = 2_300_000
 GROUND_PERCENTILE = 5.0
 LIDAR_DEFAULT_ATTR = "rgb"
 DRONE_PROJECTED_CRS = "EPSG:32719"
@@ -172,32 +172,53 @@ def clip_las_fields_to_parcel(las_path: Path, parcel_info: dict) -> dict[str, np
     geom_proj = parcel_info["geometry_proj"]
     crs_proj = parcel_info.get("crs_proj") or DRONE_PROJECTED_CRS
     las_crs = detect_las_crs(las_path)
-
-    las = laspy.read(las_path)
-    xs = np.asarray(las.x, dtype=np.float64)
-    ys = np.asarray(las.y, dtype=np.float64)
-    xs, ys = _transform_xy(xs, ys, las_crs, crs_proj)
-
     minx, miny, maxx, maxy = geom_proj.bounds
-    coarse = (xs >= minx) & (xs <= maxx) & (ys >= miny) & (ys <= maxy)
-    if not np.any(coarse):
+
+    buckets: dict[str, list[np.ndarray]] = {"x": [], "y": [], "z": []}
+    extra_dims: list[str] = []
+
+    with laspy.open(las_path) as fh:
+        for dim in fh.header.point_format.dimension_names:
+            key = dim.lower()
+            if key in ("x", "y", "z") or key in SKIP_LIDAR_DIMS:
+                continue
+            extra_dims.append(dim)
+            buckets[key] = []
+
+        for points in fh.chunk_iterator(1_500_000):
+            xs = np.asarray(points.x, dtype=np.float64)
+            ys = np.asarray(points.y, dtype=np.float64)
+            xs, ys = _transform_xy(xs, ys, las_crs, crs_proj)
+            coarse = (xs >= minx) & (xs <= maxx) & (ys >= miny) & (ys <= maxy)
+            if not np.any(coarse):
+                continue
+            xs_c = xs[coarse]
+            ys_c = ys[coarse]
+            inside = contains_xy(geom_proj, xs_c, ys_c) if xs_c.size else np.array([], dtype=bool)
+            if not np.any(inside):
+                continue
+            buckets["x"].append(xs_c[inside])
+            buckets["y"].append(ys_c[inside])
+            buckets["z"].append(np.asarray(points.z, dtype=np.float32)[coarse][inside])
+            for dim in extra_dims:
+                key = dim.lower()
+                raw = getattr(points, dim)
+                buckets[key].append(np.asarray(raw[coarse], copy=False)[inside].astype(np.float32, copy=False))
+
+    if not buckets["x"]:
         return {"x": np.array([]), "y": np.array([]), "z": np.array([]), "crs": crs_proj}
-    xs = xs[coarse]
-    ys = ys[coarse]
-    inside = contains_xy(geom_proj, xs, ys) if xs.size else np.array([], dtype=bool)
+
     fields: dict[str, np.ndarray] = {
-        "x": xs[inside],
-        "y": ys[inside],
-        "z": np.asarray(las.z[coarse], dtype=np.float32)[inside],
+        "x": np.concatenate(buckets["x"]),
+        "y": np.concatenate(buckets["y"]),
+        "z": np.concatenate(buckets["z"]),
         "crs": crs_proj,
     }
-    for dim in las.point_format.dimension_names:
-        key = dim.lower()
-        if key in ("x", "y", "z") or key in SKIP_LIDAR_DIMS:
+    for key in buckets:
+        if key in ("x", "y", "z"):
             continue
-        raw = getattr(las, dim)
-        arr = np.asarray(raw[coarse], copy=False)[inside]
-        fields[key] = arr.astype(np.float32, copy=False)
+        if buckets[key]:
+            fields[key] = np.concatenate(buckets[key])
     return fields
 
 
@@ -248,20 +269,39 @@ def subsample_pointcloud_indices(xs: np.ndarray, ys: np.ndarray, max_points: int
     if n <= max_points:
         return np.arange(n, dtype=np.int64)
     rng = np.random.default_rng(42)
-    side = int(np.ceil(np.sqrt(max_points * 1.35)))
+    side = int(np.ceil(np.sqrt(max_points * 1.25)))
     xmin, xmax = float(xs.min()), float(xs.max())
     ymin, ymax = float(ys.min()), float(ys.max())
     span_x = max(xmax - xmin, 1e-6)
     span_y = max(ymax - ymin, 1e-6)
     bx = np.clip(((xs - xmin) / span_x * side).astype(np.int32), 0, side - 1)
     by = np.clip(((ys - ymin) / span_y * side).astype(np.int32), 0, side - 1)
-    cell_id = bx * side + by
+    cell_id = bx.astype(np.int64) * side + by
+
+    order = np.argsort(cell_id, kind="mergesort")
+    sorted_cell = cell_id[order]
+    boundaries = np.concatenate(
+        (np.flatnonzero(sorted_cell[1:] != sorted_cell[:-1]) + 1, np.array([n], dtype=np.int64))
+    )
+    starts = np.concatenate((np.array([0], dtype=np.int64), boundaries[:-1]))
+    n_cells = starts.size
+    per_cell = max(1, min(3, max_points // max(n_cells, 1)))
+
     selected: list[int] = []
-    for cid in np.unique(cell_id):
-        idxs = np.flatnonzero(cell_id == cid)
-        selected.append(int(idxs[rng.integers(0, idxs.size)]))
+    for start, end in zip(starts, boundaries):
+        idxs = order[start:end]
+        k = min(per_cell, idxs.size)
+        if k >= idxs.size:
+            selected.extend(int(i) for i in idxs)
+        elif k == 1:
+            selected.append(int(idxs[rng.integers(0, idxs.size)]))
+        else:
+            selected.extend(int(i) for i in rng.choice(idxs, k, replace=False))
+
     selected_arr = np.asarray(selected, dtype=np.int64)
-    if selected_arr.size < max_points:
+    if selected_arr.size > max_points:
+        selected_arr = rng.choice(selected_arr, max_points, replace=False)
+    elif selected_arr.size < max_points:
         mask = np.ones(n, dtype=bool)
         mask[selected_arr] = False
         remaining = np.flatnonzero(mask)
@@ -269,8 +309,6 @@ def subsample_pointcloud_indices(xs: np.ndarray, ys: np.ndarray, max_points: int
         if need > 0:
             extra = rng.choice(remaining, need, replace=False)
             selected_arr = np.concatenate([selected_arr, extra.astype(np.int64)])
-    elif selected_arr.size > max_points:
-        selected_arr = rng.choice(selected_arr, max_points, replace=False)
     return np.sort(selected_arr)
 
 
@@ -307,17 +345,44 @@ def _scalar_attr_payload(values: np.ndarray, spec: dict) -> dict:
         classes = sorted({int(v) for v in np.unique(finite)})
         return {
             "type": "categorical",
-            "values": [int(v) for v in values.tolist()],
+            "values": values.astype(np.int32, copy=False).tolist(),
             "classes": {str(c): ASPRS_CLASS_LABELS.get(c, f"Clase {c}") for c in classes},
             "colors": {str(c): ASPRS_CLASS_COLORS.get(c, "#888888") for c in classes},
         }
     p0, p95 = np.percentile(finite, [2, 95])
     return {
         "type": "scalar",
-        "values": [round(float(v), 4) for v in values.tolist()],
+        "values": np.round(values.astype(np.float64), 2).tolist(),
         "vmin": round(float(p0), 4),
         "vmax": round(float(p95), 4),
     }
+
+
+def _compact_positions_list(mx: np.ndarray, my: np.ndarray) -> list[float]:
+    """XY en coords locales; Z=0 (altura en ``attributes.canopy`` para JSON más compacto)."""
+    rx = np.round(mx.astype(np.float64), 2).tolist()
+    ry = np.round(my.astype(np.float64), 2).tolist()
+    out = [0.0] * (len(rx) * 3)
+    out[0::3] = rx
+    out[1::3] = ry
+    return out
+
+
+def _rgb_channels_u8(r: np.ndarray, g: np.ndarray, b: np.ndarray) -> tuple[list[int], list[int], list[int]]:
+    """Normaliza RGB 16-bit DJI a 0–255 para reducir tamaño del JSON."""
+    peak = float(max(np.max(r), np.max(g), np.max(b)))
+    if peak > 255:
+        scale = 255.0 / 65535.0
+        return (
+            np.clip(np.round(r * scale), 0, 255).astype(np.uint8, copy=False).tolist(),
+            np.clip(np.round(g * scale), 0, 255).astype(np.uint8, copy=False).tolist(),
+            np.clip(np.round(b * scale), 0, 255).astype(np.uint8, copy=False).tolist(),
+        )
+    return (
+        r.astype(np.uint8, copy=False).tolist(),
+        g.astype(np.uint8, copy=False).tolist(),
+        b.astype(np.uint8, copy=False).tolist(),
+    )
 
 
 def export_lidar_pointcloud_json(
@@ -359,27 +424,34 @@ def export_lidar_pointcloud_json(
     mx = (xs - e0).astype(np.float32)
     my = (ys - n0).astype(np.float32)
     mz = canopy.astype(np.float32, copy=False)
-    positions = np.empty(mx.size * 3, dtype=np.float32)
-    positions[0::3] = mx
-    positions[1::3] = my
-    positions[2::3] = mz
 
     attributes: dict[str, dict] = {}
     for spec in catalog:
         aid = spec["id"]
         if spec.get("derived") == "canopy":
-            attributes[aid] = _scalar_attr_payload(mz, spec)
+            finite = mz[np.isfinite(mz)]
+            if finite.size:
+                p0, p95 = np.percentile(finite, [2, 95])
+                attributes[aid] = {
+                    "type": "scalar",
+                    "values": np.round(mz.astype(np.float64), 1).tolist(),
+                    "vmin": round(float(p0), 4),
+                    "vmax": round(float(p95), 4),
+                }
+            else:
+                attributes[aid] = {"type": "scalar", "values": [], "vmin": None, "vmax": None}
             continue
         if spec.get("type") == "rgb":
             r = fields.get("red", np.array([]))
             g = fields.get("green", np.array([]))
             b = fields.get("blue", np.array([]))
             if r.size and g.size and b.size:
+                red, green, blue = _rgb_channels_u8(r[idx], g[idx], b[idx])
                 attributes[aid] = {
                     "type": "rgb",
-                    "red": [int(v) for v in r[idx].tolist()],
-                    "green": [int(v) for v in g[idx].tolist()],
-                    "blue": [int(v) for v in b[idx].tolist()],
+                    "red": red,
+                    "green": green,
+                    "blue": blue,
                 }
             continue
         dim = spec.get("dim")
@@ -396,7 +468,7 @@ def export_lidar_pointcloud_json(
         "origin": [round(e0, 3), round(n0, 3)],
         "boundary": boundary_rings[0] if boundary_rings else [],
         "boundary_rings": boundary_rings,
-        "positions": [round(float(v), 3) for v in positions.tolist()],
+        "positions": _compact_positions_list(mx, my),
         "attributes": attributes,
         "zmin": round(float(np.min(mz)), 4),
         "zmax": round(float(np.max(mz)), 4),

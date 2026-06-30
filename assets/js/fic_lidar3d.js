@@ -12,7 +12,7 @@
   /** Fallback si no hay valor en state (≈ visor DJI Terra). */
   const LIDAR_POINT_PX_DEFAULT = 3.5;
   /** Techo de puntos a dibujar en el navegador (evita caídas por memoria GPU). */
-  const LIDAR_RENDER_POINT_CAP = 2_000_000;
+  const LIDAR_RENDER_POINT_CAP = 2_300_000;
   const LIDAR_RENDER_STEP_CAP = 4;
 
   let _lidarPointSprite = null;
@@ -567,7 +567,10 @@
         const pi = i * 3;
         const px = pos[pi];
         const py = pos[pi + 1];
-        const pz = pos[pi + 2];
+        let pz = pos[pi + 2];
+        if (canopyAttr && canopyAttr.values && canopyAttr.values.length) {
+          pz = Number(canopyAttr.values[i]);
+        }
         if (pz > zClipMax) continue;
         if (clipRings && clipRings.length && !pointInAnyRing(px, py, clipRings)) continue;
         verts[oi * 3] = px;

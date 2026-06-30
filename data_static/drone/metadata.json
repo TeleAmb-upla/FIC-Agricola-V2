@@ -3723,7 +3723,7 @@
   "lidar_stretch": {
     "canopy": {
       "vmin": 0.0,
-      "vmax": 38.6818
+      "vmax": 36.5
     },
     "intensity": {
       "vmin": 768.0,
