@@ -248,7 +248,7 @@ def subsample_pointcloud_indices(xs: np.ndarray, ys: np.ndarray, max_points: int
     if n <= max_points:
         return np.arange(n, dtype=np.int64)
     rng = np.random.default_rng(42)
-    side = int(np.ceil(np.sqrt(max_points * 1.15)))
+    side = int(np.ceil(np.sqrt(max_points * 1.35)))
     xmin, xmax = float(xs.min()), float(xs.max())
     ymin, ymax = float(ys.min()), float(ys.max())
     span_x = max(xmax - xmin, 1e-6)

@@ -9,9 +9,8 @@
     '1': { label: 'No suelo', color: '#808080' }
   };
 
-  /** Tamaño en píxeles de pantalla (sizeAttenuation=false → siempre visible al hacer zoom). */
-  const LIDAR_POINT_PX_MIN = 3.0;
-  const LIDAR_POINT_PX_MAX = 5.0;
+  /** Tamaño fijo en píxeles de pantalla (sizeAttenuation=false). */
+  const LIDAR_POINT_PX = 2.0;
   /** Techo de puntos a dibujar en el navegador (evita caídas por memoria GPU). */
   const LIDAR_RENDER_POINT_CAP = 2_000_000;
   const LIDAR_RENDER_STEP_CAP = 4;
@@ -20,7 +19,7 @@
 
   function lidarPointSpriteTexture() {
     if (_lidarPointSprite) return _lidarPointSprite;
-    const size = 64;
+    const size = 32;
     const canvas = document.createElement('canvas');
     canvas.width = size;
     canvas.height = size;
@@ -28,9 +27,8 @@
     if (ctx) {
       const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
       g.addColorStop(0, 'rgba(255,255,255,1)');
-      g.addColorStop(0.35, 'rgba(255,255,255,0.92)');
-      g.addColorStop(0.72, 'rgba(255,255,255,0.45)');
-      g.addColorStop(1, 'rgba(255,255,255,0)');
+      g.addColorStop(0.45, 'rgba(255,255,255,0.75)');
+      g.addColorStop(0.72, 'rgba(255,255,255,0)');
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, size, size);
     }
@@ -591,19 +589,14 @@
       geom.setAttribute('position', new THREE.BufferAttribute(verts.subarray(0, oi * 3), 3));
       geom.setAttribute('color', new THREE.BufferAttribute(cols.subarray(0, oi * 3), 3));
       geom.computeBoundingSphere();
-      const density = oi / Math.max(n, 1);
-      const pointPx = Math.max(
-        LIDAR_POINT_PX_MIN,
-        Math.min(LIDAR_POINT_PX_MAX, LIDAR_POINT_PX_MIN + (1 - density) * 1.2)
-      );
       const mat = new THREE.PointsMaterial({
-        size: pointPx,
+        size: LIDAR_POINT_PX,
         map: lidarPointSpriteTexture(),
-        alphaTest: 0.08,
+        alphaTest: 0.18,
         vertexColors: true,
         sizeAttenuation: false,
         transparent: true,
-        opacity: 1,
+        opacity: 0.92,
         depthWrite: false
       });
       return new THREE.Points(geom, mat);
