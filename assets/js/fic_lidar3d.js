@@ -9,8 +9,8 @@
     '1': { label: 'No suelo', color: '#808080' }
   };
 
-  /** Tamaño fijo en píxeles de pantalla (sizeAttenuation=false). */
-  const LIDAR_POINT_PX = 2.0;
+  /** Fallback si no hay valor en state (≈ visor DJI Terra). */
+  const LIDAR_POINT_PX_DEFAULT = 3.5;
   /** Techo de puntos a dibujar en el navegador (evita caídas por memoria GPU). */
   const LIDAR_RENDER_POINT_CAP = 2_000_000;
   const LIDAR_RENDER_STEP_CAP = 4;
@@ -19,7 +19,7 @@
 
   function lidarPointSpriteTexture() {
     if (_lidarPointSprite) return _lidarPointSprite;
-    const size = 32;
+    const size = 48;
     const canvas = document.createElement('canvas');
     canvas.width = size;
     canvas.height = size;
@@ -27,8 +27,9 @@
     if (ctx) {
       const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
       g.addColorStop(0, 'rgba(255,255,255,1)');
-      g.addColorStop(0.45, 'rgba(255,255,255,0.75)');
-      g.addColorStop(0.72, 'rgba(255,255,255,0)');
+      g.addColorStop(0.4, 'rgba(255,255,255,0.88)');
+      g.addColorStop(0.68, 'rgba(255,255,255,0.35)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, size, size);
     }
@@ -216,6 +217,23 @@
     bind: function (appState, dataStaticBase) {
       api.state = appState;
       api.baseUrl = dataStaticBase;
+    },
+
+    lidarPointSizePx: function () {
+      const raw = api.state && api.state.lidarPointSizePx;
+      const n = Number(raw);
+      if (isFinite(n)) return Math.max(1, Math.min(8, n));
+      return LIDAR_POINT_PX_DEFAULT;
+    },
+
+    refreshPointSize: function () {
+      const size = api.lidarPointSizePx();
+      (api.las3d.points || []).forEach(function (pts) {
+        if (pts && pts.material) {
+          pts.material.size = size;
+          pts.material.needsUpdate = true;
+        }
+      });
     },
 
     selectedPredioId: function () {
@@ -590,13 +608,13 @@
       geom.setAttribute('color', new THREE.BufferAttribute(cols.subarray(0, oi * 3), 3));
       geom.computeBoundingSphere();
       const mat = new THREE.PointsMaterial({
-        size: LIDAR_POINT_PX,
+        size: api.lidarPointSizePx(),
         map: lidarPointSpriteTexture(),
-        alphaTest: 0.18,
+        alphaTest: 0.15,
         vertexColors: true,
         sizeAttenuation: false,
         transparent: true,
-        opacity: 0.92,
+        opacity: 0.94,
         depthWrite: false
       });
       return new THREE.Points(geom, mat);

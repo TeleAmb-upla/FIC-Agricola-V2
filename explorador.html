@@ -430,6 +430,31 @@
             border-top: 1px solid rgba(29, 107, 74, 0.1);
         }
         #ficLidarAttrDesc[hidden] { display: none !important; }
+        .fic-lidar-pointsize-wrap {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            margin-top: 0.15rem;
+        }
+        .fic-lidar-pointsize-wrap input[type="range"] {
+            flex: 1;
+            min-width: 0;
+            accent-color: var(--fic-ag-accent);
+        }
+        .fic-lidar-pointsize-val {
+            flex-shrink: 0;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--fic-ag-ink);
+            min-width: 3.2rem;
+            text-align: right;
+        }
+        .fic-lidar-pointsize-hint {
+            font-size: 0.72rem;
+            color: var(--fic-ag-muted);
+            line-height: 1.35;
+            margin: 0.1rem 0 0;
+        }
         #ficAgricultorPickBlock[hidden] { display: none !important; }
         .selector-label {
             font-size: 0.68rem;
@@ -1430,6 +1455,13 @@
                     <div class="fic-sidebar-block fic-sidebar-block--lidar" id="ficLidarAttrFields" hidden>
                         <label class="selector-label" for="ficLidarAttr">Atributo LiDAR</label>
                         <select id="ficLidarAttr" title="Color de la nube de puntos LiDAR"></select>
+                        <label class="selector-label" for="ficLidarPointSize" style="margin-top:0.65rem">Tamaño de puntos</label>
+                        <div class="fic-lidar-pointsize-wrap">
+                            <input type="range" id="ficLidarPointSize" min="1" max="8" step="0.5" value="3.5"
+                                title="Tamaño de visualización de la nube (similar al control de DJI Terra)">
+                            <span class="fic-lidar-pointsize-val" id="ficLidarPointSizeVal">3.5 px</span>
+                        </div>
+                        <p class="fic-lidar-pointsize-hint">Predeterminado 3.5 px (estilo visor DJI Terra). Ajusta si lo necesitas.</p>
                         <div class="fic-index-desc fic-lidar-attr-desc" id="ficLidarAttrDesc" hidden>
                             <span class="fic-index-desc__label" id="ficLidarAttrDescLabel">RGB</span>
                             <p class="fic-index-desc__text" id="ficLidarAttrDescText"></p>
@@ -2273,6 +2305,8 @@ const state = {
     /** 0..1 opacidad de NDVI/NDWI sobre RGB (solo dron). */
     droneIndexOpacity: 1.0,
     lidarAttribute: 'rgb',
+    /** Tamaño de puntos LiDAR en píxeles de pantalla (1–8; default ~DJI Terra). */
+    lidarPointSizePx: 3.5,
     /** 0..1 posición del divisor desde la izquierda del mapa (izquierda = ráster referencia). */
     satSwipeRatio: 0.5,
     /** Último contexto predio|fuente|periodKey para el que se hizo fitBounds al WebP en el mapa principal. */
@@ -5454,7 +5488,9 @@ async function loadManifest() {
     await loadCuartelesIndex();
     await ensureDroneDatasetLoaded();
     if (typeof FicLidar3d !== 'undefined') {
+        ficLoadLidarPointSizeFromStorage();
         FicLidar3d.bind(state, BASE);
+        ficBindLidarPointSizeSlider();
     }
 
     try {
@@ -5753,6 +5789,52 @@ function updateMapLayerHint() {
     ficSyncDroneMapTitle();
 }
 
+var LS_LIDAR_POINT_PX = 'fic_lidar_point_px';
+var LIDAR_POINT_PX_DEFAULT = 3.5;
+
+function ficClampLidarPointSizePx(v) {
+    var n = Number(v);
+    if (!isFinite(n)) return LIDAR_POINT_PX_DEFAULT;
+    return Math.max(1, Math.min(8, Math.round(n * 2) / 2));
+}
+
+function ficLoadLidarPointSizeFromStorage() {
+    try {
+        var raw = localStorage.getItem(LS_LIDAR_POINT_PX);
+        if (raw != null && raw !== '') state.lidarPointSizePx = ficClampLidarPointSizePx(parseFloat(raw));
+    } catch (e) { /* noop */ }
+    if (state.lidarPointSizePx == null || !isFinite(Number(state.lidarPointSizePx))) {
+        state.lidarPointSizePx = LIDAR_POINT_PX_DEFAULT;
+    }
+}
+
+function ficSyncLidarPointSizeUi() {
+    var rng = document.getElementById('ficLidarPointSize');
+    var lab = document.getElementById('ficLidarPointSizeVal');
+    if (!rng || !lab) return;
+    var px = ficClampLidarPointSizePx(state.lidarPointSizePx);
+    state.lidarPointSizePx = px;
+    rng.value = String(px);
+    lab.textContent = px.toFixed(1).replace(/\.0$/, '') + ' px';
+    rng.setAttribute('aria-valuenow', String(px));
+}
+
+function ficBindLidarPointSizeSlider() {
+    var rng = document.getElementById('ficLidarPointSize');
+    if (!rng || rng.dataset.ficBound) return;
+    rng.dataset.ficBound = '1';
+    ficLoadLidarPointSizeFromStorage();
+    ficSyncLidarPointSizeUi();
+    rng.addEventListener('input', function () {
+        state.lidarPointSizePx = ficClampLidarPointSizePx(rng.value);
+        ficSyncLidarPointSizeUi();
+        try { localStorage.setItem(LS_LIDAR_POINT_PX, String(state.lidarPointSizePx)); } catch (e1) { /* noop */ }
+        if (typeof FicLidar3d !== 'undefined' && FicLidar3d.refreshPointSize) {
+            FicLidar3d.refreshPointSize();
+        }
+    });
+}
+
 /** Textos breves de atributos LiDAR. */
 var FIC_LIDAR_ATTR_DESCRIPTIONS = {
     rgb: 'Color real (RGB) de cada punto: ortofoto 3D del vuelo, útil como referencia visual del terreno y el dosel.',
@@ -5942,6 +6024,8 @@ function ficRefreshLidarView() {
         return;
     }
     ficUpdateLidarAttrDescription();
+    ficBindLidarPointSizeSlider();
+    ficSyncLidarPointSizeUi();
     FicLidar3d.populateLidarAttrSelect();
     ficUpdateLidarAttrDescription();
     FicLidar3d.updateView();
