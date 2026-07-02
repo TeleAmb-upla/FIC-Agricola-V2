@@ -588,7 +588,9 @@ def build_weekly_collection(
     calendar_years: list[int],
     *,
     export_half: str = "all",
+    valid_week_keys: set[tuple[int, int]] | None = None,
 ) -> ee.ImageCollection:
+    """Construye mosaicos semanales. Si ``valid_week_keys`` se provee, omite semanas sin escenas."""
     if not calendar_years:
         return ee.ImageCollection([])
 
@@ -607,6 +609,9 @@ def build_weekly_collection(
             ee.Date(scene_start_ms), ee.Date(scene_end_ms)
         ).map(mask_and_scale).map(add_indices)
         for spec in specs:
+            key = (int(spec["calendar_year"]), int(spec["iso_week"]))
+            if valid_week_keys is not None and key not in valid_week_keys:
+                continue
             monday_ms = int(spec["monday_ms"])
             start = ee.Date(monday_ms)
             end_w = start.advance(7, "day")
@@ -621,14 +626,7 @@ def build_weekly_collection(
                     "system:time_start": start.millis(),
                 }
             )
-            weekly_for_export = ee.Image(
-                ee.Algorithms.If(
-                    week_col.size().gt(0),
-                    mosaic,
-                    mosaic.set("year", -1),
-                )
-            )
-            imgs.append(weekly_for_export)
+            imgs.append(mosaic)
 
     if not imgs:
         return ee.ImageCollection([])
@@ -643,7 +641,6 @@ def build_weekly_collection(
 
     return (
         ee.ImageCollection(imgs)
-        .filter(ee.Filter.neq("year", -1))
         .map(_clip_keep_meta)
     )
 
@@ -1643,13 +1640,25 @@ def run_image_collection_exports(
                     f"  Rango ISO en esta tanda: {iy0}-W{iw0:02d} … {iy1}-W{iw1:02d} "
                     f"({len(sh)} semanas de año civil {y})"
                 )
+        precalc = audit_by_year.get(y)
+        if precalc is None:
+            precalc = get_week_audit_for_year(aoi, y, end_exclusive)
+        audit_by_year[y] = precalc
+        valid_keys = {
+            (int(r["calendar_year"]), int(r["iso_week"]))
+            for r in precalc
+            if int(r.get("n_pipeline", 0)) > 0
+        }
         final_collection = build_weekly_collection(
-            aoi, end_exclusive, [y], export_half=args.export_half
+            aoi,
+            end_exclusive,
+            [y],
+            export_half=args.export_half,
+            valid_week_keys=valid_keys,
         )
         n_m = final_collection.size().getInfo()
         total_mosaics += n_m
         print(f"  Mosaicos semanales con escenas: {n_m}")
-        precalc = audit_by_year.get(y) if audit_by_year else None
         enq, skipped = export_year(
             final_collection,
             aoi,
