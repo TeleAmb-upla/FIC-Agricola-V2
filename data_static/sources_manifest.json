@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-06-23T22:33:39.323219+00:00",
+  "generated_at": "2026-06-25T19:35:45.854953+00:00",
   "aoi_path": "wetlands_aoi.geojson",
   "year_range": {
-    "start": 2024,
+    "start": 2017,
     "end": 2026
   },
   "sources": {

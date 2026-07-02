@@ -31,10 +31,12 @@ import pipeline_utils  # noqa: F401 — inicializa PROJ (proj.db) antes de raste
 import geopandas as gpd
 import numpy as np
 import rasterio
+from contextlib import contextmanager
 from PIL import Image
 from rasterio.enums import Resampling
 from rasterio.features import geometry_mask, geometry_window
 from rasterio.mask import mask
+from rasterio.vrt import WarpedVRT
 from rasterio.warp import reproject, transform_bounds, transform_geom
 from rasterio.transform import Affine, array_bounds, from_bounds
 from rasterio.windows import bounds as window_bounds
@@ -43,12 +45,13 @@ from shapely.geometry import box, mapping, shape
 from pipeline_utils import (
     build_file_fingerprint,
     ensure_master_aoi,
-    resolve_wetland_id_from_drone_code,
+    resolve_predio_id_from_drone_code,
     ensure_predios_gv_utm19s_clone,
     get_source_input_roots,
     load_config,
     load_json_if_exists,
-    load_wetland_clip_geometries,
+    load_predio_clip_geometries,
+    predios_config,
     resolve_years,
     write_json,
 )
@@ -62,16 +65,20 @@ RGB_PREVIEW_MASK_REVISION = 12
 THERMAL_PREVIEW_REVISION = 5
 
 
-def _thermal_stretch_percentiles(index_cfg: dict, wetland_id: str | None) -> tuple[float, float]:
+def _thermal_stretch_percentiles(index_cfg: dict, predio_id: str | None) -> tuple[float, float]:
     """P0–P98 en predios con picos térmicos espurios (RIV); el resto usa P0–P100."""
     default = tuple(index_cfg.get("stretch_percentiles") or [0, 100])
     if len(default) != 2:
         default = (0.0, 100.0)
     riv_ids = {
         str(w).strip().lower()
-        for w in (index_cfg.get("legend_p95_wetland_ids") or ["riv"])
+        for w in (
+            index_cfg.get("legend_p95_predio_ids")
+            or index_cfg.get("legend_p95_predio_ids")
+            or ["riv"]
+        )
     }
-    if wetland_id and str(wetland_id).strip().lower() in riv_ids:
+    if predio_id and str(predio_id).strip().lower() in riv_ids:
         custom = tuple(index_cfg.get("stretch_percentiles_p95_legend") or [0, 95])
         if len(custom) == 2:
             return custom
@@ -127,6 +134,28 @@ COLORMAPS = {
         (122, 4, 3),
     ],
 }
+
+
+@contextmanager
+def open_as_4326(tiff_path: str | Path, resampling: Resampling = Resampling.bilinear):
+    """
+    Abre el GeoTIFF presentándolo en **EPSG:4326** (vía ``WarpedVRT`` si el origen está proyectado).
+
+    Así los WebP se rasterizan sobre una grilla geográfica regular: predios/cuarteles contiguos
+    quedan alineados con el mapa (mismo origen y proyección) en lugar de aparecer «cizallados»
+    por colocar píxeles de una grilla proyectada dentro de un bbox lat/lng.
+    """
+    with rasterio.open(tiff_path) as src:
+        epsg = None
+        try:
+            epsg = src.crs.to_epsg() if src.crs else None
+        except Exception:
+            epsg = None
+        if src.crs is None or epsg == 4326:
+            yield src
+        else:
+            with WarpedVRT(src, crs="EPSG:4326", resampling=resampling) as vrt:
+                yield vrt
 
 
 def leaflet_corners_from_affine_bounds(
@@ -239,12 +268,12 @@ def _unlink_preview_output(preview_path: Path, cfg: dict) -> None:
 
 def build_existing_point_index(existing_timeseries: dict) -> dict:
     points_index = {}
-    for wetland_id, wetland_entry in existing_timeseries.get("wetlands", {}).items():
-        for index_key, index_entry in wetland_entry.get("indices", {}).items():
+    for predio_id, predio_entry in (existing_timeseries.get("predios") or existing_timeseries.get("wetlands") or {}).items():
+        for index_key, index_entry in predio_entry.get("indices", {}).items():
             for point in index_entry.get("points", []):
                 period_key = point.get("period_key")
                 if period_key:
-                    points_index[(wetland_id, index_key, period_key)] = point
+                    points_index[(predio_id, index_key, period_key)] = point
     return points_index
 
 
@@ -467,7 +496,7 @@ def build_preview_rgb(
     leaflet_bbox = None
     native_h = native_w = None
 
-    with rasterio.open(raster_path) as src:
+    with open_as_4326(raster_path) as src:
         bands_to_read = _rgb_read_band_indexes(src)
         n_rgb = len(bands_to_read)
         alpha_band = 4 if int(src.count) >= 4 else None
@@ -607,18 +636,18 @@ def build_preview_thermal(
     visualization_cfg: dict,
     geom_wgs84: dict | None,
     index_cfg: dict,
-    wetland_id: str | None = None,
+    predio_id: str | None = None,
 ) -> dict | None:
     """WebP térmico con colormap; la leyenda usa P0–P98 sólo en predios configurados (RIV)."""
     clip_to_aoi = visualization_cfg.get("clip_to_aoi", False) and geom_wgs84 is not None
     max_dim_cfg = visualization_cfg.get("index_preview_max_size") or visualization_cfg.get("rgb_max_size")
-    stretch_percentiles = _thermal_stretch_percentiles(index_cfg, wetland_id)
+    stretch_percentiles = _thermal_stretch_percentiles(index_cfg, predio_id)
     cmap_name = str(index_cfg.get("colormap", "Turbo"))
 
     leaflet_bbox = None
     native_w = native_h = None
 
-    with rasterio.open(tiff_path) as src:
+    with open_as_4326(tiff_path) as src:
         window = None
         geom_crs = None
         bounds_for_corners = src.bounds
@@ -745,7 +774,7 @@ def build_preview_raster(
 
     leaflet_bbox = None
 
-    with rasterio.open(tiff_path) as src:
+    with open_as_4326(tiff_path) as src:
         window = None
         geom_crs = None
         bounds_for_corners = src.bounds
@@ -939,6 +968,25 @@ def _trimmed_physical_mean(physical: np.ndarray, invalid: np.ndarray) -> float |
     return float(np.mean(v))
 
 
+def _trimmed_physical_median(physical: np.ndarray, invalid: np.ndarray) -> float | None:
+    """Mediana sobre píxeles válidos tras recorte [-1.5,1.5] y recorte 5–95% si hay muestra grande."""
+    physical_ma = np.ma.array(physical, mask=invalid)
+    v = np.ma.compressed(physical_ma)
+    if v.size == 0:
+        return None
+    v = v.astype(np.float64, copy=False)
+    v = v[np.isfinite(v)]
+    v = v[(v >= -1.5) & (v <= 1.5)]
+    if v.size == 0:
+        return None
+    if v.size >= 128:
+        p05, p95 = np.percentile(v, [5.0, 95.0])
+        trimmed = v[(v >= p05) & (v <= p95)]
+        if trimmed.size >= 64:
+            v = trimmed
+    return float(np.median(v))
+
+
 def _extract_zonal_mean_gdalwarp(tiff_path: Path, zone_geom_wgs84: dict) -> float | None:
     """
     Algunos GeoTIFF tienen strips corruptos: rasterio.mask falla, pero gdalwarp a grillas
@@ -1091,24 +1139,100 @@ def extract_zonal_mean(
         return None
 
 
-def compute_area_ha(gdf_wetland: gpd.GeoDataFrame) -> float:
-    epsg = _metric_epsg_from_geometry(gdf_wetland.geometry.union_all())
-    projected = gdf_wetland.to_crs(epsg=epsg)
+def _full_raster_trimmed_median(tiff_path: Path, max_dim: int = 1024) -> float | None:
+    """Mediana física global del ráster (mismo submuestreo que ``_full_raster_trimmed_mean``)."""
+    try:
+        with rasterio.open(tiff_path) as src:
+            scale = max(1, int(max(src.width, src.height) / max_dim))
+            out_h = max(1, src.height // scale)
+            out_w = max(1, src.width // scale)
+            raw = src.read(1, out_shape=(out_h, out_w)).astype(np.float64)
+            invalid = ~np.isfinite(raw)
+            if src.nodata is not None and np.isfinite(float(src.nodata)):
+                invalid |= np.isclose(raw, float(src.nodata), rtol=1e-5, atol=1e-6)
+            physical = normalize_drone_index_band_values(raw, src, band_idx=1)
+            return _trimmed_physical_median(physical, invalid)
+    except Exception as exc:
+        print(f"    [zonal full-raster median fallback] {exc}")
+        return None
+
+
+def extract_zonal_median(
+    tiff_path: str | Path,
+    zone_geom_wgs84: dict,
+    allow_full_raster_fallback: bool = False,
+) -> float | None:
+    """Mediana zonal dentro de ``zone_geom_wgs84`` (misma normalización que ``extract_zonal_mean``)."""
+    tiff_path = Path(tiff_path)
+    try:
+        with rasterio.open(tiff_path) as src:
+            if not _aoi_intersects_raster_extent_wgs84(src, zone_geom_wgs84):
+                if allow_full_raster_fallback:
+                    fv = _full_raster_trimmed_median(tiff_path)
+                    if fv is not None:
+                        print("    [zonal] AOI fuera de huella; uso mediana global del ráster")
+                    return fv
+                return None
+            crs = src.crs
+            zone_s = zone_geom_wgs84
+            if crs and str(crs) != "EPSG:4326":
+                zone_s = transform_geom("EPSG:4326", crs, zone_geom_wgs84)
+
+            out_image, _ = mask(src, [zone_s], crop=True, indexes=[1], nodata=src.nodata)
+            raw = out_image[0]
+            invalid = np.zeros(raw.shape, dtype=bool)
+            if src.nodata is not None and np.isfinite(float(src.nodata)):
+                invalid |= np.isclose(
+                    raw.astype(np.float64), float(src.nodata), rtol=1e-5, atol=1e-6
+                )
+            invalid |= ~np.isfinite(raw.astype(np.float64))
+
+            physical = normalize_drone_index_band_values(raw, src, band_idx=1)
+            value = _trimmed_physical_median(physical, invalid)
+            if value is None and allow_full_raster_fallback:
+                fv = _full_raster_trimmed_median(tiff_path)
+                if fv is not None:
+                    print("    [zonal] Zona sin píxeles válidos; uso mediana global del ráster")
+                return fv
+            return value
+
+    except Exception as exc:
+        if "do not overlap" in str(exc).lower():
+            if allow_full_raster_fallback:
+                return _full_raster_trimmed_median(tiff_path)
+            return None
+        if isinstance(exc, rasterio.RasterioIOError) or "Read failed" in str(exc):
+            gv = _extract_zonal_mean_gdalwarp(tiff_path, zone_geom_wgs84)
+            if gv is not None:
+                print("    [zonal] Fallback gdalwarp (mediana aprox.) tras error de lectura TIFF")
+                return gv
+            if allow_full_raster_fallback:
+                fv = _full_raster_trimmed_median(tiff_path)
+                if fv is not None:
+                    print("    [zonal] Fallback mediana global tras error de lectura TIFF")
+                return fv
+        print(f"    Error: {exc}")
+        return None
+
+
+def compute_area_ha(gdf_predio: gpd.GeoDataFrame) -> float:
+    epsg = _metric_epsg_from_geometry(gdf_predio.geometry.union_all())
+    projected = gdf_predio.to_crs(epsg=epsg)
     return round(float(projected.geometry.area.sum()) / 10_000, 1)
 
 
 SEASON_ALIASES = {"otono": ["otono", "otoño"]}
 
-def get_tiff_path(source_cfg: dict, wetland_id: str, year: int, season: str, index_key: str) -> Path | None:
+def get_tiff_path(source_cfg: dict, predio_id: str, year: int, season: str, index_key: str) -> Path | None:
     for root in get_source_input_roots(source_cfg):
         season_variants = SEASON_ALIASES.get(season, [season])
         exts = (".tif", ".tiff", ".TIF", ".TIFF", ".png", ".PNG", ".jpg", ".JPG") if index_key == "rgb" else (".tif", ".tiff", ".TIF", ".TIFF")
         for s in season_variants:
             for ext in exts:
-                candidate_new = root / wetland_id / index_key / f"{year}_{s}{ext}"
+                candidate_new = root / predio_id / index_key / f"{year}_{s}{ext}"
                 if candidate_new.exists():
                     return candidate_new
-                candidate_legacy = root / wetland_id / f"{year}_{s}_{index_key}{ext}"
+                candidate_legacy = root / predio_id / f"{year}_{s}_{index_key}{ext}"
                 if candidate_legacy.exists():
                     return candidate_legacy
     return None
@@ -1182,7 +1306,7 @@ def ingest_flat_drone_date_assets(
     visualization_cfg: dict,
     indices_cfg: dict,
     source_indices: list[str],
-    wetland_ctx: dict[str, dict],
+    predio_ctx: dict[str, dict],
     rasters_dir: Path,
     existing_rasters: dict,
     periods_set: set,
@@ -1222,7 +1346,7 @@ def ingest_flat_drone_date_assets(
         if not parsed:
             bump_skip("parse_failed", file=tiff_path.name)
             continue
-        code_wid = resolve_wetland_id_from_drone_code(parsed.group(1), config)
+        code_wid = resolve_predio_id_from_drone_code(parsed.group(1), config)
         ymd_raw, index_key = parsed.group(2), parsed.group(4).lower()
         try:
             ymd = _flat_filename_date_to_ymd(ymd_raw)
@@ -1232,10 +1356,10 @@ def ingest_flat_drone_date_assets(
         if index_key not in source_indices:
             bump_skip("index_not_in_source", file=tiff_path.name, index_key=index_key)
             continue
-        ctx = wetland_ctx.get(code_wid)
+        ctx = predio_ctx.get(code_wid)
         if not ctx:
             print(f"  [flat] Sin AOI para predio {code_wid}: {tiff_path.name}")
-            bump_skip("no_wetland_ctx", file=tiff_path.name, code_wid=code_wid)
+            bump_skip("no_predio_ctx", file=tiff_path.name, code_wid=code_wid)
             continue
 
         geom_union = ctx["geom_union"]
@@ -1305,7 +1429,7 @@ def ingest_flat_drone_date_assets(
                 source_fingerprint,
                 reuse_if_unchanged=_reuse_previews_allowed(viz_flat),
             )
-            mean_value = extract_zonal_mean(
+            mean_value = extract_zonal_median(
                 tiff_path, geom_union, allow_full_raster_fallback=True
             )
             if preview_meta is None:
@@ -1332,7 +1456,7 @@ def ingest_flat_drone_date_assets(
                     "period_key": period_key,
                     "value": round(mean_value, 4),
                 }
-                wentry = source_timeseries["wetlands"].setdefault(
+                wentry = source_timeseries["predios"].setdefault(
                     code_wid,
                     {"name": ctx.get("name", code_wid), "indices": {}},
                 )
@@ -1352,7 +1476,7 @@ def ingest_flat_drone_date_assets(
         periods_set.add((period_key, f"Vuelo {period_human}"))
         rasters_index[raster_key] = {
             "source": source_key,
-            "wetland_id": code_wid,
+            "predio_id": code_wid,
             "index": index_key,
             "year": year,
             "season": period_human,
@@ -1515,25 +1639,25 @@ def export_source(
             "description": source_cfg.get("description", ""),
             "has_data": False,
         },
-        "wetlands": {},
+        "predios": {},
     }
     rasters_index = {}
-    wetland_ctx: dict[str, dict] = {}
-    wetlands_info = {}
+    predio_ctx: dict[str, dict] = {}
+    predios_info = {}
     periods_set = set()
     total_points = 0
     total_visual_rasters = 0
 
     print(f"\nFuente: {source_cfg['label']} ({source_key})")
-    clip_geoms = load_wetland_clip_geometries(config)
+    clip_geoms = load_predio_clip_geometries(config)
 
-    for wetland_id, wetland_cfg in config["wetlands"].items():
-        wetland_name = wetland_cfg.get("name", wetland_id)
-        geom_union = clip_geoms.get(wetland_id)
+    for predio_id, predio_cfg in predios_config(config).items():
+        predio_name = predio_cfg.get("name", predio_id)
+        geom_union = clip_geoms.get(predio_id)
         if not geom_union:
-            print(f"  [WARN] Sin cuarteles para {wetland_id}")
-            wetlands_info[wetland_id] = {
-                "name": wetland_name,
+            print(f"  [WARN] Sin cuarteles para {predio_id}")
+            predios_info[predio_id] = {
+                "name": predio_name,
                 "area_ha": None,
                 "center": None,
                 "n_periods": 0,
@@ -1547,11 +1671,11 @@ def export_source(
         area_ha = compute_area_ha(gdf_w)
         preview_geom_union = buffer_geom_wgs84(geom_union, clip_aoi_buffer_m)
         center = gdf_w.geometry.union_all().centroid
-        print(f"  - {wetland_name} ({wetland_id}) | {area_ha} ha | recorte: unión cuarteles")
-        wetland_ctx[wetland_id] = {"name": wetland_name, "geom_union": geom_union}
+        print(f"  - {predio_name} ({predio_id}) | {area_ha} ha | recorte: unión cuarteles")
+        predio_ctx[predio_id] = {"name": predio_name, "geom_union": geom_union}
 
-        wetland_entry = {"name": wetland_name, "indices": {}}
-        wetland_periods = set()
+        predio_entry = {"name": predio_name, "indices": {}}
+        predio_periods = set()
 
         for index_key in source_indices:
             index_cfg = indices_cfg.get(index_key, {})
@@ -1560,18 +1684,18 @@ def export_source(
 
             for year in years:
                 for season_key, season_label in config["seasons"].items():
-                    tiff_path = get_tiff_path(source_cfg, wetland_id, year, season_key, index_key)
+                    tiff_path = get_tiff_path(source_cfg, predio_id, year, season_key, index_key)
                     if tiff_path is None:
                         continue
 
                     if visual_only:
                         period_key = f"{year}_{season_key}"
                         label = f"{season_label} {year}"
-                        wetland_periods.add((period_key, label))
+                        predio_periods.add((period_key, label))
                         periods_set.add((period_key, label))
-                        raster_key = f"{wetland_id}_{period_key}_{index_key}"
+                        raster_key = f"{predio_id}_{period_key}_{index_key}"
                         preview_ext = str(visualization_cfg.get("preview_format", "WEBP")).lower()
-                        preview_name = f"{wetland_id}_{year}_{season_key}_{index_key}.{preview_ext}"
+                        preview_name = f"{predio_id}_{year}_{season_key}_{index_key}.{preview_ext}"
                         preview_path = rasters_dir / preview_name
                         source_fingerprint = build_file_fingerprint(tiff_path)
                         preview_mode = "thermal_visual" if index_key == "thermal" else "rgb_visual"
@@ -1601,7 +1725,7 @@ def export_source(
                         if preview_meta is None:
                             if index_key == "thermal":
                                 preview_meta = build_preview_thermal(
-                                    tiff_path, preview_path, visualization_cfg, preview_geom_union, index_cfg, wetland_id
+                                    tiff_path, preview_path, visualization_cfg, preview_geom_union, index_cfg, predio_id
                                 )
                             else:
                                 preview_meta = build_preview_rgb(
@@ -1609,7 +1733,7 @@ def export_source(
                                 )
                         rasters_index[raster_key] = {
                             "source": source_key,
-                            "wetland_id": wetland_id,
+                            "predio_id": predio_id,
                             "index": index_key,
                             "year": year,
                             "season": season_label,
@@ -1624,9 +1748,9 @@ def export_source(
 
                     period_key = f"{year}_{season_key}"
                     label = f"{season_label} {year}"
-                    raster_key = f"{wetland_id}_{period_key}_{index_key}"
+                    raster_key = f"{predio_id}_{period_key}_{index_key}"
                     preview_ext = str(visualization_cfg.get("preview_format", "WEBP")).lower()
-                    preview_name = f"{wetland_id}_{year}_{season_key}_{index_key}.{preview_ext}"
+                    preview_name = f"{predio_id}_{year}_{season_key}_{index_key}.{preview_ext}"
                     preview_path = rasters_dir / preview_name
                     source_fingerprint = build_file_fingerprint(tiff_path)
                     export_signature = build_export_signature(
@@ -1648,11 +1772,11 @@ def export_source(
                         source_fingerprint,
                         reuse_if_unchanged=_reuse_previews_allowed(visualization_cfg),
                     )
-                    cached_point = existing_points.get((wetland_id, index_key, period_key))
+                    cached_point = existing_points.get((predio_id, index_key, period_key))
                     if preview_meta is not None and cached_point is not None:
                         point = dict(cached_point)
                     else:
-                        mean_value = extract_zonal_mean(tiff_path, geom_union)
+                        mean_value = extract_zonal_median(tiff_path, geom_union)
                         if mean_value is None:
                             continue
                         point = {
@@ -1665,7 +1789,7 @@ def export_source(
                             "value": round(mean_value, 4),
                         }
                     points.append(point)
-                    wetland_periods.add((period_key, label))
+                    predio_periods.add((period_key, label))
                     periods_set.add((period_key, label))
                     if preview_meta is None:
                         preview_meta = build_preview_raster(
@@ -1679,7 +1803,7 @@ def export_source(
                         )
                     rasters_index[raster_key] = {
                         "source": source_key,
-                        "wetland_id": wetland_id,
+                        "predio_id": predio_id,
                         "index": index_key,
                         "year": year,
                         "season": season_label,
@@ -1692,31 +1816,31 @@ def export_source(
 
             cleaned_points = [dict(point) for point in sorted(points, key=lambda item: item["date"])]
             metrics = compute_metrics(cleaned_points)
-            wetland_entry["indices"][index_key] = {
+            predio_entry["indices"][index_key] = {
                 "points": cleaned_points,
                 "metrics": metrics,
             }
             total_points += len(cleaned_points)
 
-        source_timeseries["wetlands"][wetland_id] = wetland_entry
+        source_timeseries["predios"][predio_id] = predio_entry
         latest_period = None
-        if wetland_periods:
-            latest_period = sorted(wetland_periods, key=lambda item: item[0])[-1][1]
-        has_wetland_visuals = any(key.startswith(f"{wetland_id}_") for key in rasters_index)
+        if predio_periods:
+            latest_period = sorted(predio_periods, key=lambda item: item[0])[-1][1]
+        has_predio_visuals = any(key.startswith(f"{predio_id}_") for key in rasters_index)
         info_entry = {
-            "name": wetland_name,
+            "name": predio_name,
             "area_ha": area_ha,
             "center": [round(center.y, 4), round(center.x, 4)],
-            "n_periods": len(wetland_periods),
+            "n_periods": len(predio_periods),
             "last_period": latest_period,
-            "available_years": sorted({int(item[0].split("_")[0]) for item in wetland_periods}),
-            "status": "ready" if (wetland_periods or has_wetland_visuals) else "empty",
+            "available_years": sorted({int(item[0].split("_")[0]) for item in predio_periods}),
+            "status": "ready" if (predio_periods or has_predio_visuals) else "empty",
         }
-        if wetland_cfg.get("drone_code"):
-            info_entry["drone_code"] = wetland_cfg["drone_code"]
-        if wetland_cfg.get("s2_code"):
-            info_entry["s2_code"] = wetland_cfg["s2_code"]
-        wetlands_info[wetland_id] = info_entry
+        if predio_cfg.get("drone_code"):
+            info_entry["drone_code"] = predio_cfg["drone_code"]
+        if predio_cfg.get("s2_code"):
+            info_entry["s2_code"] = predio_cfg["s2_code"]
+        predios_info[predio_id] = info_entry
 
     if source_key == "drone" and source_cfg.get("flat_date_filenames", True):
         n_flat = ingest_flat_drone_date_assets(
@@ -1726,7 +1850,7 @@ def export_source(
             visualization_cfg=visualization_cfg,
             indices_cfg=indices_cfg,
             source_indices=source_indices,
-            wetland_ctx=wetland_ctx,
+            predio_ctx=predio_ctx,
             rasters_dir=rasters_dir,
             existing_rasters=existing_rasters,
             periods_set=periods_set,
@@ -1734,17 +1858,17 @@ def export_source(
             rasters_index=rasters_index,
         )
         total_visual_rasters += n_flat
-        for wid, wentry in source_timeseries["wetlands"].items():
+        for wid, wentry in source_timeseries["predios"].items():
             for ix in wentry.get("indices", {}).values():
                 pts = ix.get("points") or []
                 cleaned = sorted(pts, key=lambda p: (str(p.get("date", "")), str(p.get("period_key", ""))))
                 ix["points"] = [dict(x) for x in cleaned]
                 ix["metrics"] = compute_metrics([dict(x) for x in cleaned])
                 total_points += len(cleaned)
-            info = wetlands_info.get(wid)
+            info = predios_info.get(wid)
             if not info or info.get("status") == "missing_aoi":
                 continue
-            period_meta = [(rv["period_key"], rv["season"]) for rv in rasters_index.values() if rv.get("wetland_id") == wid]
+            period_meta = [(rv["period_key"], rv["season"]) for rv in rasters_index.values() if rv.get("predio_id") == wid]
             uniq = {}
             for pk, lbl in period_meta:
                 uniq[pk] = lbl
@@ -1752,8 +1876,8 @@ def export_source(
                 continue
             pkeys_sorted = sorted(uniq.keys(), key=lambda pk: pk if isinstance(pk, str) else str(pk))
             last_lbl = uniq[pkeys_sorted[-1]]
-            yrs = {rv["year"] for rv in rasters_index.values() if rv.get("wetland_id") == wid}
-            wte = source_timeseries["wetlands"].get(wid, {})
+            yrs = {rv["year"] for rv in rasters_index.values() if rv.get("predio_id") == wid}
+            wte = source_timeseries["predios"].get(wid, {})
             for ix in wte.get("indices", {}).values():
                 for pt in ix.get("points", []):
                     y = pt.get("year")
@@ -1767,15 +1891,15 @@ def export_source(
     source_has_data = total_points > 0 or total_visual_rasters > 0 or len(rasters_index) > 0
     source_timeseries["source"]["has_data"] = source_has_data
 
-    for wetland_id, wetland_entry in source_timeseries["wetlands"].items():
+    for predio_id, predio_entry in source_timeseries["predios"].items():
         rows = []
-        for index_key, index_entry in wetland_entry["indices"].items():
+        for index_key, index_entry in predio_entry["indices"].items():
             for point in index_entry["points"]:
                 rows.append(
                     {
                         "source": source_key,
-                        "wetland_id": wetland_id,
-                        "wetland_name": wetland_entry["name"],
+                        "predio_id": predio_id,
+                        "predio_name": predio_entry["name"],
                         "index": index_key.upper(),
                         "date": point["date"],
                         "year": point["year"],
@@ -1785,14 +1909,14 @@ def export_source(
                     }
                 )
         if rows:
-            csv_path = csv_dir / f"{wetland_id}_timeseries.csv"
+            csv_path = csv_dir / f"{predio_id}_timeseries.csv"
             with open(csv_path, "w", encoding="utf-8", newline="") as handle:
                 writer = csv.DictWriter(
                     handle,
                     fieldnames=[
                         "source",
-                        "wetland_id",
-                        "wetland_name",
+                        "predio_id",
+                        "predio_name",
                         "index",
                         "date",
                         "year",
@@ -1806,12 +1930,12 @@ def export_source(
 
     sorted_periods = [{"key": key, "label": label} for key, label in sorted(periods_set, key=lambda item: item[0])]
     summary = {
-        "n_wetlands": len(config["wetlands"]),
+        "n_predios": len(predios_config(config)),
         "n_periods": len(sorted_periods),
         "data_points": total_points,
         "raster_count": len(rasters_index),
         "total_area_ha": round(
-            sum(info["area_ha"] for info in wetlands_info.values() if info["area_ha"] is not None),
+            sum(info["area_ha"] for info in predios_info.values() if info["area_ha"] is not None),
             1,
         ),
         "latest_period": sorted_periods[-1]["label"] if sorted_periods else None,
@@ -1842,7 +1966,7 @@ def export_source(
             for key, value in indices_cfg.items()
             if key in source_indices
         },
-        "wetlands": wetlands_info,
+        "predios": predios_info,
         "rasters": rasters_index,
         "periods": sorted_periods,
         "summary": summary,
@@ -1887,15 +2011,15 @@ def export_static_data(selected_sources: list[str] | None = None) -> None:
     ensure_predios_gv_utm19s_clone(REPO_ROOT)
     years = resolve_years(config)
     master_aoi_path = ensure_master_aoi(config)
-    id_col = config.get("export_aoi_id_col", config["shapefile_id_col"])
+    id_col = config.get("export_aoi_id_col") or "predio_id"
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     gdf_aoi = load_aoi(master_aoi_path, id_col)
-    selected_ids = {key.lower() for key in config["wetlands"].keys()}
+    selected_ids = {key.lower() for key in predios_config(config).keys()}
     gdf_aoi = gdf_aoi[gdf_aoi[id_col].astype(str).str.strip().str.lower().isin(selected_ids)].copy()
     print(f"AOIs cargados: {gdf_aoi[id_col].unique().tolist()}")
 
-    aoi_output_path = OUTPUT_DIR / "wetlands_aoi.geojson"
+    aoi_output_path = OUTPUT_DIR / "predios_aoi.geojson"
     gdf_aoi.to_file(aoi_output_path, driver="GeoJSON")
     print(f"GeoJSON maestro -> {aoi_output_path.as_posix()}")
 

@@ -5,7 +5,7 @@ mensual / semanal + chart de series temporales + WebPs por banda.
 
 Convención de entrada (un archivo por predio × año × semana ISO)::
 
-    data/sentinel2/S2_<PREDIO>_Y<YYYY>_W<WW>.tif   # float64, 29 bandas, EPSG:4326
+    data/sentinel2/S2_<PREDIO>_Y<YYYY>_W<WW>.tif   # int16/float64, 9 índices + clear_pixel_count, EPSG:4326
 
 Salidas en ``data_static/sentinel2/``::
 
@@ -95,41 +95,23 @@ MONTH_NAMES_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
 
 # Visualización por banda (vmin, vmax, colormap matplotlib).
 # Si una banda no está acá, se usa DEFAULT_VIZ.
+# Solo los 9 índices operativos (más CLEAR_PIXEL_COUNT). Ver scripts/gee/README.md.
 BAND_VIZ: dict[str, dict] = {
-    "NDVI":              {"vmin": -1.0, "vmax": 1.0,  "colormap": "RdYlGn",     "label": "NDVI"},
-    "kNDVI":             {"vmin": -1.0, "vmax": 1.0,  "colormap": "RdYlGn",     "label": "kNDVI"},
-    "GNDVI":             {"vmin": -1.0, "vmax": 1.0,  "colormap": "YlGn",       "label": "GNDVI"},
-    "EVI":               {"vmin": -1.0, "vmax": 1.0,  "colormap": "YlGn",       "label": "EVI"},
-    "EVI2":              {"vmin": -1.0, "vmax": 1.0,  "colormap": "YlGn",       "label": "EVI2"},
-    "SAVI":              {"vmin": -1.0, "vmax": 1.0,  "colormap": "YlGn",       "label": "SAVI"},
-    "MSAVI":             {"vmin": -1.0, "vmax": 1.0,  "colormap": "YlGn",       "label": "MSAVI"},
-    "ARVI":              {"vmin": -1.0, "vmax": 1.0,  "colormap": "RdYlGn",     "label": "ARVI"},
-    "NDII":              {"vmin": -1.0, "vmax": 1.0,  "colormap": "RdYlBu",     "label": "NDII"},
-    "NDCI":              {"vmin": -1.0, "vmax": 1.0,  "colormap": "YlGn",       "label": "NDCI"},
-    "NDWI":              {"vmin": -1.0, "vmax": 1.0,  "colormap": "RdYlBu",     "label": "NDWI"},
-    "MNDWI":             {"vmin": -1.0, "vmax": 1.0,  "colormap": "Blues",      "label": "MNDWI"},
-    "NDMI":              {"vmin": -1.0, "vmax": 1.0,  "colormap": "RdYlBu_r",   "label": "NDMI"},
-    "NDMISTRESS":        {"vmin": -1.0, "vmax": 1.0,  "colormap": "RdYlBu_r",   "label": "NDMI stress"},
-    "MSI":               {"vmin":  0.0, "vmax": 3.0,  "colormap": "RdYlBu_r",   "label": "MSI"},
-    "ARI":               {"vmin":  0.0, "vmax": 2.0,  "colormap": "RdPu",       "label": "ARI"},
-    "MARI":              {"vmin":  0.0, "vmax": 4.0,  "colormap": "RdPu",       "label": "MARI"},
-    "MCARI":             {"vmin":  0.0, "vmax": 3.0,  "colormap": "YlGn",       "label": "MCARI"},
-    "CHL_REDEDGE":       {"vmin":  0.0, "vmax": 3.0,  "colormap": "YlGn",       "label": "Chl rededge"},
-    "REDEDGE_POSITION":  {"vmin": 700.0,"vmax": 750.0,"colormap": "viridis",    "label": "Red-edge pos."},
-    "PSSRB1":            {"vmin":  0.0, "vmax": 10.0, "colormap": "viridis",    "label": "PSSRB1"},
-    "SIPI1":             {"vmin":  0.0, "vmax": 2.0,  "colormap": "RdYlGn_r",   "label": "SIPI1"},
-    "PSRI":              {"vmin": -0.5, "vmax": 0.5,  "colormap": "RdYlGn_r",   "label": "PSRI"},
-    "LAI":               {"vmin":  0.0, "vmax": 8.0,  "colormap": "YlGn",       "label": "LAI"},
-    "FAPAR":             {"vmin":  0.0, "vmax": 1.0,  "colormap": "YlGn",       "label": "FAPAR"},
-    "FCOVER":            {"vmin":  0.0, "vmax": 1.0,  "colormap": "YlGn",       "label": "FCOVER"},
-    "LEAF_CHL":          {"vmin":  0.0, "vmax": 80.0, "colormap": "YlGn",       "label": "Leaf chlorophyll"},
-    "CANOPY_CHL":        {"vmin":  0.0, "vmax": 600.0,"colormap": "YlGn",       "label": "Canopy chlorophyll"},
-    "CLEAR_PIXEL_COUNT": {"vmin":  0.0, "vmax": 30.0, "colormap": "viridis",    "label": "Clear pixel count"},
+    "NDVI":              {"vmin": -1.0, "vmax": 1.0,   "colormap": "RdYlGn",   "label": "NDVI"},
+    "NDMI":              {"vmin": -1.0, "vmax": 1.0,   "colormap": "RdYlBu_r", "label": "NDMI"},
+    "MNDWI":             {"vmin": -1.0, "vmax": 1.0,   "colormap": "Blues",    "label": "MNDWI"},
+    "REDEDGE_POSITION":  {"vmin": 700.0,"vmax": 750.0, "colormap": "viridis",  "label": "Red-edge pos."},
+    "MCARI":             {"vmin":  0.0, "vmax": 3.0,   "colormap": "YlGn",     "label": "MCARI"},
+    "GNDVI":             {"vmin": -1.0, "vmax": 1.0,   "colormap": "YlGn",     "label": "GNDVI"},
+    "MSAVI":             {"vmin": -1.0, "vmax": 1.0,   "colormap": "YlGn",     "label": "MSAVI"},
+    "EVI":               {"vmin": -1.0, "vmax": 1.0,   "colormap": "YlGn",     "label": "EVI"},
+    "PSRI":              {"vmin": -0.5, "vmax": 0.5,   "colormap": "RdYlGn_r", "label": "PSRI"},
+    "CLEAR_PIXEL_COUNT": {"vmin":  0.0, "vmax": 30.0,  "colormap": "viridis",  "label": "Clear pixel count"},
 }
 DEFAULT_VIZ = {"vmin": -1.0, "vmax": 1.0, "colormap": "RdYlGn", "label": ""}
 
 # Bandas que normalmente se grafican en la series temporal (en este orden).
-DEFAULT_CHART_BAND_ORDER = ["NDVI", "NDWI", "NDMI", "EVI", "SAVI", "GNDVI", "LAI", "FAPAR", "FCOVER"]
+DEFAULT_CHART_BAND_ORDER = ["NDVI", "NDMI", "MNDWI", "EVI", "MSAVI", "GNDVI", "MCARI", "PSRI", "REDEDGE_POSITION"]
 
 WEBP_QUALITY = 86
 WEBP_METHOD = 4  # PIL WebP: 0=rápido, 6=más compresión. 4 balance velocidad/tamaño.
@@ -138,11 +120,13 @@ WEBP_UPSCALE_MIN_SIDE = 384  # Cada predio es chico (~13x17 px). Subimos hasta l
 # Divisor por banda (los TIF guardan los índices como int16-en-float64 escalados ×1000;
 # ``clear_pixel_count`` es entero crudo).
 DIVISOR_DEFAULT = 1000.0
+# Escala Int16 por banda (coherente con export_s2.index_int16_scale): REDEDGE ×10, el resto ×1000.
 BAND_DIVISOR_OVERRIDE: dict[str, float] = {
     "CLEAR_PIXEL_COUNT": 1.0,
+    "REDEDGE_POSITION": 10.0,
 }
-# Bandas que no aportan información (sentinel int16_max) y se ignoran en el pipeline.
-SKIP_BANDS: set[str] = {"REDEDGE_POSITION"}
+# Bandas que no aportan información y se ignoran en el pipeline (ninguna por ahora).
+SKIP_BANDS: set[str] = set()
 # Valores sentinel adicionales (vienen como int16): ±32767 / ±32768.
 SENTINEL_VALUES = (32767.0, -32767.0, 32768.0, -32768.0)
 
@@ -429,7 +413,7 @@ def _is_map_composite_key(comp_key: str) -> bool:
 
 
 # Bandas sin escala conjunta semanal/mensual (metadatos o sin comparación visual).
-BAND_STATS_SKIP: set[str] = set(SKIP_BANDS) | {"CLEAR_PIXEL_COUNT", "REDEDGE_POSITION"}
+BAND_STATS_SKIP: set[str] = set(SKIP_BANDS) | {"CLEAR_PIXEL_COUNT"}
 
 
 def _accumulate_map_composite_stats(
@@ -1371,6 +1355,7 @@ def build(
             "vmax": lim["vmax"],
             "colormap": viz["colormap"],
             "visual_only": False,
+            "scale": float(BAND_DIVISOR_OVERRIDE.get(band, DIVISOR_DEFAULT)),
         }
 
     # Último completo (a partir de records globales).

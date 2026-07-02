@@ -87,8 +87,8 @@ DEFAULT_EXPORT_PREFIX = "projects/teleambagr/assets/S2_weekly_valpo"
 # Proyecto Google Cloud para ``ee.Initialize(project=...)`` (API / facturación EE).
 DEFAULT_CLOUD_PROJECT = "teleambagr"
 
-DEFAULT_START_YEAR = 2026
-DEFAULT_END_YEAR = 2026
+DEFAULT_START_YEAR = 2017
+DEFAULT_END_YEAR = None  # None ⇒ año civil actual (ver resolve_year_range)
 
 # Raíz del repositorio (…/fic_agro): scripts/gee/export_s2.py → parents[2]
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -287,6 +287,33 @@ def export_key_exists(asset_id: str, keys: set[str]) -> bool:
     return asset_id.rstrip("/").split("/")[-1] in keys
 
 
+def empty_collection(export_prefix: str, *, dry_run: bool = False) -> int:
+    """
+    Borra **todas las imágenes** hijas de la ImageCollection ``export_prefix`` (la colección se
+    conserva). Operación destructiva e irreversible; devuelve el número de imágenes eliminadas.
+    """
+    export_prefix = export_prefix.strip().rstrip("/")
+    children = sorted(list_child_asset_ids(export_prefix))
+    images = [c for c in children if _asset_exists(c) and str(
+        ee.data.getAsset(c).get("type", "")).upper() == "IMAGE"]
+    print(f"Colección {export_prefix}: {len(images)} imagen(es) a eliminar.")
+    if dry_run:
+        for aid in images:
+            print(f"  [dry-run] deleteAsset {aid}")
+        return 0
+    deleted = 0
+    for aid in images:
+        try:
+            ee.data.deleteAsset(aid)
+            deleted += 1
+            if deleted % 25 == 0:
+                print(f"  ...{deleted}/{len(images)} eliminadas")
+        except ee.EEException as exc:
+            print(f"  [WARN] no se pudo eliminar {aid}: {exc}")
+    print(f"Eliminadas {deleted}/{len(images)} imágenes de {export_prefix}.")
+    return deleted
+
+
 def ensure_export_destination(export_prefix: str, *, dry_run: bool) -> None:
     """
     Crea bajo ``projects/<cloud>/assets/`` las carpetas (FOLDER) que falten y, al final del
@@ -360,445 +387,27 @@ def mask_and_scale(image: ee.Image) -> ee.Image:
     )
 
 
-def _prop_num(img: ee.Image, key: str, default: float) -> ee.Number:
-    """``img.get`` con valor por defecto si falta la propiedad (p. ej. ángulos)."""
-    names = ee.List(img.propertyNames())
-    has = names.contains(key)
-    return ee.Number(ee.Algorithms.If(has, img.get(key), ee.Number(default)))
-
-
-def _const_like(ref: ee.Image, n: ee.Number) -> ee.Image:
-    return ref.multiply(0).add(n)
-
-
-def _tansig_ee(x: ee.Image) -> ee.Image:
-    return ee.Image(2.0).divide(ee.Image(1.0).add(x.multiply(-2.0).exp())).subtract(1.0)
-
-
-def _norm_refl(b: ee.Image, lo: float, hi: float) -> ee.Image:
-    return b.subtract(lo).multiply(2.0).divide(ee.Image.constant(hi - lo)).subtract(1.0)
-
-
-def _norm_scalar_img(x: ee.Image, lo: float, hi: float) -> ee.Image:
-    return x.subtract(lo).multiply(2.0).divide(ee.Image.constant(hi - lo)).subtract(1.0)
-
-
-def _denorm_ee(x: ee.Image, lo: float, hi: float) -> ee.Image:
-    return x.add(1.0).multiply(0.5).multiply(hi - lo).add(lo)
-
-
-def _neuron_linear(coeffs: list[float], inputs: list[ee.Image]) -> ee.Image:
-    """``coeffs`` = [bias, w0..wN-1] alineado con ``inputs``."""
-    s = ee.Image.constant(coeffs[0])
-    for w, inp in zip(coeffs[1:], inputs):
-        s = s.add(inp.multiply(w))
-    return _tansig_ee(s)
-
-
-def _layer_linear(coeffs: list[float], neurons: list[ee.Image]) -> ee.Image:
-    s = ee.Image.constant(coeffs[0])
-    for w, n in zip(coeffs[1:], neurons):
-        s = s.add(n.multiply(w))
-    return s
-
-
-def _snap_norm_inputs(img: ee.Image) -> list[ee.Image]:
-    """
-    Reflectancias y ángulos normalizados como en los evalscripts SNAP de Sentinel Hub
-    (LAI, Cab, CCC, FAPAR, FCOVER). Ángulos de metadatos GEE (media de incidencia / solar).
-    """
-    ref = img.select("B4")
-    b03 = _norm_refl(img.select("B3"), 0.0, 0.253061520471542)
-    b04 = _norm_refl(img.select("B4"), 0.0, 0.290393577911328)
-    b05 = _norm_refl(img.select("B5"), 0.0, 0.305398915248555)
-    b06 = _norm_refl(img.select("B6"), 0.006637972542253, 0.608900395797889)
-    b07 = _norm_refl(img.select("B7"), 0.013972727018939, 0.753827384322927)
-    b8a = _norm_refl(img.select("B8A"), 0.026690138082061, 0.782011770669178)
-    b11 = _norm_refl(img.select("B11"), 0.016388074192258, 0.493761397883092)
-    b12 = _norm_refl(img.select("B12"), 0.0, 0.493025984460231)
-
-    vz_deg = _prop_num(img, "MEAN_INCIDENCE_ZENITH_ANGLE_B8", 10.0)
-    va_deg = _prop_num(img, "MEAN_INCIDENCE_AZIMUTH_ANGLE_B8", 180.0)
-    sz_deg = _prop_num(img, "MEAN_SOLAR_ZENITH_ANGLE", 45.0)
-    sa_deg = _prop_num(img, "MEAN_SOLAR_AZIMUTH_ANGLE", 135.0)
-
-    vz_rad = _const_like(ref, vz_deg).multiply(math.pi / 180.0)
-    sz_rad = _const_like(ref, sz_deg).multiply(math.pi / 180.0)
-    rel_rad = _const_like(ref, sa_deg.subtract(va_deg)).multiply(math.pi / 180.0)
-
-    cos_vz = vz_rad.cos()
-    cos_sz = sz_rad.cos()
-    rel_az = rel_rad.cos()
-
-    view_zen_n = _norm_scalar_img(cos_vz, 0.918595400582046, 1.0)
-    sun_zen_n = _norm_scalar_img(cos_sz, 0.342022871159208, 0.936206429175402)
-    return [b03, b04, b05, b06, b07, b8a, b11, b12, view_zen_n, sun_zen_n, rel_az]
-
-
-def _snap_lai_cab_fapar_fcover(img: ee.Image) -> tuple[ee.Image, ee.Image, ee.Image, ee.Image, ee.Image]:
-    """LAI, Cab (contenido hoja), CCC (canopy), FAPAR, FCOVER — redes SNAP vía Sentinel Hub."""
-    z = _snap_norm_inputs(img)
-
-    lai_n = [
-        [
-            4.96238030555279,
-            -0.023406878966470,
-            0.921655164636366,
-            0.135576544080099,
-            -1.938331472397950,
-            -3.342495816122680,
-            0.902277648009576,
-            0.205363538258614,
-            -0.040607844721716,
-            -0.083196409727092,
-            0.260029270773809,
-            0.284761567218845,
-        ],
-        [
-            1.416008443981500,
-            -0.132555480856684,
-            -0.139574837333540,
-            -1.014606016898920,
-            -1.330890038649270,
-            0.031730624503341,
-            -1.433583541317050,
-            -0.959637898574699,
-            1.133115706551000,
-            0.216603876541632,
-            0.410652303762839,
-            0.064760155543506,
-        ],
-        [
-            1.075897047213310,
-            0.086015977724868,
-            0.616648776881434,
-            0.678003876446556,
-            0.141102398644968,
-            -0.096682206883546,
-            -1.128832638862200,
-            0.302189102741375,
-            0.434494937299725,
-            -0.021903699490589,
-            -0.228492476802263,
-            -0.039460537589826,
-        ],
-        [
-            1.533988264655420,
-            -0.109366593670404,
-            -0.071046262972729,
-            0.064582411478320,
-            2.906325236823160,
-            -0.673873108979163,
-            -3.838051868280840,
-            1.695979344531530,
-            0.046950296081713,
-            -0.049709652688365,
-            0.021829545430994,
-            0.057483827104091,
-        ],
-        [
-            3.024115930757230,
-            -0.089939416159969,
-            0.175395483106147,
-            -0.081847329172620,
-            2.219895367487790,
-            1.713873975136850,
-            0.713069186099534,
-            0.138970813499201,
-            -0.060771761518025,
-            0.124263341255473,
-            0.210086140404351,
-            -0.183878138700341,
-        ],
-    ]
-    lai_l2 = [
-        1.096963107077220,
-        -1.500135489728730,
-        -0.096283269121503,
-        -0.194935930577094,
-        -0.352305895755591,
-        0.075107415847473,
-    ]
-    lai_lo, lai_hi = 0.000319182538301, 14.4675094548151
-    lai_neurons = [_neuron_linear(c, z) for c in lai_n]
-    lai_raw = _denorm_ee(_layer_linear(lai_l2, lai_neurons), lai_lo, lai_hi).rename("LAI")
-
-    cab_n = [
-        [
-            4.242299670155190,
-            0.400396555256580,
-            0.607936279259404,
-            0.137468650780226,
-            -2.955866573461640,
-            -3.186746687729570,
-            2.206800751246430,
-            -0.313784336139636,
-            0.256063547510639,
-            -0.071613219805105,
-            0.510113504210111,
-            0.142813982138661,
-        ],
-        [
-            -0.259569088225796,
-            -0.250781102414872,
-            0.439086302920381,
-            -1.160590937522300,
-            -1.861935250269610,
-            0.981359868451638,
-            1.634230834254840,
-            -0.872527934645577,
-            0.448240475035072,
-            0.037078083501217,
-            0.030044189670404,
-            0.005956686619403,
-        ],
-        [
-            3.130392627338360,
-            0.552080132568747,
-            -0.502919673166901,
-            6.105041924966230,
-            -1.294386119140800,
-            -1.059956388352800,
-            -1.394092902418820,
-            0.324752732710706,
-            -1.758871822827680,
-            -0.036663679860328,
-            -0.183105291400739,
-            -0.038145312117381,
-        ],
-        [
-            0.774423577181620,
-            0.211591184882422,
-            -0.248788896074327,
-            0.887151598039092,
-            1.143675895571410,
-            -0.753968830338323,
-            -1.185456953076760,
-            0.541897860471577,
-            -0.252685834607768,
-            -0.023414901078143,
-            -0.046022503549557,
-            -0.006570284080657,
-        ],
-        [
-            2.584276648534610,
-            0.254790234231378,
-            -0.724968611431065,
-            0.731872806026834,
-            2.303453821021270,
-            -0.849907966921912,
-            -6.425315500537270,
-            2.238844558459030,
-            -0.199937574297990,
-            0.097303331714567,
-            0.334528254938326,
-            0.113075306591838,
-        ],
-    ]
-    cab_l2 = [
-        0.463426463933822,
-        -0.352760040599190,
-        -0.603407399151276,
-        0.135099379384275,
-        -1.735673123851930,
-        -0.147546813318256,
-    ]
-    cab_lo, cab_hi = 0.007426692959872, 873.908222110306
-    cab_neurons = [_neuron_linear(c, z) for c in cab_n]
-    cab_raw = _denorm_ee(_layer_linear(cab_l2, cab_neurons), cab_lo, cab_hi).rename("LEAF_CHL")
-    canopy = lai_raw.multiply(cab_raw).rename("CANOPY_CHL")
-
-    fap_n = [
-        [
-            -0.887068364040280,
-            0.268714454733421,
-            -0.205473108029835,
-            0.281765694196018,
-            1.337443412255980,
-            0.390319212938497,
-            -3.612714342203350,
-            0.222530960987244,
-            0.821790549667255,
-            -0.093664567310731,
-            0.019290146147447,
-            0.037364446377188,
-        ],
-        [
-            0.320126471197199,
-            -0.248998054599707,
-            -0.571461305473124,
-            -0.369957603466673,
-            0.246031694650909,
-            0.332536215252841,
-            0.438269896208887,
-            0.819000551890450,
-            -0.934931499059310,
-            0.082716247651866,
-            -0.286978634108328,
-            -0.035890968351662,
-        ],
-        [
-            0.610523702500117,
-            -0.164063575315880,
-            -0.126303285737763,
-            -0.253670784366822,
-            -0.321162835049381,
-            0.067082287973580,
-            2.029832288655260,
-            -0.023141228827722,
-            -0.553176625657559,
-            0.059285451897783,
-            -0.034334454541432,
-            -0.031776704097009,
-        ],
-        [
-            -0.379156190833946,
-            0.130240753003835,
-            0.236781035723321,
-            0.131811664093253,
-            -0.250181799267664,
-            -0.011364149953286,
-            -1.857573214633520,
-            -0.146860751013916,
-            0.528008831372352,
-            -0.046230769098303,
-            -0.034509608392235,
-            0.031884395036004,
-        ],
-        [
-            1.353023396690570,
-            -0.029929946166941,
-            0.795804414040809,
-            0.348025317624568,
-            0.943567007518504,
-            -0.276341670431501,
-            -2.946594180142590,
-            0.289483073507500,
-            1.044006950440180,
-            -0.000413031960419,
-            0.403331114840215,
-            0.068427130526696,
-        ],
-    ]
-    fap_l2 = [
-        -0.336431283973339,
-        2.126038811064490,
-        -0.632044932794919,
-        5.598995787206250,
-        1.770444140578970,
-        -0.267879583604849,
-    ]
-    fap_lo, fap_hi = 0.000153013463222, 0.977135096979553
-    fap_neurons = [_neuron_linear(c, z) for c in fap_n]
-    fapar = _denorm_ee(_layer_linear(fap_l2, fap_neurons), fap_lo, fap_hi).rename("FAPAR")
-
-    fcv_n = [
-        [
-            -1.45261652206,
-            -0.156854264841,
-            0.124234528462,
-            0.235625516229,
-            -1.8323910258,
-            -0.217188969888,
-            5.06933958064,
-            -0.887578008155,
-            -1.0808468167,
-            -0.0323167041864,
-            -0.224476137359,
-            -0.195523962947,
-        ],
-        [
-            -1.70417477557,
-            -0.220824927842,
-            1.28595395487,
-            0.703139486363,
-            -1.34481216665,
-            -1.96881267559,
-            -1.45444681639,
-            1.02737560043,
-            -0.12494641532,
-            0.0802762437265,
-            -0.198705918577,
-            0.108527100527,
-        ],
-        [
-            1.02168965849,
-            -0.409688743281,
-            1.08858884766,
-            0.36284522554,
-            0.0369390509705,
-            -0.348012590003,
-            -2.0035261881,
-            0.0410357601757,
-            1.22373853174,
-            -0.0124082778287,
-            -0.282223364524,
-            0.0994993117557,
-        ],
-        [
-            -0.498002810205,
-            -0.188970957866,
-            -0.0358621840833,
-            0.00551248528107,
-            1.35391570802,
-            -0.739689896116,
-            -2.21719530107,
-            0.313216124198,
-            1.5020168915,
-            1.21530490195,
-            -0.421938358618,
-            1.48852484547,
-        ],
-        [
-            -3.88922154789,
-            2.49293993709,
-            -4.40511331388,
-            -1.91062012624,
-            -0.703174115575,
-            -0.215104721138,
-            -0.972151494818,
-            -0.930752241278,
-            1.2143441876,
-            -0.521665460192,
-            -0.445755955598,
-            0.344111873777,
-        ],
-    ]
-    fcv_l2 = [
-        -0.0967998147811,
-        0.23080586765,
-        -0.333655484884,
-        -0.499418292325,
-        0.0472484396749,
-        -0.0798516540739,
-    ]
-    fcv_lo, fcv_hi = 0.000181230723879, 0.999638214715
-    fcv_neurons = [_neuron_linear(c, z) for c in fcv_n]
-    fcover = _denorm_ee(_layer_linear(fcv_l2, fcv_neurons), fcv_lo, fcv_hi).rename("FCOVER")
-
-    return lai_raw, cab_raw, canopy, fapar, fcover
-
-
 def reduce_radiometric_resolution(img: ee.Image) -> ee.Image:
     """
-    Cuantiza índices a enteros tras ``×INDEX_INT16_SCALE`` (menor resolución radiométrica / tamaño).
+    Cuantiza cada índice a Int16 con su escala (``index_int16_scale``) para reducir tamaño.
 
     Se aplica **solo al mosaico semanal** listo para exportar (índices ya en reflectancia
     0–1 o rango físico del índice), no por escena: así ``median()`` y el clip no
-    reintroducen float sobre enteros ya cuantizados.
-
-    **Int16** porque LAI, Cab, CCC y otros pueden superar el rango de Int8 tras escalar.
-    ``clear_pixel_count`` no se altera.
+    reintroducen float sobre enteros ya cuantizados. ``clear_pixel_count`` no se altera.
     """
     clear = img.select("clear_pixel_count")
-    idx = img.select(COMPOSED_INDEX_BANDS).multiply(INDEX_INT16_SCALE).round().toInt16()
+    scaled = [
+        img.select(band).multiply(index_int16_scale(band)).round().toInt16()
+        for band in COMPOSED_INDEX_BANDS
+    ]
+    idx = ee.Image.cat(scaled)
     return idx.addBands(clear).copyProperties(img, ["system:time_start", "system:index"])
 
 
 def add_indices(img: ee.Image) -> ee.Image:
+    """Añade los 9 índices operativos (ver ``COMPOSED_INDEX_BANDS``)."""
     ndvi = img.normalizedDifference(["B8", "B4"]).rename("NDVI")
     ndmi = img.normalizedDifference(["B8", "B11"]).rename("NDMI")
-    ndwi = img.normalizedDifference(["B3", "B8"]).rename("NDWI")
     mndwi = img.normalizedDifference(["B3", "B11"]).rename("MNDWI")
     gndvi = img.normalizedDifference(["B8", "B3"]).rename("GNDVI")
 
@@ -807,141 +416,65 @@ def add_indices(img: ee.Image) -> ee.Image:
         {"NIR": img.select("B8"), "RED": img.select("B4"), "BLUE": img.select("B2")},
     ).rename("EVI")
 
-    savi = img.expression(
-        "((NIR - RED) / (NIR + RED + L)) * (1.0 + L)",
-        {"NIR": img.select("B8"), "RED": img.select("B4"), "L": ee.Image.constant(0.5)},
-    ).rename("SAVI")
-
     msavi = img.expression(
         "(2 * NIR + 1 - sqrt(pow((2 * NIR + 1), 2) - 8 * (NIR - RED))) / 2",
         {"NIR": img.select("B8"), "RED": img.select("B4")},
     ).rename("MSAVI")
 
     eps = ee.Image.constant(1e-6)
-    ari = img.expression(
-        "1.0 / (G + eps) - 1.0 / (RE1 + eps)",
-        {"G": img.select("B3"), "RE1": img.select("B5"), "eps": eps},
-    ).rename("ARI")
-    mari = img.expression(
-        "(1.0 / (G + eps) - 1.0 / (RE1 + eps)) * NIR",
-        {"G": img.select("B3"), "RE1": img.select("B5"), "NIR": img.select("B7"), "eps": eps},
-    ).rename("MARI")
-
-    y = ee.Image.constant(0.106)
-    arvi = img.expression(
-        "(N - R - y * (R - B)) / (N + R - y * (R - B))",
-        {"N": img.select("B8A"), "R": img.select("B4"), "B": img.select("B2"), "y": y},
-    ).rename("ARVI")
-
-    chl_rededge = img.expression("NIR / RE1 - 1.0", {"NIR": img.select("B7"), "RE1": img.select("B5")}).rename(
-        "CHL_REDEDGE"
-    )
-
-    b4, b5, b6, b7 = img.select("B4"), img.select("B5"), img.select("B6"), img.select("B7")
-    rep_num = b4.add(b7).multiply(0.5).subtract(b5)
-    rep_den = b6.subtract(b5).max(1e-6)
-    rededge_position = rep_num.multiply(40.0).divide(rep_den).add(700.0).rename("REDEDGE_POSITION")
-
-    evi2 = img.expression(
-        "2.4 * (NIR - RED) / (NIR + RED + 1.0)",
-        {"NIR": img.select("B8"), "RED": img.select("B4")},
-    ).rename("EVI2")
-
-    nd_diff = img.select("B8").subtract(img.select("B4"))
-    nd_sum = img.select("B8").add(img.select("B4")).max(1e-6)
-    kndvi = nd_diff.divide(nd_sum).pow(2).tanh().rename("kNDVI")
-
     mcari = img.expression(
         "((RE1 - R) - 0.2 * (RE1 - G)) * (RE1 / (R + eps))",
         {"RE1": img.select("B5"), "R": img.select("B4"), "G": img.select("B3"), "eps": eps},
     ).rename("MCARI")
 
-    msi = img.select("B11").divide(img.select("B8").max(1e-6)).rename("MSI")
-
-    ndmistress = img.normalizedDifference(["B8A", "B11"]).rename("NDMISTRESS")
-
-    ndii = img.normalizedDifference(["B8", "B11"]).rename("NDII")
-
-    ndci = img.normalizedDifference(["B5", "B4"]).rename("NDCI")
-
-    pssrb1 = img.select("B8").divide(img.select("B4").max(1e-6)).rename("PSSRB1")
-
-    sipi1 = img.expression(
-        "(NIR - A) / (NIR - R)", {"NIR": img.select("B8"), "A": img.select("B1"), "R": img.select("B4")}
-    ).rename("SIPI1")
+    # REDEDGE_POSITION: posición del "red edge" en nm (~700–740). Se exporta con escala
+    # propia (ver INDEX_INT16_SCALE_BY_BAND) para no desbordar Int16.
+    b4, b5, b6, b7 = img.select("B4"), img.select("B5"), img.select("B6"), img.select("B7")
+    rep_num = b4.add(b7).multiply(0.5).subtract(b5)
+    rep_den = b6.subtract(b5).max(1e-6)
+    rededge_position = rep_num.multiply(40.0).divide(rep_den).add(700.0).rename("REDEDGE_POSITION")
 
     b6_safe = img.select("B6").max(1e-6)
     psri = img.select("B4").subtract(img.select("B2")).divide(b6_safe).rename("PSRI")
 
-    lai, leaf_chl, canopy_chl, fapar, fcover = _snap_lai_cab_fapar_fcover(img)
-
     extra = [
         ndvi,
         ndmi,
-        ndwi,
         mndwi,
-        gndvi,
-        evi,
-        savi,
-        msavi,
-        ari,
-        mari,
-        arvi,
-        chl_rededge,
         rededge_position,
-        evi2,
-        kndvi,
         mcari,
-        msi,
-        ndmistress,
-        ndii,
-        ndci,
-        pssrb1,
-        sipi1,
-        lai,
-        leaf_chl,
-        canopy_chl,
-        fapar,
-        fcover,
+        gndvi,
+        msavi,
+        evi,
         psri,
     ]
     return img.addBands(extra)
 
 
-# Salida de exportación: solo estas bandas (índices compuestos arriba), sin B1…B12 ni otras del sensor.
+# Salida de exportación: solo estos índices, sin B1…B12 ni otras bandas del sensor.
 COMPOSED_INDEX_BANDS = [
     "NDVI",
     "NDMI",
-    "NDWI",
     "MNDWI",
-    "GNDVI",
-    "EVI",
-    "SAVI",
-    "MSAVI",
-    "ARI",
-    "MARI",
-    "ARVI",
-    "CHL_REDEDGE",
     "REDEDGE_POSITION",
-    "EVI2",
-    "kNDVI",
     "MCARI",
-    "MSI",
-    "NDMISTRESS",
-    "NDII",
-    "NDCI",
-    "PSSRB1",
-    "SIPI1",
-    "LAI",
-    "LEAF_CHL",
-    "CANOPY_CHL",
-    "FAPAR",
-    "FCOVER",
+    "GNDVI",
+    "MSAVI",
+    "EVI",
     "PSRI",
 ]
 
-# Escala entera al exportar índices (Int16): valor_físico ≈ pixel / INDEX_INT16_SCALE.
+# Escala entera al exportar índices (Int16): valor_físico ≈ pixel / escala.
+# La mayoría usa ×1000; REDEDGE_POSITION (~700–740 nm) usa ×10 para no desbordar Int16.
 INDEX_INT16_SCALE = 1000
+INDEX_INT16_SCALE_BY_BAND = {
+    "REDEDGE_POSITION": 10,
+}
+
+
+def index_int16_scale(band: str) -> int:
+    """Factor de escala Int16 para una banda de índice (default ``INDEX_INT16_SCALE``)."""
+    return int(INDEX_INT16_SCALE_BY_BAND.get(band, INDEX_INT16_SCALE))
 
 
 def ee_date_min(a: ee.Date, b: ee.Date) -> ee.Date:
@@ -1222,6 +755,7 @@ def export_year(
             assetId=asset_id,
             region=aoi,
             scale=10,
+            crs="EPSG:4326",
             maxPixels=1e13,
         )
         task.start()
@@ -1241,7 +775,7 @@ def export_year(
 # Per-predio Drive export: composites for side-by-side visualization
 # ---------------------------------------------------------------------------
 
-DEFAULT_PREDIOS_VIZ_BANDS = ["NDVI", "NDWI", "NDMI", "EVI", "SAVI"]
+DEFAULT_PREDIOS_VIZ_BANDS = ["NDVI", "NDMI", "MNDWI", "EVI", "MSAVI"]
 DEFAULT_PREDIOS_VIZ_SCALE = 10.0
 
 MONTH_NAMES_ES = [
@@ -1982,8 +1516,10 @@ def resolve_year_range(args: argparse.Namespace, now_year: int) -> tuple[int, in
     env_end = os.environ.get("GEE_END_YEAR", "").strip()
     if env_end.isdigit():
         default_end = int(env_end)
-    else:
+    elif DEFAULT_END_YEAR is not None:
         default_end = DEFAULT_END_YEAR
+    else:
+        default_end = now_year
     start_y = args.start_year if args.start_year is not None else default_start
     end_y = args.end_year if args.end_year is not None else default_end
     if start_y > end_y:
@@ -2189,6 +1725,14 @@ def main() -> None:
         "--force",
         action="store_true",
         help="Encolar todas las semanas aunque el asset hijo ya exista.",
+    )
+    parser.add_argument(
+        "--empty-collection",
+        action="store_true",
+        help=(
+            "DESTRUCTIVO: elimina todas las imágenes de la ImageCollection destino antes de "
+            "exportar (la colección se conserva). Combinar con --start-year para re-exportar."
+        ),
     )
     parser.add_argument(
         "--year",
@@ -2415,7 +1959,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--export-predios-aoi-json",
-        default=os.environ.get("FIC_AOI_GEOJSON", "data/shapefiles/predios.geojson"),
+        default=os.environ.get("FIC_AOI_GEOJSON", "data/vectors/cuarteles/cuarteles.geojson"),
         metavar="PATH",
         help="GeoJSON de predios (relativo al repo si no es absoluta).",
     )
@@ -2486,6 +2030,10 @@ def main() -> None:
     tasks_p: list[ee.batch.Task] = []
     weekly_enqueued_stems: set[str] = set()
     composite_enqueued_stems: set[str] = set()
+
+    if args.empty_collection:
+        print(f"== Vaciando ImageCollection destino: {export_prefix} ==")
+        empty_collection(export_prefix, dry_run=args.dry_run)
 
     ran_assets = not args.predios_drive_only and not args.no_export_assets
     if ran_assets:

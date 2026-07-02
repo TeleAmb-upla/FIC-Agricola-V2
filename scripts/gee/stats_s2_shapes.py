@@ -3,7 +3,7 @@
 Estadísticas zonal sobre mosaicos semanales S2 ya exportados a Earth Engine
 (la misma convención que ``export_s2.py``: ``year``, ``week``, bandas de índices, etc.).
 
-Carga geometrías de predios desde ``data/shapefiles/aoi.geojson`` (por defecto) o desde
+Carga geometrías de predios desde ``data/vectors/export/wetlands_export_aoi.geojson`` (por defecto) o desde
 ``.shp`` bajo ese directorio, recorre cada imagen de la colección y calcula por predio:
 
 - reducción espacial (**media**) de **todas las bandas de imagen** de la colección (por defecto),
@@ -46,9 +46,12 @@ import pandas as pd
 from shapely.geometry import mapping
 from shapely.ops import unary_union
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from export_s2 import index_int16_scale  # noqa: E402  (misma escala Int16 por banda)
+
 DEFAULT_CLOUD_PROJECT = "teleambagr"
 DEFAULT_COLLECTION = "projects/teleambagr/assets/S2_weekly_valpo"
-DEFAULT_SHAPES = "data/shapefiles/aoi.geojson"
+DEFAULT_SHAPES = "data/vectors/export/wetlands_export_aoi.geojson"
 DEFAULT_BAND = "NDVI"
 
 # Columnas de la tabla semanal que no son medias zonales de bandas de imagen
@@ -361,9 +364,12 @@ def enqueue_yearly_median_raster_tasks_drive(
     clip_geom: ee.Geometry,
     drive_folder: str,
     stem_prefix: str,
-    quantize_divisor: float,
+    quantize_divisor: float | None,
 ) -> list[ee.batch.Task]:
-    """Un GeoTIFF Drive por (año × banda): mediana anual → int16_scaled."""
+    """Un GeoTIFF Drive por (año × banda): mediana anual → int16_scaled.
+
+    ``quantize_divisor=None`` usa la escala Int16 por banda de ``export_s2`` (REDEDGE ×10, resto ×1000).
+    """
     ic_full = ee.ImageCollection(collection_id)
     tasks: list[ee.batch.Task] = []
     year_lookup = _distinct_year_lookup(ic_full)
@@ -379,7 +385,8 @@ def enqueue_yearly_median_raster_tasks_drive(
                 .clip(clip_geom)
                 .set({"year_export": yr, "band_export": band})
             )
-            out = int16_scaled_band(median_img, band, quantize_divisor)
+            div = index_int16_scale(band) if quantize_divisor is None else quantize_divisor
+            out = int16_scaled_band(median_img, band, div)
             stem = f"{stem_prefix}_{yr}_{band}"
             t = ee.batch.Export.image.toDrive(
                 image=out,
@@ -799,8 +806,11 @@ def main() -> None:
     parser.add_argument(
         "--drive-raster-quantize-divisor",
         type=float,
-        default=10000.0,
-        help="Divisor para cuantizar raster Drive (valor físico ≈ DN/divisor; default 10000).",
+        default=None,
+        help=(
+            "Divisor para cuantizar raster Drive (valor físico ≈ DN/divisor). "
+            "Default: escala Int16 por banda de export_s2 (REDEDGE ×10, resto ×1000)."
+        ),
     )
     args = parser.parse_args()
 
@@ -926,7 +936,10 @@ def main() -> None:
             clip_geom=geom_union,
             drive_folder=r_folder,
             stem_prefix=r_stem.replace(" ", "_"),
-            quantize_divisor=float(args.drive_raster_quantize_divisor),
+            quantize_divisor=(
+                None if args.drive_raster_quantize_divisor is None
+                else float(args.drive_raster_quantize_divisor)
+            ),
         )
         print(f"Tareas Export.image raster anual (Drive carpeta '{r_folder}'): {len(t_r)}", flush=True)
 

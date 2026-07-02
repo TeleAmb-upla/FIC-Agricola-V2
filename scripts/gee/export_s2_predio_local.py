@@ -39,7 +39,7 @@ from paths import DEFAULT_S2_WEEKLY_COLLECTION, resolve_ee_cloud_project
 DEFAULT_COLLECTION = DEFAULT_S2_WEEKLY_COLLECTION
 LOCAL_STEM_RE = re.compile(r"^S2_([A-Za-z0-9_]+)_Y(\d{4})_W(\d{2})$", re.I)
 EE_WEEK_BASENAME_RE = re.compile(r"^Y(\d{4})_W(\d{2})$", re.I)
-# Mismas bandas que G1…NOG (int16 ×1000 + clear_pixel_count crudo).
+# Mismas bandas que el asset (int16 con escala por banda + clear_pixel_count crudo).
 COMPOSED_BANDS = COMPOSED_INDEX_BANDS + ["clear_pixel_count"]
 SKIP_PREDIO_CODES = {"LOTE_DEMO"}
 

@@ -1,16 +1,21 @@
 # FIC Agro — monitoreo agrícola con dron y (opcional) Sentinel-2
 # ================================================================
 
-shapefile_path: "data/shapefiles/predios.geojson"
+vectors_root: "data/vectors"
+kml_root: "data/vectors/kml"
+vuelos_geojson_root: "data/vectors/vuelos"
+cuarteles_path: "data/vectors/cuarteles/cuarteles.geojson"
+shapefile_path: "data/vectors/cuarteles/cuarteles.geojson"
+predios_aoi_path: "data_static/predios_aoi.geojson"
+predios_aoi_authoritative: false
+cuarteles_geojson_authoritative: true
 shapefile_id_col: "id_cuartel"
 shapefile_name_col: "nom_predio"
-export_aoi_path: "data/shapefiles/wetlands_export_aoi.geojson"
-export_aoi_id_col: "wetland_id"
 
-year_start: 2024
+year_start: 2017
 year_end: auto
 
-wetlands:
+predios:
   # Códigos alineados con nombres de archivos dron: {DRONE_CODE}_YYYYMMDD_{indice}.tif
   # y con fic_database.csv (poligono_vuelo). s2_code = prefijo S2_* en data/sentinel2 (S2_{INICIAL}_{APELLIDO}_Y{YYYY}_W{WW}).
   l_martinez:
@@ -51,17 +56,20 @@ wetlands:
     s2_code: "O_HERRERA"
   a_brito_rci:
     name: "El resguardo RCI — Alejandra Brito"
-    aoi_source: "data/shapefiles/predios_a_brito/predio_RCI.geojson"
+    aoi_filter_col: "id_cuartel"
+    aoi_filter_val: "c00014"
     drone_code: "A_BRITO_RCI"
     s2_code: "A_BRITO_RCI"
   a_brito_rpa:
     name: "El resguardo RPA — Alejandra Brito"
-    aoi_source: "data/shapefiles/predios_a_brito/predio_RPA.geojson"
+    aoi_filter_col: "id_cuartel"
+    aoi_filter_val: "c00012,c00013"
     drone_code: "A_BRITO_RPA"
     s2_code: "A_BRITO_RPA"
   b_devoto:
     name: "Agr. Rivarola — Bruno Devoto"
-    aoi_source: "data/shapefiles/predios_b_devoto/predio_RIV.geojson"
+    aoi_filter_col: "poligono_vuelo"
+    aoi_filter_val: "FIC-B-DEVOTO-X"
     drone_code: "B_DEVOTO"
     s2_code: "B_DEVOTO"
   c_alvarado:
@@ -79,9 +87,33 @@ wetlands:
   v_siebenthal:
     name: "Von Siebenthal — Viña Von Siebenthal"
     aoi_filter_col: "poligono_vuelo"
-    aoi_filter_val: "FIC-V-SIEBENTHAL"
+    aoi_filter_val: "FIC-V-SIEBENTHAL-X"
     drone_code: "V_SIEBENTHAL"
     s2_code: "V_SIEBENTHAL"
+  v_siebenthal2:
+    name: "Von Siebenthal 2 — Viña Von Siebenthal"
+    aoi_filter_col: "poligono_vuelo"
+    aoi_filter_val: "FIC-V-SIEBENTHAL2-X"
+    drone_code: "V_SIEBENTHAL2"
+    s2_code: "V_SIEBENTHAL2"
+  v_siebenthal3:
+    name: "Von Siebenthal 3 — Viña Von Siebenthal"
+    aoi_filter_col: "poligono_vuelo"
+    aoi_filter_val: "FIC-V-SIEBENTHAL3-X"
+    drone_code: "V_SIEBENTHAL3"
+    s2_code: "V_SIEBENTHAL3"
+  a_inguerzon:
+    name: "Alfalfa — Anita Inguerzon"
+    aoi_filter_col: "poligono_vuelo"
+    aoi_filter_val: "FIC-A-INGUERZON-X"
+    drone_code: "A_INGUERZON"
+    s2_code: "A_INGUERZON"
+  v_fernandez:
+    name: "Trinidad — Vicente Fernandez"
+    aoi_filter_col: "poligono_vuelo"
+    aoi_filter_val: "FIC-V-FERNANDEZ-X"
+    drone_code: "V_FERNANDEZ"
+    s2_code: "V_FERNANDEZ"
 
 sources:
   sentinel2:
@@ -92,7 +124,8 @@ sources:
     enabled: true
     download_enabled: true
     color: "#38bdf8"
-    indices: ["ndvi", "ndwi"]
+    # 9 índices operativos GEE (ver scripts/gee/README.md).
+    indices: ["ndvi", "ndmi", "mndwi", "rededge_position", "mcari", "gndvi", "msavi", "evi", "psri"]
   drone:
     label: "Dron multiespectral"
     description: "Ortofotos e índices de campañas de vuelo."
@@ -164,6 +197,6 @@ indices:
     colormap: "Turbo"
     stretch_percentiles: [0, 100]
     stretch_percentiles_p95_legend: [0, 98]
-    legend_p95_wetland_ids: ["b_devoto"]
+    legend_p95_predio_ids: ["b_devoto"]
 
 stats: ["mean"]
