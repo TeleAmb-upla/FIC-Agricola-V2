@@ -113,7 +113,7 @@ BAND_VIZ: dict[str, dict] = {
     "NDVI":              {"vmin": -1.0, "vmax": 1.0,   "colormap": "RdYlGn",   "label": "NDVI"},
     "NDMI":              {"vmin": -1.0, "vmax": 1.0,   "colormap": "RdYlBu_r", "label": "NDMI"},
     "MNDWI":             {"vmin": -1.0, "vmax": 1.0,   "colormap": "Blues",    "label": "MNDWI"},
-    "REDEDGE_POSITION":  {"vmin": 700.0,"vmax": 750.0, "colormap": "viridis",  "label": "Red-edge pos."},
+    "REDEDGE_POSITION":  {"vmin": 700.0,"vmax": 750.0, "colormap": "viridis",  "label": "Posición red edge (nm)"},
     "MCARI":             {"vmin":  0.0, "vmax": 3.0,   "colormap": "YlGn",     "label": "MCARI"},
     "GNDVI":             {"vmin": -1.0, "vmax": 1.0,   "colormap": "YlGn",     "label": "GNDVI"},
     "MSAVI":             {"vmin": -1.0, "vmax": 1.0,   "colormap": "YlGn",     "label": "MSAVI"},
@@ -483,10 +483,21 @@ def _resolve_band_viz_ranges(
         if lo is None or hi is None or not np.isfinite(lo) or not np.isfinite(hi) or lo >= hi:
             out[band] = {"vmin": float(base["vmin"]), "vmax": float(base["vmax"])}
         else:
-            out[band] = {
-                "vmin": _round_viz_limit(lo),
-                "vmax": _round_viz_limit(hi),
-            }
+            lo_adj, hi_adj = float(lo), float(hi)
+            if band == "REDEDGE_POSITION":
+                # Valores físicos ~700–740 nm; ignorar basura de exportaciones antiguas (sentinelas sin filtrar).
+                if lo_adj < 680.0 or hi_adj > 760.0 or lo_adj >= hi_adj:
+                    out[band] = {"vmin": float(base["vmin"]), "vmax": float(base["vmax"])}
+                else:
+                    out[band] = {
+                        "vmin": _round_viz_limit(lo_adj),
+                        "vmax": _round_viz_limit(hi_adj),
+                    }
+            else:
+                out[band] = {
+                    "vmin": _round_viz_limit(lo_adj),
+                    "vmax": _round_viz_limit(hi_adj),
+                }
     return out
 
 

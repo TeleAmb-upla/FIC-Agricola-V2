@@ -4466,10 +4466,18 @@ function ficSatOperativeIndices(indices) {
     var src = indices || {};
     var out = {};
     FIC_SAT_OPERATIVE_BANDS.forEach(function (band) {
-        if (src[band]) out[band] = src[band];
-        else if (src[band.toLowerCase()]) out[band.toLowerCase()] = src[band.toLowerCase()];
+        var meta = src[band] || src[band.toLowerCase()];
+        if (meta) out[band] = meta;
     });
     return out;
+}
+
+function ficSatBandLabel(bandKey) {
+    var meta = ficIndexMeta(getSatMeta().indices, bandKey);
+    if (meta && meta.label) return meta.label;
+    var k = String(bandKey || '').toLowerCase();
+    if (k === 'rededge_position') return 'Posición red edge (nm)';
+    return String(bandKey || '').toUpperCase();
 }
 
 function satChartBandList() {
@@ -4510,7 +4518,7 @@ function chartBandOptionLabel(bandKey) {
         var meta = ficIndexMeta((state.metadata.drone || {}).indices, bandKey);
         return (meta && meta.label) || String(bandKey).toUpperCase();
     }
-    return bandKey;
+    return ficSatBandLabel(bandKey);
 }
 
 function activeDroneChartBand() {
@@ -5892,7 +5900,7 @@ var FIC_INDEX_DESCRIPTIONS = {
     msavi: 'MSAVI (SAVI modificado): ajuste del suelo con menor sensibilidad a variaciones de brillo del terreno.',
     gndvi: 'GNDVI (índice verde de vegetación normalizado): usa el verde y el NIR; sensible a clorofila y variaciones de cultivo.',
     mcari: 'MCARI (índice de absorción de clorofila modificado): sensible a clorofila y estructura del dosel.',
-    rededge_position: 'Posición del borde rojo (nm): longitud de onda del "red edge"; se desplaza con el contenido de clorofila y el estado del cultivo.',
+    rededge_position: 'Posición red edge (nm): longitud de onda del "red edge" espectral; se desplaza con el contenido de clorofila y el estado del cultivo.',
     psri: 'PSRI (índice de senescencia): aumenta cuando la vegetación envejece o pierde clorofila.',
     mndwi: 'MNDWI (NDWI modificado): mejora la detección de agua libre en superficies urbanas y agrícolas.',
     thermal: 'Ortomosaico térmico: temperatura de superficie estimada desde el sensor infrarrojo del dron.',
@@ -6066,10 +6074,17 @@ function refreshMapLayerState() {
         return;
     }
     if (idxKeys.indexOf(state.mapLayerKind) < 0) {
+        if (state.selectedSource === 'sentinel2') {
+            var upperKind = String(state.mapLayerKind || '').toUpperCase();
+            if (idxKeys.indexOf(upperKind) >= 0) state.mapLayerKind = upperKind;
+        }
+        if (idxKeys.indexOf(state.mapLayerKind) < 0) {
         if (state.selectedSource === 'drone' && idxKeys.indexOf('ndvi') >= 0) state.mapLayerKind = 'ndvi';
         else if (idxKeys.indexOf('rgb') >= 0 && state.selectedSource === 'drone') state.mapLayerKind = 'rgb';
+        else if (idxKeys.indexOf('NDVI') >= 0) state.mapLayerKind = 'NDVI';
         else if (idxKeys.indexOf('ndvi') >= 0) state.mapLayerKind = 'ndvi';
         else state.mapLayerKind = idxKeys[0];
+        }
     }
     mapIndexSel.value = state.mapLayerKind;
 
