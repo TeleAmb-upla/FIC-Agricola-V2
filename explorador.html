@@ -3409,6 +3409,10 @@ function applySatSwipeClip() {
         }
         var clipOk = ficApplyCuartelClipToOverlay(overlay, mapaSat);
         if (!clipOk) {
+            if (ficOverlayImageReady(el)) {
+                el.style.clipPath = '';
+                return true;
+            }
             ficHideRasterOverlayPending(overlay);
             pendingRetry = true;
             return false;
@@ -3539,6 +3543,7 @@ function _setSatOverlay(side, raster) {
     overlay._ficRasterBoundsKey = boundsKey;
     overlay._ficTargetOpacity = opacity;
     overlay._ficClipPending = true;
+    ficHideRasterOverlayPending(overlay);
     function syncSatOverlayClips() {
         ficScheduleRasterCuartelClips();
     }
@@ -6557,7 +6562,10 @@ function ficRevealRasterOverlay(overlay) {
     var op = overlay._ficTargetOpacity != null ? overlay._ficTargetOpacity : 0.85;
     if (overlay.setOpacity) overlay.setOpacity(op);
     var el = overlay.getElement && overlay.getElement();
-    if (el) el.style.visibility = '';
+    if (el) {
+        el.style.visibility = '';
+        if (el.style.clipPath === 'inset(100%)') el.style.clipPath = '';
+    }
 }
 
 function ficOverlayImageReady(el) {
@@ -6604,7 +6612,7 @@ function ficApplyCuartelClipToOverlay(overlay, map, opts) {
     var elH = el.offsetHeight || 0;
     var cp = ficLocalRingsToClipPath(ringsLocal, elW, elH);
     el.style.clipPath = cp || (opts.fallbackClip || '');
-    return !!cp;
+    return ficOverlayImageReady(el);
 }
 
 function ficSyncRasterCuartelClips(retryPass) {
