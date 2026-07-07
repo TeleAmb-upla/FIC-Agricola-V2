@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-25T19:35:45.854953+00:00",
+  "generated_at": "2026-07-07T15:10:39.031096+00:00",
   "aoi_path": "wetlands_aoi.geojson",
   "year_range": {
     "start": 2017,
@@ -40,7 +40,7 @@
       "status": "ready",
       "summary": {
         "n_wetlands": 16,
-        "raster_count": 42112,
+        "raster_count": 13536,
         "available_years": [
           2024,
           2025,

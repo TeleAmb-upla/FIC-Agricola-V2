@@ -4457,10 +4457,25 @@ function ficTimeseriesForPredio(predio, sourceKey) {
     return wls[String(predio || '').toLowerCase()] || null;
 }
 
+/** 9 índices Sentinel-2 operativos (único conjunto en mapa, gráfico y series). */
+var FIC_SAT_OPERATIVE_BANDS = [
+    'NDVI', 'NDMI', 'MNDWI', 'EVI', 'MSAVI', 'GNDVI', 'MCARI', 'PSRI', 'REDEDGE_POSITION'
+];
+
+function ficSatOperativeIndices(indices) {
+    var src = indices || {};
+    var out = {};
+    FIC_SAT_OPERATIVE_BANDS.forEach(function (band) {
+        if (src[band]) out[band] = src[band];
+        else if (src[band.toLowerCase()]) out[band.toLowerCase()] = src[band.toLowerCase()];
+    });
+    return out;
+}
+
 function satChartBandList() {
     var sm = getSatMeta();
-    var keys = Object.keys(sm.indices || {});
-    return keys.filter(function (b) { return b !== 'CLEAR_PIXEL_COUNT'; });
+    var keys = Object.keys(ficSatOperativeIndices(sm.indices || {}));
+    return keys.filter(function (b) { return String(b).toUpperCase() !== 'CLEAR_PIXEL_COUNT'; });
 }
 
 /** Índices con serie temporal en dron (excluye RGB, térmica, LiDAR). */
@@ -5874,31 +5889,12 @@ var FIC_INDEX_DESCRIPTIONS = {
     ndwi: 'NDWI (índice de agua normalizado): resalta agua libre y contenido hídrico en superficie frente a suelos secos.',
     ndmi: 'NDMI (índice de humedad normalizado): sensible al agua en la vegetación; útil para monitorear estrés hídrico del cultivo.',
     evi: 'EVI (índice de vegetación mejorado): mide biomasa con menor saturación que el NDVI en coberturas muy densas.',
-    evi2: 'EVI2 (índice de vegetación mejorado 2): variante del EVI que usa solo bandas del rojo y el infrarrojo cercano.',
-    savi: 'SAVI (índice de vegetación ajustado al suelo): reduce la influencia del suelo desnudo en la estimación de vegetación.',
     msavi: 'MSAVI (SAVI modificado): ajuste del suelo con menor sensibilidad a variaciones de brillo del terreno.',
     gndvi: 'GNDVI (índice verde de vegetación normalizado): usa el verde y el NIR; sensible a clorofila y variaciones de cultivo.',
-    kndvi: 'kNDVI: transformación no lineal del NDVI que mejora el contraste en distintos niveles de cobertura.',
-    ndci: 'NDCI (índice de clorofila normalizado): relacionado con el contenido de clorofila en el dosel.',
-    chl_rededge: 'Índice de clorofila en el borde rojo: estima pigmentos fotosintéticos en vegetación activa.',
-    leaf_chl: 'Contenido de clorofila foliar: proxy del pigmento verde en las hojas.',
-    canopy_chl: 'Contenido de clorofila del dosel: estimación agregada a escala de copa.',
-    ari: 'ARI (índice de antocianinas): detecta acumulación de pigmentos asociados a estrés o senescencia.',
-    mari: 'mARI (ARI modificado): variante del ARI para antocianinas con menor ruido del suelo.',
     mcari: 'MCARI (índice de absorción de clorofila modificado): sensible a clorofila y estructura del dosel.',
     rededge_position: 'Posición del borde rojo (nm): longitud de onda del "red edge"; se desplaza con el contenido de clorofila y el estado del cultivo.',
-    sipi1: 'SIPI (índice de pigmento insensible a la estructura): relacionado con clorofila y carotenoides.',
     psri: 'PSRI (índice de senescencia): aumenta cuando la vegetación envejece o pierde clorofila.',
-    pssrb1: 'PSSRa (ratio de pigmento específico): proxy de clorofila b en la hoja.',
-    ndii: 'NDII (índice de diferencia normalizado SWIR): sensible a humedad y contenido de agua en biomasa.',
-    msi: 'MSI (índice de humedad): relacionado con estrés hídrico; valores altos suelen indicar sequía.',
-    ndmistress: 'NDMI de estrés: variante del NDMI orientada a detectar estrés por déficit hídrico.',
     mndwi: 'MNDWI (NDWI modificado): mejora la detección de agua libre en superficies urbanas y agrícolas.',
-    lai: 'LAI (índice de área foliar): estima la superficie de hoja por unidad de suelo.',
-    fapar: 'FAPAR: fracción de radiación fotosintéticamente activa absorbida por la vegetación.',
-    fcover: 'FCOVER: fracción de cobertura verde del suelo por vegetación.',
-    arvi: 'ARVI (índice resistente a la atmósfera): vegetación con corrección atmosférica frente al NDVI.',
-    clear_pixel_count: 'Conteo de píxeles libres de nubes: indica cuánta área del predio es observable en el período.',
     thermal: 'Ortomosaico térmico: temperatura de superficie estimada desde el sensor infrarrojo del dron.',
     lidar: 'Nube de puntos LiDAR 3D: altura y estructura del terreno y del dosel en el vuelo seleccionado.'
 };
@@ -5947,7 +5943,10 @@ function predioHasLidarData(wid, periodKey) {
 }
 
 function droneIndicesForSelect() {
-    var indices = Object.assign({}, (currentMeta().indices || {}));
+    var raw = (currentMeta().indices || {});
+    var indices = state.selectedSource === 'sentinel2'
+        ? ficSatOperativeIndices(raw)
+        : Object.assign({}, raw);
     if (state.selectedSource === 'drone' && state.selectedPredio && predioHasAnyLidarData(state.selectedPredio)) {
         indices.lidar = {
             label: 'LiDAR',

@@ -93,9 +93,22 @@ _STEM_RE = re.compile(r"^S2_(?P<predio>[A-Za-z0-9_]+)_Y(?P<year>\d{4})_W(?P<week
 MONTH_NAMES_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
                   "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 
+# 9 índices operativos Sentinel-2 (único conjunto publicado en UI y series).
+OPERATIVE_INDEX_BANDS: tuple[str, ...] = (
+    "NDVI",
+    "NDMI",
+    "MNDWI",
+    "REDEDGE_POSITION",
+    "MCARI",
+    "GNDVI",
+    "MSAVI",
+    "EVI",
+    "PSRI",
+)
+OPERATIVE_INDEX_SET: frozenset[str] = frozenset(OPERATIVE_INDEX_BANDS)
+
 # Visualización por banda (vmin, vmax, colormap matplotlib).
 # Si una banda no está acá, se usa DEFAULT_VIZ.
-# Solo los 9 índices operativos (más CLEAR_PIXEL_COUNT). Ver scripts/gee/README.md.
 BAND_VIZ: dict[str, dict] = {
     "NDVI":              {"vmin": -1.0, "vmax": 1.0,   "colormap": "RdYlGn",   "label": "NDVI"},
     "NDMI":              {"vmin": -1.0, "vmax": 1.0,   "colormap": "RdYlBu_r", "label": "NDMI"},
@@ -125,8 +138,12 @@ BAND_DIVISOR_OVERRIDE: dict[str, float] = {
     "CLEAR_PIXEL_COUNT": 1.0,
     "REDEDGE_POSITION": 10.0,
 }
-# Bandas que no aportan información y se ignoran en el pipeline (ninguna por ahora).
-SKIP_BANDS: set[str] = set()
+# Bandas auxiliares / legado: no se publican en mapa ni series.
+SKIP_BANDS: set[str] = {"CLEAR_PIXEL_COUNT"}
+
+
+def is_published_band(name: str) -> bool:
+    return str(name or "").strip().upper() in OPERATIVE_INDEX_SET
 # Valores sentinel adicionales (vienen como int16): ±32767 / ±32768.
 SENTINEL_VALUES = (32767.0, -32767.0, 32768.0, -32768.0)
 
@@ -653,7 +670,7 @@ def compute_weekly_timeseries(
             week_to_curr_idx[r["week"]].append(i)
 
     for b_idx, band in enumerate(band_names):
-        if band in SKIP_BANDS:
+        if band in SKIP_BANDS or not is_published_band(band):
             continue
         weeks = list(range(1, 53))
         hist_med = [math.nan] * 52
@@ -755,7 +772,7 @@ def augment_timeseries_with_monthly(
             month_to_curr_idx[m].append(i)
 
     for b_idx, band in enumerate(band_names):
-        if band in SKIP_BANDS:
+        if band in SKIP_BANDS or not is_published_band(band):
             continue
         band_entry = ts_by_band.get(band)
         if not band_entry:
@@ -1011,7 +1028,7 @@ def write_predio_monthly_csv(
             f"value_{current_year}",
         ])
         for band, info in timeseries.items():
-            if band in SKIP_BANDS:
+            if band in SKIP_BANDS or not is_published_band(band):
                 continue
             months = info.get("months") or list(range(1, 13))
             hm = info.get("historical_median_by_month") or [None] * 12
@@ -1185,16 +1202,18 @@ def build(
                 stack, pl_geom, geo.get("transform"), geo.get("crs")
             )
             print(f"  Máscara AOI aplicada ({pl.upper()}).")
-        band_set.update(b for b in band_names if b not in SKIP_BANDS)
+        band_set.update(b for b in band_names if is_published_band(b))
 
         if bands_filter:
             allowed_upper = {b.strip().upper() for b in bands_filter}
             band_idx_filter = [
                 i for i, b in enumerate(band_names)
-                if b in allowed_upper and b not in SKIP_BANDS
+                if b in allowed_upper and is_published_band(b)
             ]
         else:
-            band_idx_filter = [i for i, b in enumerate(band_names) if b not in SKIP_BANDS]
+            band_idx_filter = [
+                i for i, b in enumerate(band_names) if is_published_band(b)
+            ]
         if not band_idx_filter:
             print(f"  [aviso] sin bandas válidas; salto {predio}.")
             continue
@@ -1211,15 +1230,20 @@ def build(
 
             def _merge_skipped_predio() -> None:
                 assert ts_existing is not None
-                timeseries_all[pl] = copy.deepcopy(ts_existing)
+                timeseries_all[pl] = {
+                    b: copy.deepcopy(v)
+                    for b, v in ts_existing.items()
+                    if is_published_band(b)
+                }
                 if wl_meta:
                     wetlands_meta[pl] = copy.deepcopy(wl_meta)
                 for rk, rv in (existing_meta.get("rasters") or {}).items():
-                    if rk.startswith(f"{pl}_"):
+                    if not rk.startswith(f"{pl}_"):
+                        continue
+                    if is_published_band(_raster_ref_band(rk)):
                         rasters_meta[rk] = copy.deepcopy(rv)
-                for b in ts_existing:
-                    if b not in SKIP_BANDS:
-                        band_set.add(b)
+                for b in timeseries_all[pl]:
+                    band_set.add(b)
 
             if fp_ok and ts_existing and wcsv.is_file() and has_monthly and mcsv.is_file() and wl_meta:
                 _merge_skipped_predio()
@@ -1341,8 +1365,10 @@ def build(
 
     # Indices catalog para el frontend (misma escala que los WebPs del mapa).
     indices_out: dict[str, dict] = {}
-    band_order = [b for b in DEFAULT_CHART_BAND_ORDER if b in band_set]
-    band_order.extend(sorted(b for b in band_set if b not in band_order))
+    band_order = [b for b in DEFAULT_CHART_BAND_ORDER if b in band_set and is_published_band(b)]
+    band_order.extend(
+        sorted(b for b in band_set if b not in band_order and is_published_band(b))
+    )
     for band in band_order:
         viz = BAND_VIZ.get(band, DEFAULT_VIZ)
         lim = band_viz_ranges.get(
@@ -1435,10 +1461,44 @@ def build(
           f"({timeseries_path.stat().st_size / 1024:.1f} KB)")
 
     update_sources_manifest(static_dir.parent, metadata)
+    _prune_obsolete_rasters(rasters_dir)
     print(
         f"Listo. Predios: {len(wetlands_meta)} | Rasters WebP: {len(rasters_meta)} | "
         f"Bandas: {len(indices_out)}"
     )
+
+
+def _raster_ref_band(ref_key: str) -> str:
+    upper = ref_key.upper()
+    for band in sorted(OPERATIVE_INDEX_BANDS, key=len, reverse=True):
+        if upper.endswith("_" + band):
+            return band
+    return ref_key.rsplit("_", 1)[-1].upper()
+
+
+def _raster_stem_band(stem: str) -> str:
+    upper = stem.upper()
+    for band in sorted(OPERATIVE_INDEX_BANDS, key=len, reverse=True):
+        if upper.endswith("_" + band):
+            return band
+    return stem.rsplit("_", 1)[-1].upper()
+
+
+def _prune_obsolete_rasters(rasters_dir: Path) -> None:
+    """Elimina WebPs de bandas descartadas (p. ej. NDWI, SAVI) tras cambiar el catálogo."""
+    if not rasters_dir.is_dir():
+        return
+    removed = 0
+    for webp in rasters_dir.glob("*.webp"):
+        band = _raster_stem_band(webp.stem)
+        if not is_published_band(band):
+            try:
+                webp.unlink()
+                removed += 1
+            except OSError:
+                pass
+    if removed:
+        print(f"  WebPs obsoletos eliminados: {removed}")
 
 
 def update_sources_manifest(data_static_dir: Path, sentinel_meta: dict) -> None:
@@ -1514,7 +1574,8 @@ def main(argv: list[str] | None = None) -> None:
         "--bands",
         default=None,
         metavar="LIST",
-        help="Lista separada por comas para limitar bandas (ej. NDVI,NDWI). Default: todas.",
+        help="Lista separada por comas para limitar bandas (ej. NDVI,NDMI). "
+        "Default: los 9 índices operativos.",
     )
     parser.add_argument(
         "--force",

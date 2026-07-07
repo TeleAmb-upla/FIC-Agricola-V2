@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Exporta mosaicos semanales Sentinel-2 a Earth Engine Assets: Cloud Score+ y, por pixel,
-solo bandas de índices compuestos (NDVI, NDMI, índices tipo Sentinel Hub / SNAP, etc.)
+solo bandas de índices compuestos operativos (9 índices; ver scripts/gee/README.md)
 más ``clear_pixel_count`` — sin bandas espectrales crudas del sensor.
 
 Autenticación: ``earthengine authenticate``. Proyecto Cloud por defecto: ``teleambagr``
@@ -772,7 +772,7 @@ def export_year(
 # Per-predio Drive export: composites for side-by-side visualization
 # ---------------------------------------------------------------------------
 
-DEFAULT_PREDIOS_VIZ_BANDS = ["NDVI", "NDMI", "MNDWI", "EVI", "MSAVI"]
+DEFAULT_PREDIOS_VIZ_BANDS = list(COMPOSED_INDEX_BANDS)
 DEFAULT_PREDIOS_VIZ_SCALE = 10.0
 
 MONTH_NAMES_ES = [
