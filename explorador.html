@@ -1606,12 +1606,6 @@ function ficPageDirPrefix() {
 }
 const BASE = ficPageDirPrefix() + 'data_static';
 
-// #region agent log
-function ficDbgLog(location, message, data, hypothesisId) {
-    fetch('http://127.0.0.1:7300/ingest/91b55acf-74a4-429d-9097-0159b79532a6', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'be0375' }, body: JSON.stringify({ sessionId: 'be0375', location: location, message: message, data: data || {}, hypothesisId: hypothesisId || '', timestamp: Date.now() }) }).catch(function () {});
-}
-// #endregion
-
 /** Máximo zoom nativo tiles Esri World Imagery (coherente con ``maxNativeZoom`` del layer). */
 const FIC_ESRI_MAX_NATIVE_ZOOM = 19;
 /**
@@ -3430,17 +3424,6 @@ function applySatSwipeClip() {
     okL = finishSatOverlay(satOverlayLeft);
     okR = finishSatOverlay(satOverlayRight);
 
-    // #region agent log
-    ficDbgLog('explorador.html:applySatSwipeClip', 'sat swipe clip result', {
-        okL: okL, okR: okR, pendingRetry: pendingRetry,
-        hasLeft: !!satOverlayLeft, hasRight: !!satOverlayRight,
-        leftReady: satOverlayLeft && satOverlayLeft.getElement ? ficOverlayImageReady(satOverlayLeft.getElement()) : false,
-        rightReady: satOverlayRight && satOverlayRight.getElement ? ficOverlayImageReady(satOverlayRight.getElement()) : false,
-        leftClip: satOverlayLeft && satOverlayLeft.getElement ? satOverlayLeft.getElement().style.clipPath : '',
-        rightClip: satOverlayRight && satOverlayRight.getElement ? satOverlayRight.getElement().style.clipPath : ''
-    }, 'H2');
-    // #endregion
-
     if (pendingRetry) {
         setTimeout(function () { ficScheduleRasterCuartelClips(); }, 80);
     }
@@ -3528,9 +3511,6 @@ function _setSatOverlay(side, raster) {
     var url = ficSatRasterImageUrl(raster);
     var bounds = normalizeLeafletCornerPairs(raster.visual && raster.visual.bounds);
     if (!leafletBoundsCornersValid(bounds)) {
-        // #region agent log
-        ficDbgLog('explorador.html:_setSatOverlay', 'invalid bounds', { side: side, url: url, bounds: bounds }, 'H1');
-        // #endregion
         if (existing) {
             mapaSat.removeLayer(existing);
             ficSetSatOverlayRef(side, null);
@@ -3575,20 +3555,10 @@ function _setSatOverlay(side, raster) {
     var el0 = overlay.getElement && overlay.getElement();
     if (el0) {
         var img0 = el0.tagName === 'IMG' ? el0 : el0.querySelector('img');
-        if (img0) {
-            img0.addEventListener('error', function () {
-                // #region agent log
-                ficDbgLog('explorador.html:_setSatOverlay', 'img load error', { side: side, url: url }, 'H4');
-                // #endregion
-            }, { once: true });
-        }
         if (img0 && img0.complete) {
             requestAnimationFrame(syncSatOverlayClips);
         }
     }
-    // #region agent log
-    ficDbgLog('explorador.html:_setSatOverlay', 'overlay created', { side: side, url: url, pane: pane }, 'H4');
-    // #endregion
     ficSetSatOverlayRef(side, overlay);
     return overlay;
 }
@@ -4332,18 +4302,6 @@ function updateSatSplitOverlays() {
         ? satFindRaster(predio, rightCK, band) : null;
     _setSatOverlay('right', rightRaster);
     state._satOverlaySig = overlaySig;
-
-    // #region agent log
-    ficDbgLog('explorador.html:updateSatSplitOverlays', 'sat raster resolve', {
-        predio: predio, band: band, viewMode: viewMode, leftCK: leftCK, rightCK: rightCK,
-        leftPath: leftRaster && leftRaster.visual ? leftRaster.visual.path : null,
-        rightPath: rightRaster && rightRaster.visual ? rightRaster.visual.path : null,
-        leftUrl: leftRaster ? ficSatRasterImageUrl(leftRaster) : null,
-        rightUrl: rightRaster ? ficSatRasterImageUrl(rightRaster) : null,
-        isSplit: isSatSplitMode(), hasMapaSat: !!mapaSat, BASE: BASE
-    }, 'H1');
-    // #endregion
-
     applySatSwipeClip();
 
     if (predio && (leftCK || rightCK)) {
@@ -6611,12 +6569,6 @@ function ficRevealRasterOverlay(overlay) {
         el.style.visibility = '';
         if (el.style.clipPath === 'inset(100%)') el.style.clipPath = '';
     }
-    // #region agent log
-    ficDbgLog('explorador.html:ficRevealRasterOverlay', 'overlay revealed', {
-        op: op, clipPath: el ? el.style.clipPath : '', vis: el ? el.style.visibility : '',
-        w: el ? el.offsetWidth : 0, h: el ? el.offsetHeight : 0
-    }, 'H2');
-    // #endregion
 }
 
 function ficOverlayImageReady(el) {
@@ -6911,12 +6863,6 @@ function updateMapOverlay() {
         raster = satFindRaster(wid, period, selectedIndex());
     }
     if (!raster) {
-        // #region agent log
-        ficDbgLog('explorador.html:updateMapOverlay', 'no raster found', {
-            source: state.selectedSource, predio: wid, period: period, ixKind: ixKind,
-            rkBase: rkBase, isDrone: isDrone, isSatSplit: isSatSplitMode()
-        }, 'H1');
-        // #endregion
         if (isDrone) {
             ficSyncDroneMapTitle(ficDroneUnavailableMessage(ixKind, state.mapPeriodKey));
         } else {
