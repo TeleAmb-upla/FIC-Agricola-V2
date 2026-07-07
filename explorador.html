@@ -1834,6 +1834,17 @@ function listAllSelectableCuartels() {
     var ids = Object.keys(idx);
     ids.sort();
     var allowed = prediosListedForSelect();
+    if (!allowed.length) {
+        var auth = state.authSession;
+        return ids.filter(function (cid) {
+            var wid = ficPredioForCuartel(cid);
+            if (!wid || !isUiSelectablePredio(wid)) return false;
+            if (auth && (auth.rol === 'asesor' || auth.rol === 'sat')) {
+                return predioMatchesAdvisorFilter(wid, auth.nombre);
+            }
+            return true;
+        });
+    }
     return ids.filter(function (cid) {
         var wid = ficPredioForCuartel(cid);
         if (!wid || !isUiSelectablePredio(wid)) return false;
@@ -2891,7 +2902,7 @@ function setHierarchyContextHint(key) {
     }
 }
 
-function initFromQuery() {
+async function initFromQuery() {
     state.authSession = readAuthSession();
     if (!state.authSession) {
         window.location.replace('index.html');
@@ -2929,13 +2940,19 @@ function initFromQuery() {
     setHierarchyContextHint(key);
     document.body.setAttribute('data-hierarchy', key);
     document.title = 'Monitoreo Agrícola · ' + meta.badge;
+    applyAuthSessionToUi();
+    try {
+        await ficEnsureGeoContextLoaded();
+    } catch (e) {
+        console.warn('Contexto geo previo al mapa:', e.message || e);
+    }
     initMap();
     ficBindSourcePills();
-    loadManifest();
+    await loadManifest();
     setTimeout(function () { if (mapa) mapa.invalidateSize({ animate: false }); }, 400);
 }
 
-window.addEventListener('load', initFromQuery);
+window.addEventListener('load', function () { initFromQuery(); });
 
 // ============================================================
 // Comparativa satelital: un mapa + divisor entre dos rásteres
@@ -3241,7 +3258,15 @@ function clampSatPillToViewModeItems(viewMode) {
 function initSatCompareMap() {
     if (mapaSat) return;
     if (!document.getElementById('mapaSatCompare')) return;
-    mapaSat = L.map('mapaSatCompare', { center: [-33.45, -70.74], zoom: 12, zoomControl: false, maxZoom: FIC_MAP_USER_MAX_ZOOM, attributionControl: false });
+    var iv = ficGetMapInitialView();
+    var center = iv.center;
+    var zoom = iv.zoom;
+    if (mapa) {
+        var mc = mapa.getCenter();
+        center = [mc.lat, mc.lng];
+        zoom = mapa.getZoom();
+    }
+    mapaSat = L.map('mapaSatCompare', { center: center, zoom: zoom, zoomControl: false, maxZoom: FIC_MAP_USER_MAX_ZOOM, attributionControl: false });
     mapaSat.createPane('ficSatRasterRight');
     mapaSat.getPane('ficSatRasterRight').style.zIndex = '650';
     mapaSat.createPane('ficSatRasterLeft');
@@ -3258,6 +3283,12 @@ function initSatCompareMap() {
     ficEnsureRasterClipMapListeners(mapaSat, 'sat');
     bindSatSwipeDivider();
     ficApplySatPaneSplitClip();
+    if (mapa) {
+        var mb = mapa.getBounds();
+        if (mb && mb.isValid()) mapaSat.fitBounds(mb, { animate: false });
+    } else if (iv.bounds && iv.bounds.isValid()) {
+        mapaSat.fitBounds(iv.bounds.pad(0.12), { animate: false });
+    }
 }
 
 function ficSatSplitLeftPct() {
@@ -5486,9 +5517,44 @@ function ficEnsureMainMapBasemapForRaster(showRaster) {
     }
 }
 
+/** Centro por defecto en la zona FIC (Valparaíso/Los Andes), no Santiago. */
+var FIC_DEFAULT_MAP_CENTER = [-32.85, -70.72];
+var FIC_DEFAULT_MAP_ZOOM = 11;
+
+function ficBoundsFromCuartelIds(cids) {
+    var fitBounds = null;
+    (cids || []).forEach(function (cid) {
+        var b = ficBoundsFromCuartelFeature(cid);
+        if (!b || !b.isValid()) return;
+        fitBounds = fitBounds ? fitBounds.extend(b) : b;
+    });
+    return fitBounds && fitBounds.isValid() ? fitBounds : null;
+}
+
+/** Vista inicial del mapa según cuarteles del usuario (antes de cargar metadata/rásteres). */
+function ficGetMapInitialView() {
+    applyAuthSessionToUi();
+    syncSelectionFromContext();
+    var cids = cuartelesForCurrentContext();
+    var bounds = ficBoundsFromCuartelIds(cids);
+    if (!bounds && state.aoi && state.aoi.features && state.aoi.features.length) {
+        bounds = ficBoundsFromCuartelIds(
+            state.aoi.features.map(function (f) {
+                return ficTrim((f.properties || {}).id_cuartel || '');
+            }).filter(Boolean)
+        );
+    }
+    if (bounds && bounds.isValid()) {
+        var c = bounds.getCenter();
+        return { center: [c.lat, c.lng], zoom: FIC_DEFAULT_MAP_ZOOM, bounds: bounds };
+    }
+    return { center: FIC_DEFAULT_MAP_CENTER.slice(), zoom: FIC_DEFAULT_MAP_ZOOM, bounds: null };
+}
+
 function initMap() {
     if (mapa) return;
-    mapa = L.map('mapa', { center: [-33.45, -70.74], zoom: 11, zoomControl: false, maxZoom: 24 });
+    var iv = ficGetMapInitialView();
+    mapa = L.map('mapa', { center: iv.center, zoom: iv.zoom, zoomControl: false, maxZoom: 24 });
     mapa.createPane('ficCuartelPane');
     mapa.getPane('ficCuartelPane').style.zIndex = '650';
     L.control.zoom({ position: 'topright' }).addTo(mapa);
@@ -5527,6 +5593,9 @@ function initMap() {
     ).addTo(mapa);
     ficEnsureRasterClipMapListeners(mapa, 'main');
     ficSyncMapChromeInset();
+    if (iv.bounds && iv.bounds.isValid()) {
+        mapa.fitBounds(iv.bounds.pad(0.12), Object.assign({ animate: false }, ficMainMapRasterFitBoundsOpts()));
+    }
 }
 
 function ficNormalizeAoiFeatureCollection(fc) {
@@ -5537,6 +5606,12 @@ function ficNormalizeAoiFeatureCollection(fc) {
 
 function ficCurrentAoiGeojson() {
     return state.aoi;
+}
+
+async function ficEnsureGeoContextLoaded() {
+    await loadPrediosAoiGeojson();
+    await loadFicDatabaseCsv();
+    await loadCuartelesIndex();
 }
 
 async function loadPrediosAoiGeojson() {
@@ -5575,9 +5650,7 @@ async function loadManifest() {
         return;
     }
 
-    await loadPrediosAoiGeojson();
-    await loadFicDatabaseCsv();
-    await loadCuartelesIndex();
+    await ficEnsureGeoContextLoaded();
     await ensureDroneDatasetLoaded();
     if (typeof FicLidar3d !== 'undefined') {
         ficLoadLidarPointSizeFromStorage();
