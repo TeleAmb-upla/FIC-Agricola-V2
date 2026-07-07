@@ -4462,12 +4462,61 @@ var FIC_SAT_OPERATIVE_BANDS = [
     'NDVI', 'NDMI', 'MNDWI', 'EVI', 'MSAVI', 'GNDVI', 'MCARI', 'PSRI', 'REDEDGE_POSITION'
 ];
 
+/** ¿Valor en rango físico razonable para publicar en UI? */
+function ficSatBandValueInRange(bandKey, value) {
+    if (value == null || !isFinite(Number(value))) return false;
+    var v = Number(value);
+    var b = String(bandKey || '').toUpperCase();
+    if (b === 'REDEDGE_POSITION') return v >= 680 && v <= 760;
+    if (b === 'CLEAR_PIXEL_COUNT') return v >= 0;
+    return v >= -2.5 && v <= 2.5;
+}
+
+function ficSatSeriesHasUsableValues(bandKey, series) {
+    if (!series) return false;
+    var arrs = [
+        series.historical_median,
+        series.historical_median_by_month,
+        series.historical_p25,
+        series.historical_p75,
+        series.current_year && series.current_year.values_by_week,
+        series.current_year && series.current_year.values_by_month
+    ];
+    for (var ai = 0; ai < arrs.length; ai++) {
+        var arr = arrs[ai];
+        if (!arr || !arr.length) continue;
+        for (var i = 0; i < arr.length; i++) {
+            if (ficSatBandValueInRange(bandKey, arr[i])) return true;
+        }
+    }
+    return false;
+}
+
+/** ¿Hay al menos un valor usable en la serie del predio (o en algún predio si no hay selección)? */
+function ficSatBandHasUsableData(bandKey, predio) {
+    var band = String(bandKey || '').toUpperCase();
+    var wid = predio || state.selectedPredio;
+    if (!wid) {
+        var src = state.selectedSource || 'sentinel2';
+        var ds = normalizeSourcePayload(state.datasets[src] || {});
+        var wls = ds.predios || ds.wetlands || {};
+        return Object.keys(wls).some(function (p) {
+            return ficSatBandHasUsableData(band, p);
+        });
+    }
+    var base = ficTimeseriesForPredio(wid, state.selectedSource);
+    if (!base) return false;
+    var series = base[band] || base[band.toLowerCase()];
+    return ficSatSeriesHasUsableValues(band, series);
+}
+
 function ficSatOperativeIndices(indices) {
     var src = indices || {};
     var out = {};
     FIC_SAT_OPERATIVE_BANDS.forEach(function (band) {
         var meta = src[band] || src[band.toLowerCase()];
-        if (meta) out[band] = meta;
+        if (!meta || !ficSatBandHasUsableData(band)) return;
+        out[band] = meta;
     });
     return out;
 }
