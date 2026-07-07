@@ -3257,6 +3257,32 @@ function initSatCompareMap() {
     mapaSat.on('move zoom moveend zoomend', applySatSwipeClip);
     ficEnsureRasterClipMapListeners(mapaSat, 'sat');
     bindSatSwipeDivider();
+    ficApplySatPaneSplitClip();
+}
+
+function ficSatSplitLeftPct() {
+    var ratio = state.satSwipeRatio;
+    if (ratio == null || !isFinite(ratio)) ratio = 0.5;
+    ratio = Math.min(1, Math.max(0, ratio));
+    var insetPx = ficReadMapChromeInsetLeftPx();
+    var mc = mapaSat && mapaSat.getContainer();
+    if (!mc) return 50;
+    var mr = mc.getBoundingClientRect();
+    if (mr.width <= 0) return 50;
+    var usableMapW = Math.max(1, mr.width - insetPx);
+    return ((insetPx + ratio * usableMapW) / mr.width) * 100;
+}
+
+/** Recorte duro por pane: histórico no puede pintar en la mitad «Actual» aunque la máscara del img tarde. */
+function ficApplySatPaneSplitClip() {
+    if (!mapaSat) return;
+    var leftPct = ficSatSplitLeftPct();
+    var leftInset = leftPct.toFixed(3);
+    var rightCut = (100 - leftPct).toFixed(3);
+    var paneL = mapaSat.getPane('ficSatRasterLeft');
+    var paneR = mapaSat.getPane('ficSatRasterRight');
+    if (paneL) paneL.style.clipPath = 'inset(0 ' + rightCut + '% 0 0)';
+    if (paneR) paneR.style.clipPath = 'inset(0 0 0 ' + leftInset + '%)';
 }
 
 function ficClearRasterSwipeMask(el) {
@@ -3326,71 +3352,55 @@ function applySatSwipeClip() {
     }
     if (grip) grip.setAttribute('aria-valuenow', String(Math.round(ratio * 100)));
 
-    if (!satOverlayLeft && satOverlayRight) {
-        var clipR = ficApplyCuartelClipToOverlay(satOverlayRight, mapaSat);
-        ficClearRasterSwipeMask(satOverlayRight.getElement && satOverlayRight.getElement());
-        if (clipR) ficRevealRasterOverlay(satOverlayRight);
-        else ficHideRasterOverlayPending(satOverlayRight);
-        return;
-    }
-    if (satOverlayLeft && !satOverlayRight) {
-        var clipLonly = ficApplyCuartelClipToOverlay(satOverlayLeft, mapaSat);
-        var swipeLonly = false;
-        var mcL = mapaSat && mapaSat.getContainer();
-        if (mcL) {
-            var mrL = mcL.getBoundingClientRect();
-            var usableMapWL = Math.max(1, mrL.width - insetPx);
-            var splitXL = mrL.left + insetPx + ratio * usableMapWL;
-            swipeLonly = ficApplyRasterSwipeMask(satOverlayLeft, splitXL, 'left');
-        } else {
-            ficClearRasterSwipeMask(satOverlayLeft.getElement && satOverlayLeft.getElement());
-            swipeLonly = clipLonly;
+    if (!mapaSat) return;
+    ficApplySatPaneSplitClip();
+
+    var pendingRetry = false;
+    var okL = false;
+    var okR = false;
+
+    function finishSatOverlay(overlay) {
+        if (!overlay) return false;
+        var el = overlay.getElement && overlay.getElement();
+        if (el) ficClearRasterSwipeMask(el);
+        if (!el || !ficOverlayImageReady(el)) {
+            ficHideRasterOverlayPending(overlay);
+            pendingRetry = true;
+            if (el) {
+                var imgWait = el.tagName === 'IMG' ? el : el.querySelector('img');
+                if (imgWait && !imgWait.complete) {
+                    imgWait.addEventListener('load', function () {
+                        ficScheduleRasterCuartelClips();
+                    }, { once: true });
+                }
+            }
+            return false;
         }
-        if (clipLonly && swipeLonly) ficRevealRasterOverlay(satOverlayLeft);
-        else ficHideRasterOverlayPending(satOverlayLeft);
-        return;
-    }
-    if (!mapaSat || !satOverlayLeft) {
-        if (mapaSat && satOverlayRight) {
-            var clipRf = ficApplyCuartelClipToOverlay(satOverlayRight, mapaSat);
-            ficClearRasterSwipeMask(satOverlayRight.getElement && satOverlayRight.getElement());
-            if (clipRf) ficRevealRasterOverlay(satOverlayRight);
-            else ficHideRasterOverlayPending(satOverlayRight);
+        var clipOk = ficApplyCuartelClipToOverlay(overlay, mapaSat);
+        if (!clipOk) {
+            ficHideRasterOverlayPending(overlay);
+            pendingRetry = true;
+            return false;
         }
-        return;
-    }
-    var el = typeof satOverlayLeft.getElement === 'function' ? satOverlayLeft.getElement() : null;
-    if (!el) return;
-
-    if (!ficOverlayImageReady(el)) {
-        ficHideRasterOverlayPending(satOverlayLeft);
-        if (satOverlayRight) ficHideRasterOverlayPending(satOverlayRight);
-        var imgWaitSwipe = el.tagName === 'IMG' ? el : el.querySelector('img');
-        if (imgWaitSwipe && imgWaitSwipe.complete) {
-            setTimeout(function () { ficScheduleRasterCuartelClips(); }, 80);
-        }
-        return;
+        return true;
     }
 
-    var mc = mapaSat.getContainer();
-    if (!mc) return;
-    var mr = mc.getBoundingClientRect();
-    if (mr.width <= 0) return;
+    okL = finishSatOverlay(satOverlayLeft);
+    okR = finishSatOverlay(satOverlayRight);
 
-    var usableMapW = Math.max(1, mr.width - insetPx);
-    var splitScreenX = mr.left + insetPx + ratio * usableMapW;
-
-    // Cada lado mantiene su WebP fijo; el slider solo revela izquierda (hist) o derecha (actual).
-    var clipL = ficApplyCuartelClipToOverlay(satOverlayLeft, mapaSat);
-    var swipeL = ficApplyRasterSwipeMask(satOverlayLeft, splitScreenX, 'left');
-    if (clipL && swipeL) ficRevealRasterOverlay(satOverlayLeft);
-    else ficHideRasterOverlayPending(satOverlayLeft);
-    if (satOverlayRight) {
-        var clipR2 = ficApplyCuartelClipToOverlay(satOverlayRight, mapaSat);
-        var swipeR = ficApplyRasterSwipeMask(satOverlayRight, splitScreenX, 'right');
-        if (clipR2 && swipeR) ficRevealRasterOverlay(satOverlayRight);
-        else ficHideRasterOverlayPending(satOverlayRight);
+    if (pendingRetry) {
+        setTimeout(function () { ficScheduleRasterCuartelClips(); }, 80);
     }
+
+    requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+            ficApplySatPaneSplitClip();
+            if (okL) ficRevealRasterOverlay(satOverlayLeft);
+            else if (satOverlayLeft) ficHideRasterOverlayPending(satOverlayLeft);
+            if (okR) ficRevealRasterOverlay(satOverlayRight);
+            else if (satOverlayRight) ficHideRasterOverlayPending(satOverlayRight);
+        });
+    });
 }
 
 function bindSatSwipeDivider() {
@@ -3481,6 +3491,7 @@ function _setSatOverlay(side, raster) {
         mapaSat.removeLayer(existing);
         ficSetSatOverlayRef(side, null);
     }
+    ficApplySatPaneSplitClip();
     _ficClipRetryCount = 0;
     var llb = boundsLatLngBoundsFromCorners(bounds);
     if (!llb) return null;
