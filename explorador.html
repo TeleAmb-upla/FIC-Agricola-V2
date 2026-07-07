@@ -3270,15 +3270,13 @@ function ficClearRasterSwipeMask(el) {
 /** Máscara rectangular del swipe: histórico visible a la izquierda, actual a la derecha. */
 function ficApplyRasterSwipeMask(overlay, splitScreenX, side) {
     var el = overlay && overlay.getElement && overlay.getElement();
-    if (!el) return;
+    if (!el) return false;
     if (!ficOverlayImageReady(el)) {
-        ficClearRasterSwipeMask(el);
-        return;
+        return false;
     }
     var ir = el.getBoundingClientRect();
     if (ir.width <= 0) {
-        ficClearRasterSwipeMask(el);
-        return;
+        return false;
     }
     var stop = ((splitScreenX - ir.left) / ir.width) * 100;
     stop = Math.max(0, Math.min(100, stop));
@@ -3290,6 +3288,7 @@ function ficApplyRasterSwipeMask(overlay, splitScreenX, side) {
     el.style.webkitMaskImage = mask;
     el.style.maskSize = '100% 100%';
     el.style.webkitMaskSize = '100% 100%';
+    return true;
 }
 
 function ficRefreshSatMapRasters() {
@@ -3328,27 +3327,35 @@ function applySatSwipeClip() {
     if (grip) grip.setAttribute('aria-valuenow', String(Math.round(ratio * 100)));
 
     if (!satOverlayLeft && satOverlayRight) {
-        ficApplyCuartelClipToOverlay(satOverlayRight, mapaSat);
+        var clipR = ficApplyCuartelClipToOverlay(satOverlayRight, mapaSat);
         ficClearRasterSwipeMask(satOverlayRight.getElement && satOverlayRight.getElement());
+        if (clipR) ficRevealRasterOverlay(satOverlayRight);
+        else ficHideRasterOverlayPending(satOverlayRight);
         return;
     }
     if (satOverlayLeft && !satOverlayRight) {
-        ficApplyCuartelClipToOverlay(satOverlayLeft, mapaSat);
+        var clipLonly = ficApplyCuartelClipToOverlay(satOverlayLeft, mapaSat);
+        var swipeLonly = false;
         var mcL = mapaSat && mapaSat.getContainer();
         if (mcL) {
             var mrL = mcL.getBoundingClientRect();
             var usableMapWL = Math.max(1, mrL.width - insetPx);
             var splitXL = mrL.left + insetPx + ratio * usableMapWL;
-            ficApplyRasterSwipeMask(satOverlayLeft, splitXL, 'left');
+            swipeLonly = ficApplyRasterSwipeMask(satOverlayLeft, splitXL, 'left');
         } else {
             ficClearRasterSwipeMask(satOverlayLeft.getElement && satOverlayLeft.getElement());
+            swipeLonly = clipLonly;
         }
+        if (clipLonly && swipeLonly) ficRevealRasterOverlay(satOverlayLeft);
+        else ficHideRasterOverlayPending(satOverlayLeft);
         return;
     }
     if (!mapaSat || !satOverlayLeft) {
         if (mapaSat && satOverlayRight) {
-            ficApplyCuartelClipToOverlay(satOverlayRight, mapaSat);
+            var clipRf = ficApplyCuartelClipToOverlay(satOverlayRight, mapaSat);
             ficClearRasterSwipeMask(satOverlayRight.getElement && satOverlayRight.getElement());
+            if (clipRf) ficRevealRasterOverlay(satOverlayRight);
+            else ficHideRasterOverlayPending(satOverlayRight);
         }
         return;
     }
@@ -3356,14 +3363,11 @@ function applySatSwipeClip() {
     if (!el) return;
 
     if (!ficOverlayImageReady(el)) {
-        ficClearRasterSwipeMask(el);
+        ficHideRasterOverlayPending(satOverlayLeft);
+        if (satOverlayRight) ficHideRasterOverlayPending(satOverlayRight);
         var imgWaitSwipe = el.tagName === 'IMG' ? el : el.querySelector('img');
         if (imgWaitSwipe && imgWaitSwipe.complete) {
             setTimeout(function () { ficScheduleRasterCuartelClips(); }, 80);
-        }
-        if (satOverlayRight) {
-            var elR = satOverlayRight.getElement && satOverlayRight.getElement();
-            if (elR) ficClearRasterSwipeMask(elR);
         }
         return;
     }
@@ -3377,11 +3381,15 @@ function applySatSwipeClip() {
     var splitScreenX = mr.left + insetPx + ratio * usableMapW;
 
     // Cada lado mantiene su WebP fijo; el slider solo revela izquierda (hist) o derecha (actual).
-    ficApplyCuartelClipToOverlay(satOverlayLeft, mapaSat);
-    ficApplyRasterSwipeMask(satOverlayLeft, splitScreenX, 'left');
+    var clipL = ficApplyCuartelClipToOverlay(satOverlayLeft, mapaSat);
+    var swipeL = ficApplyRasterSwipeMask(satOverlayLeft, splitScreenX, 'left');
+    if (clipL && swipeL) ficRevealRasterOverlay(satOverlayLeft);
+    else ficHideRasterOverlayPending(satOverlayLeft);
     if (satOverlayRight) {
-        ficApplyCuartelClipToOverlay(satOverlayRight, mapaSat);
-        ficApplyRasterSwipeMask(satOverlayRight, splitScreenX, 'right');
+        var clipR2 = ficApplyCuartelClipToOverlay(satOverlayRight, mapaSat);
+        var swipeR = ficApplyRasterSwipeMask(satOverlayRight, splitScreenX, 'right');
+        if (clipR2 && swipeR) ficRevealRasterOverlay(satOverlayRight);
+        else ficHideRasterOverlayPending(satOverlayRight);
     }
 }
 
@@ -3464,7 +3472,8 @@ function _setSatOverlay(side, raster) {
     var boundsKey = JSON.stringify(bounds);
     if (existing && existing._ficRasterPath === url && existing._ficRasterBoundsKey === boundsKey) {
         var opReuse = raster.visual.opacity != null ? raster.visual.opacity : 0.85;
-        if (existing.setOpacity) existing.setOpacity(opReuse);
+        existing._ficTargetOpacity = opReuse;
+        ficHideRasterOverlayPending(existing);
         ficScheduleRasterCuartelClips();
         return existing;
     }
@@ -3479,13 +3488,15 @@ function _setSatOverlay(side, raster) {
     var opacity = raster.visual.opacity != null ? raster.visual.opacity : 0.85;
     var pane = side === 'left' ? 'ficSatRasterLeft' : 'ficSatRasterRight';
     var overlay = L.imageOverlay(url, llb, {
-        opacity: opacity,
+        opacity: 0,
         className: imgClass,
         interactive: false,
         pane: pane,
     }).addTo(mapaSat);
     overlay._ficRasterPath = url;
     overlay._ficRasterBoundsKey = boundsKey;
+    overlay._ficTargetOpacity = opacity;
+    overlay._ficClipPending = true;
     function syncSatOverlayClips() {
         ficScheduleRasterCuartelClips();
     }
@@ -6445,6 +6456,26 @@ function ficLocalPointsToClipPath(points, w, h) {
     }).join(', ') + ')';
 }
 
+function ficHideRasterOverlayPending(overlay) {
+    if (!overlay) return;
+    overlay._ficClipPending = true;
+    if (overlay.setOpacity) overlay.setOpacity(0);
+    var el = overlay.getElement && overlay.getElement();
+    if (el) {
+        el.style.visibility = 'hidden';
+        el.style.clipPath = 'inset(100%)';
+    }
+}
+
+function ficRevealRasterOverlay(overlay) {
+    if (!overlay) return;
+    overlay._ficClipPending = false;
+    var op = overlay._ficTargetOpacity != null ? overlay._ficTargetOpacity : 0.85;
+    if (overlay.setOpacity) overlay.setOpacity(op);
+    var el = overlay.getElement && overlay.getElement();
+    if (el) el.style.visibility = '';
+}
+
 function ficOverlayImageReady(el) {
     if (!el) return false;
     var img = el.tagName === 'IMG' ? el : el.querySelector('img');
@@ -6455,25 +6486,23 @@ function ficOverlayImageReady(el) {
 function ficApplyCuartelClipToOverlay(overlay, map, opts) {
     opts = opts || {};
     var el = overlay && overlay.getElement && overlay.getElement();
-    if (!el || !map) return;
+    if (!el || !map) return false;
     var cids = ficCuartelIdsForClip();
     if (!cids.length) {
         el.style.clipPath = opts.fallbackClip || '';
-        return;
+        return ficOverlayImageReady(el);
     }
     if (!ficOverlayImageReady(el)) {
-        el.style.clipPath = '';
+        ficHideRasterOverlayPending(overlay);
         var imgWait = el.tagName === 'IMG' ? el : el.querySelector('img');
         if (imgWait && !imgWait.complete) {
-            // Image still loading – fire when it arrives
             imgWait.addEventListener('load', function () {
                 ficScheduleRasterCuartelClips();
             }, { once: true });
         } else {
-            // Image loaded but Leaflet hasn't positioned it yet – retry after layout tick
             setTimeout(function () { ficScheduleRasterCuartelClips(); }, 80);
         }
-        return;
+        return false;
     }
     var ringsLocal = [];
     cids.forEach(function (cuCid) {
@@ -6485,12 +6514,13 @@ function ficApplyCuartelClipToOverlay(overlay, map, opts) {
     });
     if (!ringsLocal.length) {
         el.style.clipPath = opts.fallbackClip || '';
-        return;
+        return true;
     }
     var elW = el.offsetWidth || 0;
     var elH = el.offsetHeight || 0;
     var cp = ficLocalRingsToClipPath(ringsLocal, elW, elH);
     el.style.clipPath = cp || (opts.fallbackClip || '');
+    return !!cp;
 }
 
 function ficSyncRasterCuartelClips(retryPass) {
@@ -6504,7 +6534,9 @@ function ficSyncRasterCuartelClips(retryPass) {
     }
     if (mapa) {
         [rasterOverlay, rasterDroneRgb, rasterDroneIndex].forEach(function (ov) {
-            if (ov) ficApplyCuartelClipToOverlay(ov, mapa);
+            if (!ov) return;
+            if (ficApplyCuartelClipToOverlay(ov, mapa)) ficRevealRasterOverlay(ov);
+            else ficHideRasterOverlayPending(ov);
         });
     }
     if (!retryPass) {
@@ -6757,16 +6789,19 @@ function updateMapOverlay() {
         if (!llb) return null;
         var op = opacity != null ? opacity : (r.visual.opacity != null ? r.visual.opacity : 0.9);
         var ov = L.imageOverlay(BASE + '/' + p, llb, {
-            opacity: op,
+            opacity: 0,
             className: (className || '') + ' fic-raster-overlay',
             interactive: false,
             crossOrigin: true
         }).addTo(mapa);
+        ov._ficTargetOpacity = op;
+        ov._ficClipPending = true;
         ov.on('load', function () { ficScheduleRasterCuartelClips(); });
         ficBindRasterOverlayRecovery(ov, mapa);
         var el0 = ov.getElement && ov.getElement();
         if (el0) {
-            el0.style.clipPath = '';
+            el0.style.visibility = 'hidden';
+            el0.style.clipPath = 'inset(100%)';
             var img0 = el0.tagName === 'IMG' ? el0 : el0.querySelector('img');
             if (img0 && img0.complete) {
                 requestAnimationFrame(function () { ficScheduleRasterCuartelClips(); });
