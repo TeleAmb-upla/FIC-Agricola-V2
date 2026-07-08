@@ -756,6 +756,15 @@
             height: 100%;
             border-radius: 0;
         }
+        #mapaSatCompare .leaflet-image-layer {
+            visibility: visible !important;
+            opacity: 0.88;
+            pointer-events: none;
+        }
+        #mapaSatCompare .leaflet-ficSatRasterLeft-pane,
+        #mapaSatCompare .leaflet-ficSatRasterRight-pane {
+            clip-path: none !important;
+        }
         .fic-sat-swipe {
             position: absolute;
             top: 0;
@@ -1606,6 +1615,64 @@ function ficPageDirPrefix() {
 }
 const BASE = ficPageDirPrefix() + 'data_static';
 
+/** Panel de diagnóstico satelital: ``?ficDebugSat=1`` en la URL. */
+var FIC_SAT_DEBUG = /(?:^|[?&])ficDebugSat=1(?:&|$)/.test(window.location.search);
+var ficSatDebugLog = [];
+function ficSatDebug(tag, data) {
+    if (!FIC_SAT_DEBUG) return;
+    ficSatDebugLog.push({ t: Date.now(), tag: tag, data: data });
+    if (ficSatDebugLog.length > 36) ficSatDebugLog.shift();
+    var panel = document.getElementById('ficSatDebugPanel');
+    if (!panel) {
+        panel = document.createElement('div');
+        panel.id = 'ficSatDebugPanel';
+        panel.setAttribute('aria-live', 'polite');
+        panel.style.cssText = 'position:fixed;bottom:8px;left:8px;max-width:min(440px,94vw);max-height:42vh;overflow:auto;z-index:99999;background:rgba(8,12,10,.92);color:#9d9;font:11px/1.35 monospace;padding:8px 10px;border:1px solid #4a6;pointer-events:none;white-space:pre-wrap;';
+        document.body.appendChild(panel);
+    }
+    panel.textContent = ficSatDebugLog.map(function (e) {
+        return e.tag + ': ' + JSON.stringify(e.data);
+    }).join('\n');
+}
+function ficSatDebugSnapshot(label) {
+    if (!FIC_SAT_DEBUG) return;
+    function sideInfo(side, ov) {
+        var el = ov && ov.getElement && ov.getElement();
+        var img = el ? (el.tagName === 'IMG' ? el : el.querySelector('img')) : null;
+        var pane = el && el.parentElement;
+        var pr = pane ? pane.getBoundingClientRect() : {};
+        var ir = el ? el.getBoundingClientRect() : {};
+        return {
+            side: side,
+            file: img && img.src ? img.src.split('/').pop().split('?')[0] : null,
+            nw: img ? img.naturalWidth : 0,
+            ok: !!(img && img.complete && img.naturalWidth > 0),
+            ir: { w: Math.round(ir.width || 0), h: Math.round(ir.height || 0) },
+            pane: { w: Math.round(pr.width || 0), h: Math.round(pr.height || 0), clip: pane ? pane.style.clipPath : '' },
+            clip: el ? el.style.clipPath : '',
+            vis: el ? getComputedStyle(el).visibility : '',
+            op: el ? getComputedStyle(el).opacity : '',
+            pending: ov ? !!ov._ficClipPending : null,
+        };
+    }
+    var mc = mapaSat && mapaSat.getContainer();
+    var mr = mc ? mc.getBoundingClientRect() : {};
+    ficSatDebug(label, {
+        base: BASE,
+        proto: window.location.protocol,
+        predio: state.selectedPredio,
+        source: state.selectedSource,
+        split: isSatSplitMode(),
+        stageHidden: document.getElementById('ficSatSplitStage') ? document.getElementById('ficSatSplitStage').hidden : null,
+        inset: ficReadMapChromeInsetLeftPx(),
+        insetEff: ficEffectiveMapChromeInsetPx(mr.width),
+        map: { w: Math.round(mr.width || 0), h: Math.round(mr.height || 0) },
+        ratio: state.satSwipeRatio,
+        left: sideInfo('left', satOverlayLeft),
+        right: sideInfo('right', satOverlayRight),
+    });
+}
+
 /** Máximo zoom nativo tiles Esri World Imagery (coherente con ``maxNativeZoom`` del layer). */
 const FIC_ESRI_MAX_NATIVE_ZOOM = 19;
 /**
@@ -2326,7 +2393,9 @@ const state = {
     /** Firma predio|modo|leftCK|rightCK del último fitBounds en el mapa comparativo satelital. */
     _satMapFitSig: null,
     /** Firma del último par de overlays satélite aplicado (evita saltos de fit sin repintar). */
-    _satOverlaySig: null
+    _satOverlaySig: null,
+    /** Sin recorte CSS en capas satelitales (solo con ``?ficSatNoClip=1``). */
+    _ficSatNoClip: false
 };
 
 window.addEventListener('resize', function () {
@@ -2461,6 +2530,7 @@ async function applyCuartelSelection(cid) {
         state._lastMapFitContextKey = null;
         state._satMapFitSig = null;
         state._satOverlaySig = null;
+        ficResetSatOverlaySig();
         if (typeof FicLidar3d !== 'undefined' && FicLidar3d.las3d) {
             FicLidar3d.las3d.pcdCache = null;
             FicLidar3d.las3d.lastViewKey = null;
@@ -3077,31 +3147,94 @@ function predioHasSatRasterForPill(wid, viewMode, pillValue, band) {
         satFindRaster(wid, satCompositeKeyForPill('right', viewMode, pillValue), b));
 }
 
+/** ¿El mes/semana del selector está más allá del último período completo con datos actuales? */
+function ficSatPillBeyondLastComplete(viewMode, pillValue) {
+    var sm = getSatMeta();
+    if (viewMode === 'monthly') {
+        var lcm = sm.last_complete_month && sm.last_complete_month.month;
+        if (lcm != null && Number(pillValue) > Number(lcm)) return true;
+    } else if (viewMode === 'weekly') {
+        var lcw = sm.last_complete_week && sm.last_complete_week.week;
+        if (lcw != null && Number(pillValue) > Number(lcw)) return true;
+    }
+    return false;
+}
+
 /** ¿Hay dato del año actual para mes/semana ``pillValue`` (serie + raster válido)? */
 function ficSatHasCurrentDataForPill(wid, viewMode, pillValue, band) {
     if (!wid || pillValue == null) return false;
+    if (ficSatPillBeyondLastComplete(viewMode, pillValue)) return false;
     var b = band || satBand();
     var ck = satCompositeKeyForPill('right', viewMode, pillValue);
     var ts = ficTsEntryForSelection(wid);
     var bandKey = String(b || '').toUpperCase();
     var series = ts && (ts[bandKey] || ts[b] || ts[String(b).toLowerCase()]);
-    if (series) {
-        var cy = series.current_year;
-        if (viewMode === 'weekly') {
-            var weeks = series.weeks || [];
-            var wi = weeks.indexOf(pillValue);
-            if (wi < 0) wi = Number(pillValue) - 1;
-            var vals = (cy && cy.values_by_week) || [];
-            var v = wi >= 0 && wi < vals.length ? vals[wi] : null;
-            if (v == null || !isFinite(Number(v))) return false;
-        } else if (viewMode === 'monthly') {
-            var mi = Number(pillValue) - 1;
-            var mvals = (cy && cy.values_by_month) || [];
-            var mv = mi >= 0 && mi < mvals.length ? mvals[mi] : null;
-            if (mv == null || !isFinite(Number(mv))) return false;
-        }
+    if (!series || !series.current_year) return false;
+    var cy = series.current_year;
+    if (viewMode === 'weekly') {
+        var weeks = series.weeks || [];
+        var wi = weeks.indexOf(pillValue);
+        if (wi < 0) return false;
+        var vals = cy.values_by_week || [];
+        var v = wi < vals.length ? vals[wi] : null;
+        if (v == null || !isFinite(Number(v))) return false;
+    } else if (viewMode === 'monthly') {
+        var mi = Number(pillValue) - 1;
+        if (!isFinite(mi) || mi < 0) return false;
+        var mvals = cy.values_by_month || [];
+        var mv = mi < mvals.length ? mvals[mi] : null;
+        if (mv == null || !isFinite(Number(mv))) return false;
+    } else {
+        return false;
     }
     return !!satFindRaster(wid, ck, b);
+}
+
+/** Ráster del lado actual: solo si hay dato válido y archivo distinto al histórico. */
+function ficSatResolveRightRaster(predio, viewMode, pill, band) {
+    if (!predio || pill == null) return null;
+    if (!ficSatHasCurrentDataForPill(predio, viewMode, pill, band)) return null;
+    var rightCK = satCompositeKeyForPill('right', viewMode, pill);
+    var leftCK = satCompositeKeyForPill('left', viewMode, pill);
+    if (!rightCK || rightCK === leftCK) return null;
+    var rightR = satFindRaster(predio, rightCK, band);
+    if (!rightR) return null;
+    var leftR = satFindRaster(predio, leftCK, band);
+    if (leftR && leftR.visual && rightR.visual
+        && String(leftR.visual.path) === String(rightR.visual.path)) {
+        return null;
+    }
+    return rightR;
+}
+
+/** Quita el overlay derecho si el período activo no tiene dato actual válido. */
+function ficPurgeSatRightIfNoCurrentData() {
+    if (!mapaSat || !isSatSplitMode()) return;
+    var viewMode = state.satViewMode || 'monthly';
+    var pill = satCurrentPillValue(viewMode);
+    var band = satBand();
+    var predio = state.selectedPredio;
+    if (ficSatHasCurrentDataForPill(predio, viewMode, pill, band)) return;
+    var rightCK = satCompositeKeyForPill('right', viewMode, pill);
+    _setSatOverlay('right', null, rightCK);
+}
+
+function ficSatRightOverlayStillValid(overlay) {
+    if (!overlay) return false;
+    var viewMode = state.satViewMode || 'monthly';
+    var pill = satCurrentPillValue(viewMode);
+    var band = satBand();
+    var predio = state.selectedPredio;
+    var rightCK = satCompositeKeyForPill('right', viewMode, pill);
+    if (!ficSatHasCurrentDataForPill(predio, viewMode, pill, band)) return false;
+    if (overlay._ficSatCompositeKey && overlay._ficSatCompositeKey !== rightCK) return false;
+    return !!ficSatResolveRightRaster(predio, viewMode, pill, band);
+}
+
+/** Cuarteles para recorte en comparador satelital: solo el cuartel seleccionado. */
+function ficSatCuartelIdsForClip() {
+    var cid = ficTrim(state.selectedCuartel || '');
+    return cid ? [cid] : [];
 }
 
 /** Meses/semanas del selector temporal que tienen imagen para el predio y banda activos. */
@@ -3183,6 +3316,43 @@ function mapFitContextKey() {
 
 var _ficClipDebounceTimer = null;
 var _ficClipRetryCount = 0;
+var _ficSatOverlaySig = '';
+
+/** Firma del par left|right para evitar recrear overlays en cada frame del slider. */
+function ficSatOverlayUpdateSig(viewMode, predio, band, pill) {
+    var leftCK = satCompositeKeyForPill('left', viewMode, pill);
+    var hasRight = ficSatHasCurrentDataForPill(predio, viewMode, pill, band);
+    var rightCK = hasRight ? satCompositeKeyForPill('right', viewMode, pill) : '';
+    return String(predio || '') + '|' + String(viewMode || '') + '|' + String(band || '')
+        + '|' + String(pill || '') + '|' + String(leftCK || '') + '|' + String(rightCK || '');
+}
+
+function ficResetSatOverlaySig() {
+    _ficSatOverlaySig = '';
+}
+
+/** Actualiza overlays satélite solo si cambió mes/semana/banda (evita parpadeo al arrastrar). */
+function ficUpdateSatCompareOverlays(opts) {
+    opts = opts || {};
+    if (!mapaSat || !isSatSplitMode()) return;
+    var viewMode = state.satViewMode || 'monthly';
+    var predio = state.selectedPredio;
+    var band = satBand();
+    var pill = satCurrentPillValue(viewMode);
+    var sig = ficSatOverlayUpdateSig(viewMode, predio, band, pill);
+    if (!opts.force && sig === _ficSatOverlaySig) {
+        applySatSwipeClip();
+        return;
+    }
+    _ficSatOverlaySig = sig;
+    var leftCK = satCompositeKeyForPill('left', viewMode, pill);
+    var leftRaster = predio ? satFindRaster(predio, leftCK, band) : null;
+    _setSatOverlay('left', leftRaster, leftCK);
+    var rightCK = satCompositeKeyForPill('right', viewMode, pill);
+    var rightRaster = ficSatResolveRightRaster(predio, viewMode, pill, band);
+    _setSatOverlay('right', rightRaster, rightCK);
+    applySatSwipeClip();
+}
 
 function ficSatRasterImageUrl(raster) {
     if (!raster || !raster.visual || !raster.visual.path) return '';
@@ -3272,6 +3442,8 @@ function initSatCompareMap() {
     mapaSat.getPane('ficSatRasterRight').style.zIndex = '650';
     mapaSat.createPane('ficSatRasterLeft');
     mapaSat.getPane('ficSatRasterLeft').style.zIndex = '651';
+    ficEnsureSatRasterPaneLayout();
+    mapaSat.on('resize', ficEnsureSatRasterPaneLayout);
     mapaSat.createPane('ficSatAoiPane');
     mapaSat.getPane('ficSatAoiPane').style.zIndex = '680';
     mapaSat.createPane('ficSatOutlinePane');
@@ -3283,7 +3455,6 @@ function initSatCompareMap() {
     mapaSat.on('move zoom moveend zoomend', applySatSwipeClip);
     ficEnsureRasterClipMapListeners(mapaSat, 'sat');
     bindSatSwipeDivider();
-    ficApplySatPaneSplitClip();
     if (mapa) {
         var mb = mapa.getBounds();
         if (mb && mb.isValid()) mapaSat.fitBounds(mb, { animate: false });
@@ -3292,29 +3463,164 @@ function initSatCompareMap() {
     }
 }
 
-function ficSatSplitLeftPct() {
+function ficSatSplitScreenX() {
+    var stage = document.getElementById('ficSatMapStage');
+    if (!stage) return null;
+    var sr = stage.getBoundingClientRect();
+    if (sr.width <= 0) return null;
+    var insetPx = ficEffectiveMapChromeInsetPx(sr.width);
     var ratio = state.satSwipeRatio;
     if (ratio == null || !isFinite(ratio)) ratio = 0.5;
     ratio = Math.min(1, Math.max(0, ratio));
-    var insetPx = ficReadMapChromeInsetLeftPx();
-    var mc = mapaSat && mapaSat.getContainer();
-    if (!mc) return 50;
-    var mr = mc.getBoundingClientRect();
-    if (mr.width <= 0) return 50;
-    var usableMapW = Math.max(1, mr.width - insetPx);
-    return Math.min(100, Math.max(0, ((insetPx + ratio * usableMapW) / mr.width) * 100));
+    return sr.left + insetPx + ratio * Math.max(1, sr.width - insetPx);
 }
 
-/** Recorte duro por pane: histórico no puede pintar en la mitad «Actual» aunque la máscara del img tarde. */
-function ficApplySatPaneSplitClip() {
+function ficSatSplitLeftPct() {
+    var stage = document.getElementById('ficSatMapStage');
+    if (!stage) return (state.satSwipeRatio != null ? state.satSwipeRatio : 0.5) * 100;
+    var sr = stage.getBoundingClientRect();
+    if (sr.width <= 0) return 50;
+    var splitX = ficSatSplitScreenX();
+    if (splitX == null) return 50;
+    return Math.min(100, Math.max(0, ((splitX - sr.left) / sr.width) * 100));
+}
+
+/** Panes satelitales: sin forzar tamaño (pane 0×0 + clip-path funciona en la mayoría de navegadores). */
+function ficEnsureSatRasterPaneLayout() {
     if (!mapaSat) return;
-    var leftPct = ficSatSplitLeftPct();
-    var leftInset = leftPct.toFixed(3);
-    var rightCut = (100 - leftPct).toFixed(3);
+    ['ficSatRasterLeft', 'ficSatRasterRight'].forEach(function (name) {
+        var pane = mapaSat.getPane(name);
+        if (!pane) return;
+        pane.style.pointerEvents = 'none';
+    });
+}
+
+function ficClearSatPaneSplitClip() {
+    if (!mapaSat) return;
     var paneL = mapaSat.getPane('ficSatRasterLeft');
     var paneR = mapaSat.getPane('ficSatRasterRight');
-    if (paneL) paneL.style.clipPath = 'inset(0 ' + rightCut + '% 0 0)';
-    if (paneR) paneR.style.clipPath = 'inset(0 0 0 ' + leftInset + '%)';
+    if (paneL) paneL.style.clipPath = '';
+    if (paneR) paneR.style.clipPath = '';
+}
+
+/** Split histórico/actual sobre el ``img`` (evita clip en pane Leaflet 0×0). */
+function ficApplySatSplitOnImg(el, side) {
+    if (!el || !mapaSat || !side) return false;
+    var img = el.tagName === 'IMG' ? el : el.querySelector('img');
+    if (!img || !img.complete || !img.naturalWidth) return false;
+    var mc = mapaSat.getContainer();
+    var mr = mc.getBoundingClientRect();
+    var ir = el.getBoundingClientRect();
+    if (ir.width < 1 || mr.width < 1) return false;
+    var insetPx = ficEffectiveMapChromeInsetPx(mr.width);
+    var ratio = state.satSwipeRatio;
+    if (ratio == null || !isFinite(ratio)) ratio = 0.5;
+    ratio = Math.min(1, Math.max(0, ratio));
+    var splitX = mr.left + insetPx + ratio * Math.max(1, mr.width - insetPx);
+    var cut = Math.max(0, Math.min(ir.width, splitX - ir.left));
+    var w = Math.round(ir.width);
+    var h = Math.round(ir.height);
+    var c = Math.round(cut);
+    if (side === 'left') {
+        if (c <= 0) {
+            el.style.clipPath = 'inset(0 100% 0 0)';
+        } else {
+            el.style.clipPath = 'polygon(0px 0px, ' + c + 'px 0px, ' + c + 'px ' + h + 'px, 0px ' + h + 'px)';
+        }
+    } else if (c >= w) {
+        el.style.clipPath = 'inset(0 0 0 100%)';
+    } else {
+        el.style.clipPath = 'polygon(' + c + 'px 0px, ' + w + 'px 0px, ' + w + 'px ' + h + 'px, ' + c + 'px ' + h + 'px)';
+    }
+    return true;
+}
+
+function ficApplySatPaneSplitClip() {
+    ficClearSatPaneSplitClip();
+}
+
+/** Split histórico/actual: máscara alineada al divisor vertical en pantalla. */
+function ficApplySatSplitMaskOnEl(el, side) {
+    if (!el || !side) return false;
+    var splitX = ficSatSplitScreenX();
+    if (splitX == null) return false;
+    return ficApplyRasterSwipeMask({ getElement: function () { return el; } }, splitX, side);
+}
+
+/** Modo sin recorte CSS (más compatible). Activar split con ``?ficSatSplit=1``. */
+function ficSatResolveNoClipDefault() {
+    return /(?:^|[?&])ficSatNoClip=1(?:&|$)/.test(window.location.search);
+}
+
+function ficSatUpdateStatusBanner() {
+    var el = document.getElementById('ficLoadHint');
+    if (!el) return;
+    if (!isSatSplitMode()) {
+        if (!el.dataset.ficSticky) {
+            el.hidden = true;
+        }
+        return;
+    }
+    if (window.location.protocol === 'file:') {
+        el.textContent = 'Abre el explorador con un servidor HTTP (no como archivo local). Ej.: python -m http.server 8090';
+        el.hidden = false;
+        return;
+    }
+    if (!el.dataset.ficSticky) {
+        el.textContent = '';
+        el.hidden = true;
+    }
+}
+
+/** Sin recorte split/polígono: solo WebP a bounds del predio (``?ficSatNoClip=1``). */
+function ficSatFallbackShowRasters() {
+    if (!mapaSat || !isSatSplitMode()) return;
+    state._ficSatNoClip = true;
+    ficClearSatPaneSplitClip();
+    [satOverlayLeft, satOverlayRight].forEach(function (ov) {
+        if (!ov) return;
+        var el = ov.getElement && ov.getElement();
+        if (el) {
+            el.style.clipPath = '';
+            ficClearRasterSwipeMask(el);
+        }
+        ficShowSatOverlay(ov, { clearMask: true });
+    });
+    ficSatDebug('noClipMode', {});
+}
+
+function ficSatAnyOverlayReady() {
+    function ready(ov) {
+        var el = ov && ov.getElement && ov.getElement();
+        return !!(el && ficOverlayImageReady(el));
+    }
+    return ready(satOverlayLeft) || ready(satOverlayRight);
+}
+
+function ficShowSatOverlay(overlay, opts) {
+    opts = opts || {};
+    if (!overlay) return;
+    overlay._ficClipPending = false;
+    var op = overlay._ficTargetOpacity != null ? overlay._ficTargetOpacity : 0.88;
+    if (overlay.setOpacity) overlay.setOpacity(op);
+    var el = overlay.getElement && overlay.getElement();
+    if (el) {
+        el.style.visibility = 'visible';
+        el.style.display = '';
+        el.style.opacity = String(op);
+        if (el.style.clipPath === 'inset(100%)') el.style.clipPath = '';
+        if (opts.clearMask) ficClearRasterSwipeMask(el);
+    }
+}
+
+function ficHideSatOverlay(overlay) {
+    if (!overlay) return;
+    if (overlay.setOpacity) overlay.setOpacity(0);
+    var el = overlay.getElement && overlay.getElement();
+    if (el) {
+        el.style.visibility = 'hidden';
+        ficClearRasterSwipeMask(el);
+    }
 }
 
 function ficClearRasterSwipeMask(el) {
@@ -3350,20 +3656,48 @@ function ficApplyRasterSwipeMask(overlay, splitScreenX, side) {
 }
 
 function ficRefreshSatMapRasters() {
-    if (!mapaSat || !isSatSplitMode()) return;
-    var viewMode = state.satViewMode || 'monthly';
-    var predio = state.selectedPredio;
-    var band = satBand();
-    var pill = satCurrentPillValue(viewMode);
-    var leftCK = satCompositeKeyForSide('left', viewMode);
-    var leftRaster = predio ? satFindRaster(predio, leftCK, band) : null;
-    _setSatOverlay('left', leftRaster);
-    var rightCK = satCompositeKeyForSide('right', viewMode);
-    var rightRaster = (predio && ficSatHasCurrentDataForPill(predio, viewMode, pill, band))
-        ? satFindRaster(predio, rightCK, band) : null;
-    _setSatOverlay('right', rightRaster);
-    applySatSwipeClip();
-    ficScheduleRasterCuartelClips();
+    ficUpdateSatCompareOverlays({ force: true });
+}
+
+function ficPaintSatCompareSide(overlay, side) {
+    if (!overlay) return;
+    if (side === 'right' && !ficSatRightOverlayStillValid(overlay)) return;
+    var el = overlay.getElement && overlay.getElement();
+    if (!el) return;
+    var img = el.tagName === 'IMG' ? el : el.querySelector('img');
+    if (!img) return;
+    if (!img.complete || !img.naturalWidth) {
+        if (side === 'right') ficHideSatOverlay(overlay);
+        img.addEventListener('load', function () {
+            ficScheduleRasterCuartelClips();
+        }, { once: true });
+        img.addEventListener('error', function () {
+            ficSatDebug('imgError', { side: side, src: img.src });
+            if (side === 'right') ficHideSatOverlay(overlay);
+        }, { once: true });
+        return;
+    }
+    if (state._ficSatNoClip) {
+        ficShowSatOverlay(overlay);
+        el.style.clipPath = '';
+        ficClearRasterSwipeMask(el);
+        return;
+    }
+    var satCids = ficSatCuartelIdsForClip();
+    if (satCids.length) {
+        var sized = (el.offsetWidth || 0) >= 8 && (el.offsetHeight || 0) >= 8;
+        if (sized) {
+            if (!ficApplyCuartelClipToOverlay(overlay, mapaSat, { noHide: true, cuartelIds: satCids })) {
+                el.style.clipPath = '';
+            }
+        } else {
+            el.style.clipPath = '';
+        }
+    } else {
+        el.style.clipPath = '';
+    }
+    ficApplySatSplitMaskOnEl(el, side);
+    ficShowSatOverlay(overlay);
 }
 
 function applySatSwipeClip() {
@@ -3372,72 +3706,28 @@ function applySatSwipeClip() {
     ratio = Math.min(1, Math.max(0, ratio));
     state.satSwipeRatio = ratio;
 
-    var insetPx = ficReadMapChromeInsetLeftPx();
     var stage = document.getElementById('ficSatMapStage');
     var line = document.getElementById('ficSatSwipeLine');
     var grip = document.getElementById('ficSatSwipeGrip');
-    if (line && stage) {
+    var splitX = ficSatSplitScreenX();
+    if (line && stage && splitX != null) {
         var sr = stage.getBoundingClientRect();
-        var usableW = Math.max(1, sr.width - insetPx);
-        var leftPx = insetPx + ratio * usableW;
-        line.style.left = (leftPx / Math.max(1, sr.width) * 100) + '%';
+        line.style.left = ((splitX - sr.left) / Math.max(1, sr.width) * 100) + '%';
     }
     if (grip) grip.setAttribute('aria-valuenow', String(Math.round(ratio * 100)));
 
     if (!mapaSat) return;
-    ficApplySatPaneSplitClip();
+    ficEnsureSatRasterPaneLayout();
+    ficClearSatPaneSplitClip();
 
-    var pendingRetry = false;
-    var okL = false;
-    var okR = false;
-
-    function finishSatOverlay(overlay) {
-        if (!overlay) return false;
-        var el = overlay.getElement && overlay.getElement();
-        if (el) ficClearRasterSwipeMask(el);
-        if (!el || !ficOverlayImageReady(el)) {
-            ficHideRasterOverlayPending(overlay);
-            pendingRetry = true;
-            if (el) {
-                var imgWait = el.tagName === 'IMG' ? el : el.querySelector('img');
-                if (imgWait && !imgWait.complete) {
-                    imgWait.addEventListener('load', function () {
-                        ficScheduleRasterCuartelClips();
-                    }, { once: true });
-                }
-            }
-            return false;
-        }
-        var clipOk = ficApplyCuartelClipToOverlay(overlay, mapaSat);
-        if (!clipOk) {
-            if (ficOverlayImageReady(el)) {
-                el.style.clipPath = '';
-                return true;
-            }
-            ficHideRasterOverlayPending(overlay);
-            pendingRetry = true;
-            return false;
-        }
-        return true;
-    }
-
-    okL = finishSatOverlay(satOverlayLeft);
-    okR = finishSatOverlay(satOverlayRight);
-
-    if (pendingRetry) {
-        setTimeout(function () { ficScheduleRasterCuartelClips(); }, 80);
-    }
+    ficPaintSatCompareSide(satOverlayLeft, 'left');
+    ficPaintSatCompareSide(satOverlayRight, 'right');
+    ficSatDebugSnapshot('applySatSwipeClip');
+    ficSatUpdateStatusBanner();
 
     requestAnimationFrame(function () {
-        requestAnimationFrame(function () {
-            ficApplySatPaneSplitClip();
-            if (okL) ficRevealRasterOverlay(satOverlayLeft);
-            else if (satOverlayLeft) ficHideRasterOverlayPending(satOverlayLeft);
-            if (okR) ficRevealRasterOverlay(satOverlayRight);
-            else if (satOverlayRight) ficHideRasterOverlayPending(satOverlayRight);
-            ficForceRevealLoadedOverlay(satOverlayLeft);
-            ficForceRevealLoadedOverlay(satOverlayRight);
-        });
+        ficPaintSatCompareSide(satOverlayLeft, 'left');
+        ficPaintSatCompareSide(satOverlayRight, 'right');
     });
 }
 
@@ -3451,7 +3741,7 @@ function bindSatSwipeDivider() {
     function ratioFromClientX(clientX) {
         var r = track.getBoundingClientRect();
         if (r.width <= 0) return state.satSwipeRatio;
-        var insetPx = ficReadMapChromeInsetLeftPx();
+        var insetPx = ficEffectiveMapChromeInsetPx(r.width);
         var usable = Math.max(1, r.width - insetPx);
         return Math.min(1, Math.max(0, (clientX - r.left - insetPx) / usable));
     }
@@ -3498,11 +3788,13 @@ function bindSatSwipeDivider() {
     });
 }
 
-function _setSatOverlay(side, raster) {
+function _setSatOverlay(side, raster, compositeKey) {
     if (!mapaSat) return null;
     var existing = ficSatOverlayForSide(side);
     if (!raster) {
         if (existing) {
+            ficHideSatOverlay(existing);
+            existing.off('load');
             mapaSat.removeLayer(existing);
             ficSetSatOverlayRef(side, null);
         }
@@ -3512,54 +3804,69 @@ function _setSatOverlay(side, raster) {
     var bounds = normalizeLeafletCornerPairs(raster.visual && raster.visual.bounds);
     if (!leafletBoundsCornersValid(bounds)) {
         if (existing) {
+            existing.off('load');
             mapaSat.removeLayer(existing);
             ficSetSatOverlayRef(side, null);
         }
         return null;
     }
     var boundsKey = JSON.stringify(bounds);
-    if (existing && existing._ficRasterPath === url && existing._ficRasterBoundsKey === boundsKey) {
+    var ck = compositeKey || '';
+    if (existing && existing._ficRasterPath === url && existing._ficRasterBoundsKey === boundsKey
+        && existing._ficSatCompositeKey === ck) {
         var opReuse = raster.visual.opacity != null ? raster.visual.opacity : 0.85;
         existing._ficTargetOpacity = opReuse;
-        ficHideRasterOverlayPending(existing);
+        if (existing.setOpacity) existing.setOpacity(opReuse);
         ficScheduleRasterCuartelClips();
         return existing;
     }
     if (existing) {
+        ficHideSatOverlay(existing);
+        existing.off('load');
         mapaSat.removeLayer(existing);
         ficSetSatOverlayRef(side, null);
     }
-    ficApplySatPaneSplitClip();
     _ficClipRetryCount = 0;
     var llb = boundsLatLngBoundsFromCorners(bounds);
     if (!llb) return null;
     var imgClass = raster.visual.render_mode === 'smooth' ? '' : 'preview-raster';
     var opacity = raster.visual.opacity != null ? raster.visual.opacity : 0.85;
     var pane = side === 'left' ? 'ficSatRasterLeft' : 'ficSatRasterRight';
+    var overlaySide = side;
+    var initOpacity = overlaySide === 'right' ? 0 : opacity;
     var overlay = L.imageOverlay(url, llb, {
-        opacity: 0,
+        opacity: initOpacity,
         className: imgClass,
         interactive: false,
         pane: pane,
     }).addTo(mapaSat);
     overlay._ficRasterPath = url;
     overlay._ficRasterBoundsKey = boundsKey;
+    overlay._ficSatCompositeKey = ck;
+    overlay._ficSatSide = side;
     overlay._ficTargetOpacity = opacity;
-    overlay._ficClipPending = true;
-    ficHideRasterOverlayPending(overlay);
     function syncSatOverlayClips() {
-        ficScheduleRasterCuartelClips();
+        if (overlaySide === 'right') {
+            if (!ficSatRightOverlayStillValid(overlay)) {
+                ficHideSatOverlay(overlay);
+                overlay.off('load');
+                mapaSat.removeLayer(overlay);
+                if (ficSatOverlayForSide('right') === overlay) ficSetSatOverlayRef('right', null);
+                applySatSwipeClip();
+                return;
+            }
+        }
+        applySatSwipeClip();
     }
     overlay.on('load', syncSatOverlayClips);
     ficBindRasterOverlayRecovery(overlay, mapaSat);
     var el0 = overlay.getElement && overlay.getElement();
-    if (el0) {
-        var img0 = el0.tagName === 'IMG' ? el0 : el0.querySelector('img');
-        if (img0 && img0.complete) {
-            requestAnimationFrame(syncSatOverlayClips);
-        }
+    if (el0 && overlaySide === 'right') {
+        el0.style.visibility = 'hidden';
     }
     ficSetSatOverlayRef(side, overlay);
+    ficSatDebug('setSatOverlay', { side: side, url: url, bounds: boundsKey });
+    ficSatDebugSnapshot('_setSatOverlay');
     return overlay;
 }
 
@@ -3586,6 +3893,13 @@ function ficReadMapChromeInsetLeftPx() {
     } catch (e0) {
         return 0;
     }
+}
+
+/** Inset lateral acotado al ancho del mapa (evita split inválido en móvil cuando el panel cubre casi todo). */
+function ficEffectiveMapChromeInsetPx(mapWidth) {
+    var inset = ficReadMapChromeInsetLeftPx();
+    if (!mapWidth || mapWidth <= 0) return inset;
+    return Math.min(inset, Math.round(mapWidth * 0.82));
 }
 
 /**
@@ -4151,55 +4465,63 @@ function buildSatPeriodPills() {
             }
 
             var dragActive = false;
-            function applyIndexNoRebuild(i) {
+            var previewIdx = currentIdx();
+
+            function applyIndexPreview(i) {
                 i = Math.max(0, Math.min(items.length - 1, i));
+                previewIdx = i;
+                var pct = pctForIdx(i);
+                thumb.style.left = pct + '%';
+                fill.style.width = pct + '%';
+                thumbLabel.textContent = formatThumb(items[i]);
+            }
+
+            function applyIndexCommit(i) {
+                i = Math.max(0, Math.min(items.length - 1, i));
+                previewIdx = i;
                 if (viewMode === 'monthly') state.satLeftMonth = items[i];
                 else state.satLeftWeek = items[i];
                 syncUiFromState();
-                ficRefreshSatMapRasters();
+                ficUpdateSatCompareOverlays({ force: true });
             }
 
             track.addEventListener('pointerdown', function (ev) {
                 dragActive = true;
                 try { track.setPointerCapture(ev.pointerId); } catch (eCap) { /* noop */ }
-                applyIndexNoRebuild(idxFromClientX(ev.clientX));
+                applyIndexPreview(idxFromClientX(ev.clientX));
             });
             track.addEventListener('pointermove', function (ev) {
                 if (!dragActive || !track.hasPointerCapture(ev.pointerId)) return;
-                applyIndexNoRebuild(idxFromClientX(ev.clientX));
+                applyIndexPreview(idxFromClientX(ev.clientX));
             });
             function endDrag(ev) {
                 if (!dragActive) return;
                 dragActive = false;
                 try { track.releasePointerCapture(ev.pointerId); } catch (eRel) { /* noop */ }
-                updateSatSplitOverlays();
+                applyIndexCommit(idxFromClientX(ev.clientX));
             }
             track.addEventListener('pointerup', endDrag);
             track.addEventListener('pointercancel', endDrag);
             track.addEventListener('lostpointercapture', function () {
                 if (dragActive) {
                     dragActive = false;
-                    updateSatSplitOverlays();
+                    applyIndexCommit(previewIdx);
                 }
             });
 
             track.addEventListener('keydown', function (ev) {
                 if (ev.key === 'ArrowLeft' || ev.key === 'ArrowDown') {
                     ev.preventDefault();
-                    applyIndexNoRebuild(currentIdx() - 1);
-                    updateSatSplitOverlays();
+                    applyIndexCommit(currentIdx() - 1);
                 } else if (ev.key === 'ArrowRight' || ev.key === 'ArrowUp') {
                     ev.preventDefault();
-                    applyIndexNoRebuild(currentIdx() + 1);
-                    updateSatSplitOverlays();
+                    applyIndexCommit(currentIdx() + 1);
                 } else if (ev.key === 'Home') {
                     ev.preventDefault();
-                    applyIndexNoRebuild(0);
-                    updateSatSplitOverlays();
+                    applyIndexCommit(0);
                 } else if (ev.key === 'End') {
                     ev.preventDefault();
-                    applyIndexNoRebuild(items.length - 1);
-                    updateSatSplitOverlays();
+                    applyIndexCommit(items.length - 1);
                 }
             });
 
@@ -4294,36 +4616,48 @@ function updateSatSplitOverlays() {
 
     var leftCK = satCompositeKeyForSide('left', viewMode);
     var leftRaster = predio ? satFindRaster(predio, leftCK, band) : null;
-    _setSatOverlay('left', leftRaster);
+    _setSatOverlay('left', leftRaster, leftCK);
 
-    var rightCK = satCompositeKeyForSide('right', viewMode);
     var pill = satCurrentPillValue(viewMode);
-    var rightRaster = (predio && ficSatHasCurrentDataForPill(predio, viewMode, pill, band))
-        ? satFindRaster(predio, rightCK, band) : null;
-    _setSatOverlay('right', rightRaster);
+    var rightCK = satCompositeKeyForSide('right', viewMode);
+    var rightRaster = ficSatResolveRightRaster(predio, viewMode, pill, band);
+    _setSatOverlay('right', rightRaster, rightCK);
+    _ficSatOverlaySig = ficSatOverlayUpdateSig(viewMode, predio, band, pill);
     state._satOverlaySig = overlaySig;
-    applySatSwipeClip();
 
     if (predio && (leftCK || rightCK)) {
         state.mapPeriodKey = rightRaster ? rightCK : (leftRaster ? leftCK : state.mapPeriodKey);
     }
 
     var fitRaster = leftRaster || rightRaster;
-    if (fitRaster && fitRaster.visual && fitRaster.visual.bounds) {
+    var needsFit = !!(fitRaster && fitRaster.visual && fitRaster.visual.bounds);
+    if (needsFit) {
         var bounds = ficBoundsCornersForSelection(normalizeLeafletCornerPairs(fitRaster.visual.bounds));
-        if (!skipSatFit && leafletBoundsCornersValid(bounds)) {
-            var insetPx = ficReadMapChromeInsetLeftPx();
-            var m = 36;
-            mapaSat.fitBounds(bounds, {
-                paddingTopLeft: L.point(Math.round(insetPx + m), m),
-                paddingBottomRight: L.point(m, m),
-                animate: false,
-                maxZoom: FIC_RASTER_VIEW_MAX_ZOOM,
-            });
-            state._satMapFitSig = satSig;
-        }
+        needsFit = !skipSatFit && leafletBoundsCornersValid(bounds);
+    } else {
+        bounds = null;
+    }
+
+    function finishSatOverlayPaint() {
+        applySatSwipeClip();
+        ficSatDebugSnapshot('finishSatOverlayPaint');
+    }
+
+    if (needsFit) {
+        var insetPx = ficReadMapChromeInsetLeftPx();
+        var m = 36;
+        mapaSat.once('moveend', finishSatOverlayPaint);
+        mapaSat.fitBounds(bounds, {
+            paddingTopLeft: L.point(Math.round(insetPx + m), m),
+            paddingBottomRight: L.point(m, m),
+            animate: false,
+            maxZoom: FIC_RASTER_VIEW_MAX_ZOOM,
+        });
+        state._satMapFitSig = satSig;
+        setTimeout(finishSatOverlayPaint, 180);
     } else {
         state._satMapFitSig = null;
+        finishSatOverlayPaint();
     }
 
     buildSatPeriodPills();
@@ -4331,7 +4665,7 @@ function updateSatSplitOverlays() {
     updateSatMapTitle();
     ficApplyColorbar(getSatMeta(), satBand());
     renderAOI();
-    ficScheduleRasterCuartelClips();
+    ficSatUpdateStatusBanner();
 }
 
 /** Actualiza el mode bar (pills Mensual/Semanal). */
@@ -5402,6 +5736,8 @@ function applySatSplitVisibility() {
         if (mapa) mapa.invalidateSize({ animate: false });
     }
     if (isSplit) {
+        state._ficSatNoClip = ficSatResolveNoClipDefault();
+        if (state._ficSatNoClip) ficSatFallbackShowRasters();
         ensureSatLeftDefaults();
         initSatCompareMap();
         bindSatModeBarPills();
@@ -5413,7 +5749,14 @@ function applySatSplitVisibility() {
             updateSatSplitOverlays();
             renderAOI();
             updateSatChartDock(true);
+            applySatSwipeClip();
+            if (state._ficSatNoClip) ficSatFallbackShowRasters();
         }, 120);
+        setTimeout(function () {
+            if (!mapaSat || !isSatSplitMode()) return;
+            mapaSat.invalidateSize({ animate: false });
+            applySatSwipeClip();
+        }, 400);
     }
     ficSyncMapChromeInset();
     ficSyncSatPlotChromeVisibility();
@@ -5649,6 +5992,12 @@ async function loadManifest() {
     if (state.manifest) return;
     const errEl = document.getElementById('ficLoadHint');
     if (errEl) { errEl.hidden = true; errEl.textContent = ''; }
+    if (window.location.protocol === 'file:') {
+        var fileMsg = 'No se pueden cargar los datos abriendo explorador.html como archivo local (file://). Usa un servidor HTTP en la carpeta del proyecto, por ejemplo: python -m http.server 8090 y abre http://127.0.0.1:8090/explorador.html';
+        if (errEl) { errEl.textContent = fileMsg; errEl.hidden = false; }
+        ficSatDebug('fileProtocol', { base: BASE });
+        return;
+    }
     try {
         state.manifest = await fetchJson(BASE + '/sources_manifest.json');
     } catch (error) {
@@ -5695,6 +6044,8 @@ async function setSource(sourceKey) {
         state._lastMapFitContextKey = null;
         state._satMapFitSig = null;
         state._satOverlaySig = null;
+        ficResetSatOverlaySig();
+        state._ficSatNoClip = ficSatResolveNoClipDefault();
         if (_ficClipDebounceTimer) {
             clearTimeout(_ficClipDebounceTimer);
             _ficClipDebounceTimer = null;
@@ -6550,6 +6901,7 @@ function ficLocalPointsToClipPath(points, w, h) {
 
 function ficHideRasterOverlayPending(overlay) {
     if (!overlay) return;
+    if (overlay === satOverlayLeft || overlay === satOverlayRight) return;
     overlay._ficClipPending = true;
     if (overlay.setOpacity) overlay.setOpacity(0);
     var el = overlay.getElement && overlay.getElement();
@@ -6567,6 +6919,7 @@ function ficRevealRasterOverlay(overlay) {
     var el = overlay.getElement && overlay.getElement();
     if (el) {
         el.style.visibility = '';
+        el.style.opacity = String(op);
         if (el.style.clipPath === 'inset(100%)') el.style.clipPath = '';
     }
 }
@@ -6591,13 +6944,13 @@ function ficApplyCuartelClipToOverlay(overlay, map, opts) {
     opts = opts || {};
     var el = overlay && overlay.getElement && overlay.getElement();
     if (!el || !map) return false;
-    var cids = ficCuartelIdsForClip();
+    var cids = opts.cuartelIds != null ? opts.cuartelIds : ficCuartelIdsForClip();
     if (!cids.length) {
         el.style.clipPath = opts.fallbackClip || '';
         return ficOverlayImageReady(el);
     }
     if (!ficOverlayImageReady(el)) {
-        ficHideRasterOverlayPending(overlay);
+        if (!opts.noHide) ficHideRasterOverlayPending(overlay);
         var imgWait = el.tagName === 'IMG' ? el : el.querySelector('img');
         if (imgWait && !imgWait.complete) {
             imgWait.addEventListener('load', function () {
@@ -6622,6 +6975,9 @@ function ficApplyCuartelClipToOverlay(overlay, map, opts) {
     }
     var elW = el.offsetWidth || 0;
     var elH = el.offsetHeight || 0;
+    if (elW < 8 || elH < 8) {
+        return false;
+    }
     var cp = ficLocalRingsToClipPath(ringsLocal, elW, elH);
     el.style.clipPath = cp || (opts.fallbackClip || '');
     return ficOverlayImageReady(el);
@@ -6650,10 +7006,12 @@ function ficSyncRasterCuartelClips(retryPass) {
             }
         });
     }
-    [rasterOverlay, rasterDroneRgb, rasterDroneIndex, satOverlayLeft, satOverlayRight].forEach(ficForceRevealLoadedOverlay);
-    if (!retryPass) {
+    [rasterOverlay, rasterDroneRgb, rasterDroneIndex].forEach(function (ov) {
+        ficForceRevealLoadedOverlay(ov);
+    });
+    if (!retryPass && !isSatSplitMode()) {
         var needRetry = false;
-        [rasterOverlay, rasterDroneRgb, rasterDroneIndex, satOverlayLeft, satOverlayRight].forEach(function (ov) {
+        [rasterOverlay, rasterDroneRgb, rasterDroneIndex].forEach(function (ov) {
             if (!ov || !ov.getElement) return;
             var el = ov.getElement();
             if (el && !ficOverlayImageReady(el)) needRetry = true;
