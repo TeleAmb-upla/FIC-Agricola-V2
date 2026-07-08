@@ -3402,11 +3402,14 @@ function ficScheduleRasterCuartelClips() {
     }, 32);
 }
 
+/** Firma del encuadre del mapa satelital: solo predio + cuartel (+ modo temporal). */
+function ficSatMapFitContextKey() {
+    return String(state.selectedPredio || '') + '|' + String(state.selectedCuartel || '')
+        + '|' + String(state.satViewMode || 'monthly');
+}
+
 function satTemporalFitSignature(predio, viewMode) {
-    var leftCK = satCompositeKeyForSide('left', viewMode);
-    var rightCK = satCompositeKeyForSide('right', viewMode);
-    return String(predio || '') + '|' + String(viewMode || '') + '|' + String(leftCK || '')
-        + '|' + String(rightCK || '') + '|' + String(state.selectedCuartel || '');
+    return ficSatMapFitContextKey();
 }
 
 function clampSatPillToViewModeItems(viewMode) {
@@ -4610,9 +4613,8 @@ function updateSatSplitOverlays() {
     var overlaySig = String(predio || '') + '|' + String(viewMode || '') + '|' + String(band || '')
         + '|' + String(state.satLeftMonth || '') + '|' + String(state.satLeftWeek || '')
         + '|' + String(state.selectedCuartel || '');
-    var satSig = satTemporalFitSignature(predio, viewMode);
-    var skipSatFit = state._satMapFitSig != null && state._satMapFitSig === satSig
-        && state._satOverlaySig === overlaySig;
+    var fitCtx = ficSatMapFitContextKey();
+    var skipSatFit = state._satMapFitSig != null && state._satMapFitSig === fitCtx;
 
     var leftCK = satCompositeKeyForSide('left', viewMode);
     var leftRaster = predio ? satFindRaster(predio, leftCK, band) : null;
@@ -4653,10 +4655,9 @@ function updateSatSplitOverlays() {
             animate: false,
             maxZoom: FIC_RASTER_VIEW_MAX_ZOOM,
         });
-        state._satMapFitSig = satSig;
+        state._satMapFitSig = fitCtx;
         setTimeout(finishSatOverlayPaint, 180);
     } else {
-        state._satMapFitSig = null;
         finishSatOverlayPaint();
     }
 
