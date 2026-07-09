@@ -1,5 +1,5 @@
-source,wetland_id,wetland_name,index,date,year,season,period_key,mean
-drone,l_martinez,Parcela 17 — Luisa Martinez,NDVI,2026-01-21,2026,21 Jan 2026,20260121,0.3297
-drone,l_martinez,Parcela 17 — Luisa Martinez,NDVI,2026-06-12,2026,12 Jun 2026,20260612,0.2362
-drone,l_martinez,Parcela 17 — Luisa Martinez,NDWI,2026-01-21,2026,21 Jan 2026,20260121,-0.0303
-drone,l_martinez,Parcela 17 — Luisa Martinez,NDWI,2026-06-12,2026,12 Jun 2026,20260612,-0.0519
+source,predio_id,predio_name,index,date,year,season,period_key,mean
+drone,l_martinez,Parcela 17 — Luisa Martinez,NDVI,2026-01-21,2026,21 Jan 2026,20260121,0.3368
+drone,l_martinez,Parcela 17 — Luisa Martinez,NDVI,2026-06-12,2026,12 Jun 2026,20260612,0.2374
+drone,l_martinez,Parcela 17 — Luisa Martinez,NDWI,2026-01-21,2026,21 Jan 2026,20260121,-0.0519
+drone,l_martinez,Parcela 17 — Luisa Martinez,NDWI,2026-06-12,2026,12 Jun 2026,20260612,-0.0566

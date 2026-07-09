@@ -1,5 +1,5 @@
-source,wetland_id,wetland_name,index,date,year,season,period_key,mean
-drone,c_alvarado,Nogales — Claudio Alvarado,NDVI,2026-01-21,2026,21 Jan 2026,20260121,0.2814
-drone,c_alvarado,Nogales — Claudio Alvarado,NDVI,2026-06-18,2026,18 Jun 2026,20260618,0.2236
-drone,c_alvarado,Nogales — Claudio Alvarado,NDWI,2026-01-21,2026,21 Jan 2026,20260121,-0.0509
-drone,c_alvarado,Nogales — Claudio Alvarado,NDWI,2026-06-18,2026,18 Jun 2026,20260618,-0.0054
+source,predio_id,predio_name,index,date,year,season,period_key,mean
+drone,c_alvarado,Nogales — Claudio Alvarado,NDVI,2026-01-21,2026,21 Jan 2026,20260121,0.4351
+drone,c_alvarado,Nogales — Claudio Alvarado,NDVI,2026-06-18,2026,18 Jun 2026,20260618,0.2073
+drone,c_alvarado,Nogales — Claudio Alvarado,NDWI,2026-01-21,2026,21 Jan 2026,20260121,-0.1127
+drone,c_alvarado,Nogales — Claudio Alvarado,NDWI,2026-06-18,2026,18 Jun 2026,20260618,0.009

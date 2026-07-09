@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Construye ``data/shapefiles/predios.geojson`` (WGS84) a partir de:
+Construye ``data/vectors/cuarteles/cuarteles.geojson`` (WGS84) a partir de:
 
-- Shape maestro ``predios_fic.shp`` (geometría por ``id_cuartel``)
-- Atributos de ``data/fic_database.csv``
+- Geometrías existentes en ``cuarteles.geojson`` (fuente de verdad espacial)
+- Atributos de ``data/fic_database.csv`` (sin ``superficie``; se calcula desde geometría)
+- KMZ en ``data/vectors/kml/`` (cuarteles sin polígono en el GeoJSON maestro)
 
-Si ``predios_fic.shp`` no existe o falta algún cuartel, usa fuentes legacy
-(KMZ, predios_gv.shp, geojson RCI/RPA/RIV) como respaldo.
+Tras regenerar, ejecuta ``sync_predios_master.py`` para propagar superficies al CSV.
 
 Uso::
 
@@ -18,6 +18,7 @@ import csv
 import json
 import math
 import re
+import sys
 import zipfile
 from pathlib import Path
 
@@ -26,10 +27,19 @@ from shapely.geometry import Polygon, mapping
 from shapely.ops import transform as shp_transform
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SHAPES_ROOT = REPO_ROOT / "data" / "shapefiles"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from scripts.data_prep.vectors_paths import (  # noqa: E402
+    CUARTELES_GEOJSON,
+    CUARTELES_ROOT,
+    KML_ROOT,
+    VUELOS_ROOT,
+)
+from scripts.data_prep.cuartel_areas import superficie_from_geometry  # noqa: E402
+
 DB_CSV = REPO_ROOT / "data" / "fic_database.csv"
-OUTPUT = SHAPES_ROOT / "predios.geojson"
-MASTER_SHP = SHAPES_ROOT / "predios_fic.shp"
+OUTPUT = CUARTELES_GEOJSON
 
 # Nombres truncados típicos de shapefile (≤10 caracteres).
 SHAPE_ATTR_ALIASES = {
@@ -56,7 +66,7 @@ PROP_COLS = [
     "poligono_vuelo",
 ]
 
-# Columnas exportadas en predios.geojson (mismo orden en cada feature).
+# Columnas exportadas en cuarteles.geojson (mismo orden en cada feature).
 GEOJSON_PROP_COLS = PROP_COLS + ["fuente", "plot_id"]
 
 
@@ -142,7 +152,7 @@ def load_flight_polygons() -> dict[str, dict]:
     """``flight_key`` → {geometry, fuente, nombre_archivo}."""
     out: dict[str, dict] = {}
     for pattern in ("*.kml", "*.kmz"):
-        for path in sorted(SHAPES_ROOT.rglob(pattern)):
+        for path in sorted(KML_ROOT.rglob(pattern)):
             polys = read_kml_or_kmz(path)
             if not polys:
                 print(f"  [warn] sin polígono: {path.relative_to(REPO_ROOT)}")
@@ -177,7 +187,7 @@ def _parse_popup(popup: str) -> dict[str, str]:
 
 
 def load_cultivo_polygons() -> list[dict]:
-    shp = SHAPES_ROOT / "predios_g_vasquez" / "predios_gv.shp"
+    shp = CUARTELES_ROOT / "_legacy" / "predios_gv" / "predios_gv.shp"
     if not shp.exists():
         return []
     gdf = gpd.read_file(shp)
@@ -214,10 +224,10 @@ def load_cultivo_polygons() -> list[dict]:
     return rows
 
 
-def load_predio_geojson(rel_path: str, wetland_id: str) -> dict | None:
-    path = SHAPES_ROOT / rel_path
+def load_predio_geojson(name: str, wetland_id: str) -> dict | None:
+    path = VUELOS_ROOT / name
     if not path.exists():
-        path = REPO_ROOT / rel_path
+        path = REPO_ROOT / name
     if not path.exists():
         return None
     gdf = gpd.read_file(path)
@@ -238,7 +248,7 @@ def load_predio_geojson(rel_path: str, wetland_id: str) -> dict | None:
 def load_csv_rows() -> list[dict]:
     rows: list[dict] = []
     with open(DB_CSV, encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f)
+        reader = csv.DictReader(line for line in f if line.strip())
         fields = reader.fieldnames or []
         for raw in reader:
             row = {k: re.sub(r"\s+", " ", (raw.get(k) or "").strip()) for k in PROP_COLS if k in fields}
@@ -315,35 +325,29 @@ def _normalize_shape_props(raw: dict) -> dict[str, str]:
     return out
 
 
-def load_master_shape_by_cuartel() -> dict[str, dict]:
-    """Filas de ``predios_fic.shp`` indexadas por ``id_cuartel`` (geometría + atributos)."""
-    if not MASTER_SHP.exists():
+def load_existing_cuarteles_by_id() -> dict[str, dict]:
+    if not OUTPUT.is_file():
         return {}
-    gdf = gpd.read_file(MASTER_SHP)
-    if gdf.crs is None:
-        gdf = gdf.set_crs("EPSG:4326")
-    else:
-        gdf = gdf.to_crs("EPSG:4326")
-    rel = MASTER_SHP.relative_to(REPO_ROOT).as_posix()
+    fc = json.loads(OUTPUT.read_text(encoding="utf-8"))
     out: dict[str, dict] = {}
-    for _, row in gdf.iterrows():
-        props = _normalize_shape_props(row.to_dict())
-        cid = props.get("id_cuartel")
+    for feat in fc.get("features") or []:
+        props = feat.get("properties") or {}
+        cid = str(props.get("id_cuartel") or "").strip()
         if not cid:
-            print(f"  [warn] fila sin id_cuartel en {MASTER_SHP.name}")
             continue
-        geom = _to_2d(row.geometry)
-        if geom is None or geom.is_empty:
-            print(f"  [warn] geometría vacía para {cid} en {MASTER_SHP.name}")
+        geom = feat.get("geometry")
+        if not geom:
             continue
-        props.setdefault("fuente", rel)
-        out[cid] = {"geometry": geom, "properties": props}
-    print(f"  [shp] {len(out)} cuarteles en {MASTER_SHP.name}")
+        from shapely.geometry import shape as shp_shape
+
+        out[cid] = {"geometry": _to_2d(shp_shape(geom)), "properties": props}
+    print(f"  [geojson] {len(out)} cuarteles en {OUTPUT.name}")
     return out
 
 
 def _merge_csv_and_shape(csv_row: dict, shape_entry: dict) -> dict:
-    props = {col: csv_row.get(col, "") for col in PROP_COLS}
+    props = {col: csv_row.get(col, "") for col in PROP_COLS if col != "superficie"}
+    props["superficie"] = superficie_from_geometry(shape_entry.get("geometry"))
     shape_props = shape_entry["properties"]
     for key in ("fuente", "plot_id"):
         val = shape_props.get(key, "")
@@ -354,47 +358,163 @@ def _merge_csv_and_shape(csv_row: dict, shape_entry: dict) -> dict:
     return {col: props.get(col, "") for col in GEOJSON_PROP_COLS}
 
 
-def _shape_only_properties(shape_props: dict) -> dict:
-    props = {col: shape_props.get(col, "") for col in PROP_COLS}
+def _shape_only_properties(shape_props: dict, geometry=None) -> dict:
+    props = {col: shape_props.get(col, "") for col in PROP_COLS if col != "superficie"}
+    if geometry is not None:
+        props["superficie"] = superficie_from_geometry(geometry)
+    else:
+        props["superficie"] = ""
     for key in ("fuente", "plot_id"):
         props[key] = shape_props.get(key, "") or ""
     return {col: props.get(col, "") for col in GEOJSON_PROP_COLS}
 
 
-def _build_from_master_and_csv(master: dict[str, dict], rows: list[dict]) -> list[dict]:
-    """Exporta predios.geojson sólo desde predios_fic.shp + fic_database.csv."""
+def _register_rivarola_flight(flights: dict[str, dict]) -> None:
+    rivarola = KML_ROOT / "Rivarola-60m.kmz"
+    if not rivarola.exists():
+        return
+    key = _flight_key("FIC-B-DEVOTO")
+    if key in flights:
+        return
+    polys = read_kml_or_kmz(rivarola)
+    if not polys:
+        return
+    from shapely.ops import unary_union
+
+    flights[key] = {
+        "geometry": _to_2d(unary_union(polys)),
+        "fuente": rivarola.relative_to(REPO_ROOT).as_posix(),
+        "poligono_vuelo": "FIC-B-DEVOTO",
+    }
+
+
+def _flight_key_counts(features: list[dict]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for feat in features:
+        fk = _resolve_flight_key(feat.get("properties", {}).get("poligono_vuelo", ""))
+        if fk:
+            counts[fk] = counts.get(fk, 0) + 1
+    return counts
+
+
+def _apply_kml_flights(features: list[dict], flights: dict[str, dict]) -> set[str]:
+    """Usa KMZ cuando un único cuartel comparte el vuelo (p. ej. Contreras, Alvarado)."""
+    used: set[str] = set()
+    fk_counts = _flight_key_counts(features)
+    for feat in features:
+        props = feat.get("properties") or {}
+        fk = _resolve_flight_key(props.get("poligono_vuelo", ""))
+        if not fk or fk not in flights or fk_counts.get(fk, 0) != 1:
+            continue
+        flight = flights[fk]
+        feat["geometry"] = mapping(flight["geometry"])
+        props["fuente"] = flight.get("fuente", props.get("fuente"))
+        used.add(fk)
+        print(f"  [kml->cuartel] {props.get('id_cuartel')} <- {flight.get('poligono_vuelo')}")
+    return used
+
+
+def _append_orphan_kml_features(
+    features: list[dict],
+    flights: dict[str, dict],
+    used_flight_keys: set[str],
+) -> None:
+    covered_flights = {
+        _resolve_flight_key(f.get("properties", {}).get("poligono_vuelo", ""))
+        for f in features
+        if f.get("properties", {}).get("poligono_vuelo")
+    }
+    seen_sources: set[str] = set()
+    for fk, flight in flights.items():
+        resolved = _resolve_flight_key(flight.get("poligono_vuelo", ""))
+        if fk in used_flight_keys or resolved in covered_flights or resolved in used_flight_keys:
+            continue
+        src = str(flight.get("fuente") or "")
+        if src in seen_sources:
+            continue
+        seen_sources.add(src)
+        covered_flights.add(resolved)
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "id_cuartel": None,
+                    "poligono_vuelo": flight.get("poligono_vuelo"),
+                    "fuente": flight.get("fuente"),
+                },
+                "geometry": mapping(flight["geometry"]),
+            }
+        )
+        print(f"  [kml+] {flight.get('poligono_vuelo')}")
+
+
+def _merge_kml_flights(features: list[dict]) -> None:
+    flights = load_flight_polygons()
+    _register_rivarola_flight(flights)
+    used = _apply_kml_flights(features, flights)
+    _append_orphan_kml_features(features, flights, used)
+
+
+def _feature_from_csv_and_kml(row: dict, flights: dict[str, dict]) -> dict | None:
+    fk = _resolve_flight_key(row.get("poligono_vuelo", ""))
+    src = flights.get(fk) if fk else None
+    if not src or src.get("geometry") is None or src["geometry"].is_empty:
+        return None
+    props = {col: row.get(col, "") for col in PROP_COLS if col != "superficie"}
+    props["superficie"] = superficie_from_geometry(src["geometry"])
+    props["fuente"] = src.get("fuente", "")
+    props["plot_id"] = ""
+    return {
+        "type": "Feature",
+        "properties": {col: props.get(col, "") for col in GEOJSON_PROP_COLS},
+        "geometry": mapping(src["geometry"]),
+    }
+
+
+def _build_from_existing_and_csv(existing: dict[str, dict], rows: list[dict]) -> list[dict]:
+    """Exporta cuarteles.geojson desde geometrías existentes + fic_database.csv + KMZ."""
     features: list[dict] = []
     csv_ids: set[str] = set()
+    flights = load_flight_polygons()
+    _register_rivarola_flight(flights)
 
     for row in rows:
         cid = row.get("id_cuartel")
         if not cid:
             continue
         csv_ids.add(cid)
-        if cid not in master:
-            print(f"  [warn] {cid} en CSV pero no en {MASTER_SHP.name}")
+        if cid in existing:
+            entry = existing[cid]
+            features.append(
+                {
+                    "type": "Feature",
+                    "properties": _merge_csv_and_shape(row, entry),
+                    "geometry": mapping(entry["geometry"]),
+                }
+            )
             continue
-        entry = master[cid]
-        features.append(
-            {
-                "type": "Feature",
-                "properties": _merge_csv_and_shape(row, entry),
-                "geometry": mapping(entry["geometry"]),
-            }
-        )
 
-    for cid, entry in sorted(master.items()):
+        feat = _feature_from_csv_and_kml(row, flights)
+        if feat:
+            print(f"  [kml+csv] {cid} <- {row.get('poligono_vuelo')}")
+            features.append(feat)
+        else:
+            print(f"  [warn] {cid} en CSV sin geometría ({row.get('propietario')})")
+
+    for cid, entry in sorted(existing.items()):
         if cid in csv_ids:
             continue
-        print(f"  [warn] {cid} en {MASTER_SHP.name} pero no en fic_database.csv")
+        print(f"  [warn] {cid} en cuarteles.geojson pero no en fic_database.csv")
         features.append(
             {
                 "type": "Feature",
-                "properties": _shape_only_properties(entry["properties"]),
+                "properties": _shape_only_properties(entry["properties"], entry["geometry"]),
                 "geometry": mapping(entry["geometry"]),
             }
         )
 
+    used = _apply_kml_flights(features, flights)
+    _append_orphan_kml_features(features, flights, used)
     return features
 
 
@@ -402,14 +522,14 @@ def _build_legacy_features(master: dict[str, dict], rows: list[dict]) -> list[di
     flights = load_flight_polygons()
     cultivos = load_cultivo_polygons()
     predios = {
-        "rci": load_predio_geojson("predios_a_brito/predio_RCI.geojson", "rci"),
-        "rpa": load_predio_geojson("predios_a_brito/predio_RPA.geojson", "rpa"),
-        "riv": load_predio_geojson("predios_b_devoto/predio_RIV.geojson", "riv"),
+        "rci": load_predio_geojson("predio_RCI.geojson", "rci"),
+        "rpa": load_predio_geojson("predio_RPA.geojson", "rpa"),
+        "riv": load_predio_geojson("predio_RIV.geojson", "riv"),
     }
     predios = {k: v for k, v in predios.items() if v}
 
     # Rivarola KMZ también como vuelo Bruno Devoto si el nombre del archivo no coincide con FIC-B-DEVOTO
-    rivarola = SHAPES_ROOT / "predios_b_devoto" / "Rivarola-60m.kmz"
+    rivarola = KML_ROOT / "Rivarola-60m.kmz"
     if rivarola.exists():
         key = _flight_key("FIC-B-DEVOTO")
         if key not in flights:
@@ -511,28 +631,25 @@ def _build_legacy_features(master: dict[str, dict], rows: list[dict]) -> list[di
 
 
 def build_features() -> list[dict]:
-    master = load_master_shape_by_cuartel()
+    existing = load_existing_cuarteles_by_id()
     rows = load_csv_rows()
-
-    if master and rows:
-        missing = [r["id_cuartel"] for r in rows if r.get("id_cuartel") not in master]
-        if not missing:
-            print("  [mode] predios_fic.shp + fic_database.csv")
-            return _build_from_master_and_csv(master, rows)
-        print(f"  [mode] legacy (faltan {len(missing)} cuarteles en predios_fic.shp)")
-
-    return _build_legacy_features(master, rows)
+    missing = [r["id_cuartel"] for r in rows if r.get("id_cuartel") not in existing]
+    if missing:
+        print(f"  [mode] cuarteles.geojson + fic_database.csv (+ {len(missing)} desde KMZ)")
+    else:
+        print("  [mode] cuarteles.geojson + fic_database.csv")
+    return _build_from_existing_and_csv(existing, rows)
 
 
 def main() -> None:
-    print("Construyendo predios.geojson …")
+    print("Construyendo cuarteles.geojson …")
     features = build_features()
     if not features:
         raise SystemExit("No se generó ningún polígono.")
 
     fc = {
         "type": "FeatureCollection",
-        "name": "predios",
+        "name": "cuarteles",
         "features": features,
     }
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)

@@ -498,7 +498,9 @@
         return;
       }
       const attrs = api.droneMeta().lidar_attributes || {};
-      const ids = Object.keys(attrs).sort(function (a, b) {
+      const ids = Object.keys(attrs).filter(function (id) {
+        return String(id).toLowerCase() !== 'intensity';
+      }).sort(function (a, b) {
         if (a === 'rgb') return -1;
         if (b === 'rgb') return 1;
         const la = (attrs[a] && attrs[a].label) || a;
@@ -514,6 +516,9 @@
         sel.appendChild(opt);
       });
       const def = api.droneMeta().lidar_default_attribute || 'rgb';
+      if (String(api.state.lidarAttribute || '').toLowerCase() === 'intensity') {
+        api.state.lidarAttribute = def;
+      }
       if (ids.indexOf(api.state.lidarAttribute) < 0) api.state.lidarAttribute = def;
       sel.value = api.state.lidarAttribute || def;
       if (!sel.dataset.ficBound) {
@@ -533,7 +538,8 @@
       let data = cachedData;
       if (!data) return null;
       if (!data.count || !data.positions || !data.positions.length) return null;
-      const attrId = api.state.lidarAttribute || 'rgb';
+      const attrIdRaw = api.state.lidarAttribute || 'rgb';
+      const attrId = String(attrIdRaw).toLowerCase() === 'intensity' ? 'rgb' : attrIdRaw;
       const attr = (data.attributes && data.attributes[attrId]) || null;
       const lim = api.stretchForAttr(attrId, data);
       const pos = data.positions;

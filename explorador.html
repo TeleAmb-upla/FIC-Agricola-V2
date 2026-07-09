@@ -125,7 +125,8 @@
             #ficSatBottomStack .fic-sat-chart-dock:not(.fic-sat-chart-dock--collapsed) {
                 max-height: min(42vh, 340px);
             }
-            .fic-sat-compare-yrs__v { font-size: 0.86rem; }
+            .fic-sat-compare-yrs__v { font-size: 0.98rem; }
+            .fic-sat-compare-yrs__k { font-size: 0.68rem; }
             .fic-sat-period-step { width: 36px; height: 36px; }
         }
 
@@ -430,31 +431,6 @@
             border-top: 1px solid rgba(29, 107, 74, 0.1);
         }
         #ficLidarAttrDesc[hidden] { display: none !important; }
-        .fic-lidar-pointsize-wrap {
-            display: flex;
-            align-items: center;
-            gap: 0.55rem;
-            margin-top: 0.15rem;
-        }
-        .fic-lidar-pointsize-wrap input[type="range"] {
-            flex: 1;
-            min-width: 0;
-            accent-color: var(--fic-ag-accent);
-        }
-        .fic-lidar-pointsize-val {
-            flex-shrink: 0;
-            font-size: 0.78rem;
-            font-weight: 700;
-            color: var(--fic-ag-ink);
-            min-width: 3.2rem;
-            text-align: right;
-        }
-        .fic-lidar-pointsize-hint {
-            font-size: 0.72rem;
-            color: var(--fic-ag-muted);
-            line-height: 1.35;
-            margin: 0.1rem 0 0;
-        }
         #ficAgricultorPickBlock[hidden] { display: none !important; }
         .selector-label {
             font-size: 0.68rem;
@@ -507,6 +483,83 @@
             line-height: 1.5;
             color: var(--fic-ag-muted);
         }
+        .fic-index-desc__scale {
+            margin-top: 0.5rem;
+            padding: 0.52rem 0.58rem 0.48rem;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid rgba(29, 107, 74, 0.12);
+        }
+        .fic-index-desc__scale[hidden] { display: none; }
+        .fic-index-desc__scale-head {
+            display: block;
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+            color: var(--fic-ag-ink);
+            line-height: 1.2;
+        }
+        .fic-index-desc__scale-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.35rem;
+            margin-top: 0.32rem;
+            font-family: 'IBM Plex Mono', 'Consolas', monospace;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #1a3d2c;
+            line-height: 1.2;
+        }
+        .fic-index-desc__scale-sep {
+            flex: 0 0 auto;
+            font-weight: 400;
+            color: rgba(26, 61, 44, 0.45);
+        }
+        .fic-index-desc__scale-hint {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 0.18rem;
+            font-size: 0.64rem;
+            color: var(--fic-ag-muted);
+            line-height: 1.2;
+        }
+        .fic-index-desc__rows {
+            margin: 0.55rem 0 0;
+            padding: 0;
+        }
+        .fic-index-desc__row {
+            margin: 0;
+            padding: 0;
+        }
+        .fic-index-desc__row + .fic-index-desc__row {
+            margin-top: 0.42rem;
+        }
+        .fic-index-desc__row dt {
+            margin: 0;
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--fic-ag-ink);
+            line-height: 1.25;
+        }
+        .fic-index-desc__row dd {
+            margin: 0.16rem 0 0;
+            font-size: 0.78rem;
+            line-height: 1.48;
+            color: var(--fic-ag-muted);
+        }
+        .fic-index-desc__note {
+            margin: 0.55rem 0 0;
+            padding-top: 0.48rem;
+            border-top: 1px solid rgba(29, 107, 74, 0.1);
+            font-size: 0.7rem;
+            line-height: 1.45;
+            color: rgba(26, 61, 44, 0.72);
+        }
+        .fic-index-desc__note[hidden] { display: none; }
 
         .fic-map-hud {
             position: absolute;
@@ -714,14 +767,14 @@
         }
         .fic-sat-compare-yrs__side {
             min-width: 0;
-            max-width: min(240px, 100%);
+            max-width: min(260px, 100%);
             width: fit-content;
             justify-self: center;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 2px;
-            padding: 5px 12px 6px;
+            gap: 3px;
+            padding: 7px 14px 8px;
             border-radius: 12px;
             background: rgba(255, 255, 255, 0.92);
             border: 1px solid rgba(29, 107, 74, 0.12);
@@ -729,17 +782,24 @@
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             text-align: center;
+            transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
+        }
+        .fic-sat-compare-yrs__side--hidden {
+            opacity: 0;
+            visibility: hidden;
+            transform: scale(0.94);
+            pointer-events: none;
         }
         .fic-sat-compare-yrs__k {
-            font-size: 0.62rem;
+            font-size: 0.72rem;
             font-weight: 800;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: rgba(26, 32, 24, 0.55);
+            letter-spacing: 0.02em;
+            text-transform: none;
+            color: rgba(26, 32, 24, 0.58);
         }
         .fic-sat-compare-yrs__v {
             font-family: 'Outfit', sans-serif;
-            font-size: 0.95rem;
+            font-size: 1.1rem;
             font-weight: 800;
             letter-spacing: -0.02em;
             color: var(--fic-ag-dark);
@@ -1381,6 +1441,10 @@
         .colorbar-gradient { height: 168px; width: 14px; border-radius: 999px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06); }
         .colorbar-scale span { font-size: 0.74rem; color: var(--fic-ag-ink); font-weight: 700; }
         .preview-raster { image-rendering: pixelated; image-rendering: crisp-edges; }
+        .fic-raster-overlay,
+        .leaflet-image-layer.fic-raster-overlay {
+            image-rendering: auto;
+        }
 
         .btn {
             display: inline-flex;
@@ -1458,19 +1522,40 @@
                         <select id="mapIndex" title="Capa en el mapa: RGB, NDVI, NDWI…"></select>
                         <div class="fic-index-desc" id="ficIndexDesc" hidden>
                             <span class="fic-index-desc__label" id="ficIndexDescLabel">Capa</span>
-                            <p class="fic-index-desc__text" id="ficIndexDescText">Selecciona una capa para ver su descripción.</p>
+                            <div class="fic-index-desc__scale" id="ficIndexDescScale" hidden>
+                                <span class="fic-index-desc__scale-head">Escala del mapa</span>
+                                <div class="fic-index-desc__scale-bar">
+                                    <span class="fic-index-desc__scale-val" id="ficIndexDescVmin">—</span>
+                                    <span class="fic-index-desc__scale-sep" aria-hidden="true">—</span>
+                                    <span class="fic-index-desc__scale-val" id="ficIndexDescVmax">—</span>
+                                </div>
+                                <div class="fic-index-desc__scale-hint">
+                                    <span>bajo</span>
+                                    <span>alto</span>
+                                </div>
+                            </div>
+                            <dl class="fic-index-desc__rows">
+                                <div class="fic-index-desc__row">
+                                    <dt>Qué mide</dt>
+                                    <dd id="ficIndexDescWhat"></dd>
+                                </div>
+                                <div class="fic-index-desc__row" id="ficIndexDescMapRow">
+                                    <dt>Cómo leer el mapa</dt>
+                                    <dd id="ficIndexDescMap"></dd>
+                                </div>
+                                <div class="fic-index-desc__row" id="ficIndexDescChartRow" hidden>
+                                    <dt>Gráfico</dt>
+                                    <dd id="ficIndexDescChart"></dd>
+                                </div>
+                            </dl>
+                            <p class="fic-index-desc__note" id="ficIndexDescNote" hidden>
+                                Los colores solo ubican cada zona dentro de esta escala en el predio. El tono más claro no implica por sí solo un valor «muy bueno».
+                            </p>
                         </div>
                     </div>
                     <div class="fic-sidebar-block fic-sidebar-block--lidar" id="ficLidarAttrFields" hidden>
                         <label class="selector-label" for="ficLidarAttr">Atributo LiDAR</label>
                         <select id="ficLidarAttr" title="Color de la nube de puntos LiDAR"></select>
-                        <label class="selector-label" for="ficLidarPointSize" style="margin-top:0.65rem">Tamaño de puntos</label>
-                        <div class="fic-lidar-pointsize-wrap">
-                            <input type="range" id="ficLidarPointSize" min="1" max="8" step="0.5" value="3.5"
-                                title="Tamaño de visualización de la nube (similar al control de DJI Terra)">
-                            <span class="fic-lidar-pointsize-val" id="ficLidarPointSizeVal">3.5 px</span>
-                        </div>
-                        <p class="fic-lidar-pointsize-hint">Predeterminado 3.5 px (estilo visor DJI Terra). Ajusta si lo necesitas.</p>
                         <div class="fic-index-desc fic-lidar-attr-desc" id="ficLidarAttrDesc" hidden>
                             <span class="fic-index-desc__label" id="ficLidarAttrDescLabel">RGB</span>
                             <p class="fic-index-desc__text" id="ficLidarAttrDescText"></p>
@@ -3718,6 +3803,7 @@ function applySatSwipeClip() {
         line.style.left = ((splitX - sr.left) / Math.max(1, sr.width) * 100) + '%';
     }
     if (grip) grip.setAttribute('aria-valuenow', String(Math.round(ratio * 100)));
+    ficSyncSatCompareYearLabelVisibility();
 
     if (!mapaSat) return;
     ficEnsureSatRasterPaneLayout();
@@ -4580,7 +4666,7 @@ function syncSatCompareYearSubtitles() {
     rightEl.textContent = '';
     var kL = document.createElement('span');
     kL.className = 'fic-sat-compare-yrs__k';
-    kL.textContent = 'Histórico';
+    kL.textContent = 'Estado histórico';
     var vL = document.createElement('span');
     vL.className = 'fic-sat-compare-yrs__v';
     vL.textContent = leftYear;
@@ -4588,12 +4674,25 @@ function syncSatCompareYearSubtitles() {
     leftEl.appendChild(vL);
     var kR = document.createElement('span');
     kR.className = 'fic-sat-compare-yrs__k';
-    kR.textContent = 'Actual';
+    kR.textContent = 'Estado actual';
     var vR = document.createElement('span');
     vR.className = 'fic-sat-compare-yrs__v';
     vR.textContent = rightYear;
     rightEl.appendChild(kR);
     rightEl.appendChild(vR);
+    ficSyncSatCompareYearLabelVisibility();
+}
+
+/** Oculta el bloque completo del lado que queda tapado al mover el divisor. */
+function ficSyncSatCompareYearLabelVisibility() {
+    var leftEl = document.getElementById('ficSatSideYearLeft');
+    var rightEl = document.getElementById('ficSatSideYearRight');
+    if (!leftEl || !rightEl) return;
+    var ratio = state.satSwipeRatio;
+    if (ratio == null || !isFinite(ratio)) ratio = 0.5;
+    ratio = Math.min(1, Math.max(0, ratio));
+    leftEl.classList.toggle('fic-sat-compare-yrs__side--hidden', ratio < 0.5);
+    rightEl.classList.toggle('fic-sat-compare-yrs__side--hidden', ratio > 0.5);
 }
 
 function updateSatSplitOverlays() {
@@ -4665,6 +4764,7 @@ function updateSatSplitOverlays() {
     updateSatChartDock();
     updateSatMapTitle();
     ficApplyColorbar(getSatMeta(), satBand());
+    ficUpdateIndexDescription();
     renderAOI();
     ficSatUpdateStatusBanner();
 }
@@ -6011,9 +6111,8 @@ async function loadManifest() {
     await ficEnsureGeoContextLoaded();
     await ensureDroneDatasetLoaded();
     if (typeof FicLidar3d !== 'undefined') {
-        ficLoadLidarPointSizeFromStorage();
+        state.lidarPointSizePx = 3.5;
         FicLidar3d.bind(state, BASE);
-        ficBindLidarPointSizeSlider();
     }
 
     try {
@@ -6314,58 +6413,11 @@ function updateMapLayerHint() {
     ficSyncDroneMapTitle();
 }
 
-var LS_LIDAR_POINT_PX = 'fic_lidar_point_px';
-var LIDAR_POINT_PX_DEFAULT = 3.5;
-
-function ficClampLidarPointSizePx(v) {
-    var n = Number(v);
-    if (!isFinite(n)) return LIDAR_POINT_PX_DEFAULT;
-    return Math.max(1, Math.min(8, Math.round(n * 2) / 2));
-}
-
-function ficLoadLidarPointSizeFromStorage() {
-    try {
-        var raw = localStorage.getItem(LS_LIDAR_POINT_PX);
-        if (raw != null && raw !== '') state.lidarPointSizePx = ficClampLidarPointSizePx(parseFloat(raw));
-    } catch (e) { /* noop */ }
-    if (state.lidarPointSizePx == null || !isFinite(Number(state.lidarPointSizePx))) {
-        state.lidarPointSizePx = LIDAR_POINT_PX_DEFAULT;
-    }
-}
-
-function ficSyncLidarPointSizeUi() {
-    var rng = document.getElementById('ficLidarPointSize');
-    var lab = document.getElementById('ficLidarPointSizeVal');
-    if (!rng || !lab) return;
-    var px = ficClampLidarPointSizePx(state.lidarPointSizePx);
-    state.lidarPointSizePx = px;
-    rng.value = String(px);
-    lab.textContent = px.toFixed(1).replace(/\.0$/, '') + ' px';
-    rng.setAttribute('aria-valuenow', String(px));
-}
-
-function ficBindLidarPointSizeSlider() {
-    var rng = document.getElementById('ficLidarPointSize');
-    if (!rng || rng.dataset.ficBound) return;
-    rng.dataset.ficBound = '1';
-    ficLoadLidarPointSizeFromStorage();
-    ficSyncLidarPointSizeUi();
-    rng.addEventListener('input', function () {
-        state.lidarPointSizePx = ficClampLidarPointSizePx(rng.value);
-        ficSyncLidarPointSizeUi();
-        try { localStorage.setItem(LS_LIDAR_POINT_PX, String(state.lidarPointSizePx)); } catch (e1) { /* noop */ }
-        if (typeof FicLidar3d !== 'undefined' && FicLidar3d.refreshPointSize) {
-            FicLidar3d.refreshPointSize();
-        }
-    });
-}
-
-/** Textos breves de atributos LiDAR. */
+/** Textos de atributos LiDAR para el agricultor. */
 var FIC_LIDAR_ATTR_DESCRIPTIONS = {
-    rgb: 'Color real (RGB) de cada punto: ortofoto 3D del vuelo, útil como referencia visual del terreno y el dosel.',
-    canopy: 'Altura del dosel: distancia vertical entre el suelo y la parte superior de la vegetación; ayuda a estimar estructura y biomasa.',
-    intensity: 'Intensidad de retorno del láser: refleja la fuerza de la señal recibida; varía con el material, humedad y ángulo de incidencia.',
-    classification: 'Clasificación de puntos (suelo, vegetación, edificaciones, etc.): separa elementos del paisaje según el algoritmo del procesamiento LiDAR.'
+    rgb: 'Foto a color de cada punto del vuelo. Úsala como referencia visual del terreno y el cultivo.',
+    canopy: 'Altura del dosel: qué tan alto está el cultivo sobre el suelo. Ayuda a ver estructura y diferencias entre zonas.',
+    classification: 'Tipo de superficie (suelo, vegetación, construcciones, etc.). Sirve para separar el cultivo de otros elementos del paisaje.'
 };
 
 function ficLidarAttrDescriptionText(attrId) {
@@ -6394,37 +6446,135 @@ function ficUpdateLidarAttrDescription() {
     box.hidden = false;
 }
 
-/** Textos breves de índices (referencia: Sentinel Hub Sentinel-2 custom scripts). */
+/** Textos de índices para agricultores (ref. Sentinel Hub S2). Lectura relativa al rango del mapa. */
 var FIC_INDEX_DESCRIPTIONS = {
-    rgb: 'Composición en color verdadero (RGB): imagen como la veríamos a simple vista. Sirve de referencia para orientarse y comparar con los índices espectrales.',
-    ndvi: 'NDVI (índice de vegetación normalizado): estima vigor y cobertura vegetal. Valores altos indican mayor actividad fotosintética; valores bajos, suelo desnudo o estrés.',
-    ndwi: 'NDWI (índice de agua normalizado): resalta agua libre y contenido hídrico en superficie frente a suelos secos.',
-    ndmi: 'NDMI (índice de humedad normalizado): sensible al agua en la vegetación; útil para monitorear estrés hídrico del cultivo.',
-    evi: 'EVI (índice de vegetación mejorado): mide biomasa con menor saturación que el NDVI en coberturas muy densas.',
-    msavi: 'MSAVI (SAVI modificado): ajuste del suelo con menor sensibilidad a variaciones de brillo del terreno.',
-    gndvi: 'GNDVI (índice verde de vegetación normalizado): usa el verde y el NIR; sensible a clorofila y variaciones de cultivo.',
-    mcari: 'MCARI (índice de absorción de clorofila modificado): sensible a clorofila y estructura del dosel.',
-    rededge_position: 'Posición red edge (nm): longitud de onda del "red edge" espectral; se desplaza con el contenido de clorofila y el estado del cultivo.',
-    psri: 'PSRI (índice de senescencia): aumenta cuando la vegetación envejece o pierde clorofila.',
-    mndwi: 'MNDWI (NDWI modificado): mejora la detección de agua libre en superficies urbanas y agrícolas.',
-    thermal: 'Ortomosaico térmico: temperatura de superficie estimada desde el sensor infrarrojo del dron.',
-    lidar: 'Nube de puntos LiDAR 3D: altura y estructura del terreno y del dosel en el vuelo seleccionado.'
+    rgb: {
+        what: 'Foto a color del campo, como la verías a simple vista.',
+        map: 'Úsala para ubicarte, reconocer caminos y comparar con los mapas de índices.'
+    },
+    ndvi: {
+        what: 'Actividad de la vegetación (verdor y biomasa).',
+        map: 'Compara zonas del cuartel entre sí: dónde el valor es relativamente más alto o más bajo dentro de la escala.',
+        chart: 'Revisa si el índice sube o baja en el tiempo y entre fechas del comparador.'
+    },
+    ndwi: {
+        what: 'Agua libre en la superficie (charcos, canales, zonas encharcadas).',
+        map: 'Muestra dónde hay valores relativamente mayores o menores dentro de este predio y fecha.',
+        chart: 'El gráfico ayuda a seguir cambios de humedad superficial entre períodos.'
+    },
+    ndmi: {
+        what: 'Humedad en el follaje de las plantas.',
+        map: 'Indica diferencias relativas entre zonas; revísalo junto al riego, suelo y clima.',
+        chart: 'Compara la evolución del índice para detectar tendencias de estrés hídrico.'
+    },
+    evi: {
+        what: 'Vigor del cultivo, especialmente con dosel cerrado.',
+        map: 'Útil para ver manchas con desarrollo relativamente mayor o menor dentro del cuartel.',
+        chart: 'Sigue la curva temporal para comparar etapas del ciclo.'
+    },
+    msavi: {
+        what: 'Cobertura vegetal al inicio del ciclo, cuando aún se ve suelo.',
+        map: 'Compara brotes y emergencia entre zonas del mismo cuartel.',
+        chart: 'Observa cómo evoluciona la cobertura en las primeras semanas.'
+    },
+    gndvi: {
+        what: 'Contenido de clorofila y verdor del cultivo.',
+        map: 'Destaca zonas con valores relativamente distintos (crecimiento, nutrición o variedad).',
+        chart: 'Compara fechas para ver si el verdor mejora o se estanca.'
+    },
+    mcari: {
+        what: 'Contenido de clorofila en las hojas (nutrición foliar).',
+        map: 'Las diferencias entre zonas pueden señalar variación nutricional dentro del cuartel.',
+        chart: 'Revisa la tendencia temporal antes de interpretar una sola imagen.'
+    },
+    rededge_position: {
+        what: 'Posición del espectro «red edge», ligada al estado del cultivo.',
+        map: 'Compara zonas con valores relativamente altos o bajos expresados en nanómetros.',
+        chart: 'Los cambios en el tiempo pueden reflejar vigor, madurez o estrés.'
+    },
+    psri: {
+        what: 'Indicador de senescencia o madurez del cultivo.',
+        map: 'Muestra dónde el valor es relativamente mayor o menor dentro del cuartel.',
+        chart: 'Un aumento sostenido en el gráfico puede anticipar madurez o estrés tardío.'
+    },
+    mndwi: {
+        what: 'Agua en suelo y superficies húmedas (útil en campo abierto).',
+        map: 'Señala zonas con humedad relativa mayor o menor en esta vista.',
+        chart: 'Útil para seguir encharcamientos o exceso de humedad en el tiempo.'
+    },
+    thermal: {
+        what: 'Temperatura de la superficie del cultivo.',
+        map: 'Compara zonas más cálidas o más frías respecto al resto de la imagen.'
+    },
+    lidar: {
+        what: 'Modelo 3D del terreno y del dosel.',
+        map: 'Permite ver relieve y altura del cultivo por zona.'
+    }
 };
 
-function ficIndexDescriptionText(kind) {
+function ficIndexDescriptionParts(kind) {
     var k = String(kind || '').toLowerCase();
     if (FIC_INDEX_DESCRIPTIONS[k]) return FIC_INDEX_DESCRIPTIONS[k];
     var metaIdx = currentMeta().indices || {};
     var info = metaIdx[k] || metaIdx[k.toUpperCase()] || {};
-    if (info && ficTrim(info.description)) return ficTrim(info.description);
-    return 'Capa espectral del mapa.';
+    var fallback = (info && ficTrim(info.description)) ? ficTrim(info.description) : 'Capa espectral del mapa.';
+    return { what: fallback, map: 'Compara zonas del cuartel entre sí dentro de la escala del mapa.' };
+}
+
+function ficIndexHasChartSeries(kind) {
+    var k = String(kind || '').toLowerCase();
+    if (!k || k === 'rgb' || k === 'thermal' || k === 'lidar') return false;
+    if (state.selectedSource === 'drone') {
+        return droneChartBandList().indexOf(k) >= 0;
+    }
+    return satChartBandList().indexOf(k) >= 0 || satChartBandList().indexOf(k.toUpperCase()) >= 0;
+}
+
+function ficIndexDescriptionRange(kind) {
+    var k = String(kind || '').toLowerCase();
+    if (!k || k === 'rgb' || k === 'lidar') return null;
+    if (k === 'thermal' && state.selectedSource === 'drone') {
+        var raster = ficDronePickRaster('thermal');
+        var visual = raster && raster.visual ? raster.visual : null;
+        if (!visual || visual.stretch_p0 == null || visual.stretch_p100 == null) return null;
+        var vnT = Number(visual.stretch_p0);
+        var vxT = Number(visual.stretch_p100);
+        if (!isFinite(vnT) || !isFinite(vxT)) return null;
+        return {
+            vmin: vnT,
+            vmax: vxT,
+            unit: visual.legend_unit ? String(visual.legend_unit) : '°C',
+            format: ficFormatThermalLegendScalar
+        };
+    }
+    var idxMeta = ficIndexMeta(currentMeta().indices, k);
+    if (!idxMeta || idxMeta.visual_only) return null;
+    if (idxMeta.vmin == null || idxMeta.vmax == null) return null;
+    var vn = Number(idxMeta.vmin);
+    var vx = Number(idxMeta.vmax);
+    if (!isFinite(vn) || !isFinite(vx)) return null;
+    return { vmin: vn, vmax: vx, unit: '', format: ficFormatLegendScalar };
+}
+
+function ficFormatIndexDescScalar(v, fmt, unit) {
+    var text = (typeof fmt === 'function') ? fmt(v) : ficFormatLegendScalar(v);
+    if (unit) text += ' ' + unit;
+    return text;
 }
 
 function ficUpdateIndexDescription() {
     var box = document.getElementById('ficIndexDesc');
     var labelEl = document.getElementById('ficIndexDescLabel');
-    var textEl = document.getElementById('ficIndexDescText');
-    if (!box || !labelEl || !textEl) return;
+    var scaleEl = document.getElementById('ficIndexDescScale');
+    var vminEl = document.getElementById('ficIndexDescVmin');
+    var vmaxEl = document.getElementById('ficIndexDescVmax');
+    var whatEl = document.getElementById('ficIndexDescWhat');
+    var mapRowEl = document.getElementById('ficIndexDescMapRow');
+    var mapEl = document.getElementById('ficIndexDescMap');
+    var chartRowEl = document.getElementById('ficIndexDescChartRow');
+    var chartEl = document.getElementById('ficIndexDescChart');
+    var noteEl = document.getElementById('ficIndexDescNote');
+    if (!box || !labelEl || !whatEl || !mapEl) return;
     if (!state.selectedPredio || !state.mapLayerKind) {
         box.hidden = true;
         return;
@@ -6432,8 +6582,36 @@ function ficUpdateIndexDescription() {
     var kind = String(state.mapLayerKind || '').toLowerCase();
     var metaIdx = currentMeta().indices || {};
     var info = metaIdx[kind] || metaIdx[kind.toUpperCase()] || {};
+    var parts = ficIndexDescriptionParts(kind);
     labelEl.textContent = info.label || kind.toUpperCase();
-    textEl.textContent = ficIndexDescriptionText(kind);
+    whatEl.textContent = parts.what || '';
+    if (parts.map && mapRowEl) {
+        mapEl.textContent = parts.map;
+        mapRowEl.hidden = false;
+    } else if (mapRowEl) {
+        mapRowEl.hidden = true;
+    }
+    if (chartRowEl && chartEl) {
+        if (parts.chart && ficIndexHasChartSeries(kind)) {
+            chartEl.textContent = parts.chart;
+            chartRowEl.hidden = false;
+        } else {
+            chartRowEl.hidden = true;
+        }
+    }
+    var lim = ficIndexDescriptionRange(kind);
+    if (scaleEl && vminEl && vmaxEl && noteEl) {
+        if (lim) {
+            var fmt = lim.format || ficFormatLegendScalar;
+            vminEl.textContent = ficFormatIndexDescScalar(lim.vmin, fmt, lim.unit);
+            vmaxEl.textContent = ficFormatIndexDescScalar(lim.vmax, fmt, lim.unit);
+            scaleEl.hidden = false;
+            noteEl.hidden = false;
+        } else {
+            scaleEl.hidden = true;
+            noteEl.hidden = true;
+        }
+    }
     box.hidden = false;
 }
 
@@ -6520,6 +6698,10 @@ function ficSyncDroneMapTitle(overrideText) {
 
 function ficRefreshLidarView() {
     ficSyncLidarAttrPanelVisibility();
+    state.lidarPointSizePx = 3.5;
+    if (String(state.lidarAttribute || '').toLowerCase() === 'intensity') {
+        state.lidarAttribute = 'rgb';
+    }
     if (typeof FicLidar3d === 'undefined') return;
     if (!ficIsLidarAttrPanelActive()) {
         FicLidar3d.showView(false);
@@ -6534,8 +6716,6 @@ function ficRefreshLidarView() {
         return;
     }
     ficUpdateLidarAttrDescription();
-    ficBindLidarPointSizeSlider();
-    ficSyncLidarPointSizeUi();
     FicLidar3d.populateLidarAttrSelect();
     ficUpdateLidarAttrDescription();
     FicLidar3d.updateView();
@@ -7346,6 +7526,7 @@ function updateMapOverlay() {
     } else {
         ficSyncMapNoteVisibility();
     }
+    ficUpdateIndexDescription();
 }
 
 function fmtHa(value) { return value === null || value === undefined ? '—' : Number(value).toFixed(1) + ' ha'; }

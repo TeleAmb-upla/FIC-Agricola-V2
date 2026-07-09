@@ -81,7 +81,7 @@ def _visible_geom(cuartel_geom, alpha: np.ndarray, transform) -> dict | None:
     return mapping(merged)
 
 
-def _feature_props(cu: dict, wetland_id: str, raster_key: str) -> dict:
+def _feature_props(cu: dict, predio_id: str, raster_key: str) -> dict:
     return {
         "id_cuartel": cu["id_cuartel"],
         "nom_cuartel": cu.get("nom_cuartel"),
@@ -89,7 +89,7 @@ def _feature_props(cu: dict, wetland_id: str, raster_key: str) -> dict:
         "nom_predio": cu.get("nom_predio"),
         "propietario": cu.get("propietario"),
         "superficie": cu.get("superficie"),
-        "wetland_id": wetland_id,
+        "predio_id": predio_id,
         "raster_key": raster_key,
         "fuente": "drone_webp_alpha",
     }
@@ -105,7 +105,7 @@ def outlines_for_raster(
     bounds = vis.get("bounds")
     if not path or not bounds:
         return None
-    wetland_id = str(meta.get("wetland_id") or "").lower()
+    wetland_id = str(meta.get("predio_id") or meta.get("wetland_id") or "").lower()
     cuartels = cuartels_by_wetland.get(wetland_id) or []
     if not cuartels:
         return None

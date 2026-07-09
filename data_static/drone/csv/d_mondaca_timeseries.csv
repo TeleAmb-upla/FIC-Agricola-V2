@@ -1,5 +1,5 @@
-source,wetland_id,wetland_name,index,date,year,season,period_key,mean
-drone,d_mondaca,Parcela 8 — Domingo Mondaca,NDVI,2026-01-21,2026,21 Jan 2026,20260121,0.3707
-drone,d_mondaca,Parcela 8 — Domingo Mondaca,NDVI,2026-06-12,2026,12 Jun 2026,20260612,0.2669
-drone,d_mondaca,Parcela 8 — Domingo Mondaca,NDWI,2026-01-21,2026,21 Jan 2026,20260121,-0.1129
-drone,d_mondaca,Parcela 8 — Domingo Mondaca,NDWI,2026-06-12,2026,12 Jun 2026,20260612,-0.0818
+source,predio_id,predio_name,index,date,year,season,period_key,mean
+drone,d_mondaca,Parcela 8 — Domingo Mondaca,NDVI,2026-01-21,2026,21 Jan 2026,20260121,0.3744
+drone,d_mondaca,Parcela 8 — Domingo Mondaca,NDVI,2026-06-12,2026,12 Jun 2026,20260612,0.265
+drone,d_mondaca,Parcela 8 — Domingo Mondaca,NDWI,2026-01-21,2026,21 Jan 2026,20260121,-0.1139
+drone,d_mondaca,Parcela 8 — Domingo Mondaca,NDWI,2026-06-12,2026,12 Jun 2026,20260612,-0.0824

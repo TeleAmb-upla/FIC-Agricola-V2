@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-07T18:34:20+00:00",
+  "generated_at": "2026-07-07T19:12:44+00:00",
   "aoi_id_column": "predio_id",
   "source": {
     "id": "drone",
@@ -183,10 +183,10 @@
     },
     "c_alvarado": {
       "name": "Nogales — Claudio Alvarado",
-      "area_ha": 3.8,
+      "area_ha": 2.7,
       "center": [
         -32.8283,
-        -70.5433
+        -70.5434
       ],
       "n_periods": 2,
       "last_period": "18 Jun 2026",
@@ -231,7 +231,7 @@
     },
     "v_siebenthal2": {
       "name": "Von Siebenthal 2 — Viña Von Siebenthal",
-      "area_ha": 11.2,
+      "area_ha": 10.1,
       "center": [
         -32.8084,
         -70.8453
@@ -247,9 +247,9 @@
     },
     "v_siebenthal3": {
       "name": "Von Siebenthal 3 — Viña Von Siebenthal",
-      "area_ha": 5.7,
+      "area_ha": 4.6,
       "center": [
-        -32.8088,
+        -32.8089,
         -70.8404
       ],
       "n_periods": 1,
@@ -263,7 +263,7 @@
     },
     "a_inguerzon": {
       "name": "Alfalfa — Anita Inguerzon",
-      "area_ha": 6.5,
+      "area_ha": 5.9,
       "center": [
         -32.8567,
         -70.681
@@ -279,7 +279,7 @@
     },
     "v_fernandez": {
       "name": "Trinidad — Vicente Fernandez",
-      "area_ha": 11.7,
+      "area_ha": 10.1,
       "center": [
         -32.8448,
         -70.6733
@@ -636,26 +636,25 @@
         "path": "drone/rasters/A_INGUERZON_2026_06_18_ndvi.webp",
         "bounds": [
           [
-            -32.85825872897115,
-            -70.68287656891663
+            -32.858130466749316,
+            -70.68278968825155
           ],
           [
-            -32.85543515167025,
-            -70.67769179429621
+            -32.8555663498872,
+            -70.67781340498617
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          25945,
-          16497
+          26396,
+          13601
         ],
         "display_size": [
           4096,
-          2604
+          2111
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/a_inguerzon_20260618_ndvi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/A_INGUERZON_2026_06_18_ndvi.tif",
       "source_fingerprint": {
@@ -663,7 +662,7 @@
         "size": 1574352899,
         "mtime_ns": 1782131494047554900
       },
-      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"0867a0389119a2233967017971dee557\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"a219a50c4ef516d60d56046b9865cbd2\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "a_inguerzon_20260618_ndwi": {
       "source": "drone",
@@ -676,26 +675,25 @@
         "path": "drone/rasters/A_INGUERZON_2026_06_18_ndwi.webp",
         "bounds": [
           [
-            -32.85825872897115,
-            -70.68287656891663
+            -32.858130466749316,
+            -70.68278968825155
           ],
           [
-            -32.85543515167025,
-            -70.67769179429621
+            -32.8555663498872,
+            -70.67781340498617
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          25945,
-          16497
+          26396,
+          13601
         ],
         "display_size": [
           4096,
-          2604
+          2111
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/a_inguerzon_20260618_ndwi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/A_INGUERZON_2026_06_18_ndwi.tif",
       "source_fingerprint": {
@@ -703,7 +701,7 @@
         "size": 1627072431,
         "mtime_ns": 1782131536999093600
       },
-      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"0867a0389119a2233967017971dee557\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"a219a50c4ef516d60d56046b9865cbd2\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "a_inguerzon_20260618_rgb": {
       "source": "drone",
@@ -716,26 +714,25 @@
         "path": "drone/rasters/A_INGUERZON_2026_06_18_rgb.webp",
         "bounds": [
           [
-            -32.85825872897115,
-            -70.68287656891663
+            -32.858130466749316,
+            -70.68278968825155
           ],
           [
-            -32.85543515167025,
-            -70.67769179429621
+            -32.8555663498872,
+            -70.67781340498617
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          25945,
-          16497
+          26396,
+          13601
         ],
         "display_size": [
           4096,
-          2604
+          2111
         ],
         "render_mode": "smooth",
-        "opacity": 1.0,
-        "cuartel_outlines": "drone/outlines/a_inguerzon_20260618_rgb.geojson"
+        "opacity": 1.0
       },
       "analytic_path": "data/drone/A_INGUERZON_2026_06_18_rgb.tif",
       "source_fingerprint": {
@@ -743,7 +740,7 @@
         "size": 4294917500,
         "mtime_ns": 1781905509304901800
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"0867a0389119a2233967017971dee557\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"a219a50c4ef516d60d56046b9865cbd2\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     },
     "a_inguerzon_20260618_thermal": {
       "source": "drone",
@@ -756,31 +753,30 @@
         "path": "drone/rasters/A_INGUERZON_2026_06_18_thermal.webp",
         "bounds": [
           [
-            -32.858258249939716,
-            -70.68287681038514
+            -32.8581304609596,
+            -70.68278963681661
           ],
           [
-            -32.8556948345914,
-            -70.67776522267192
+            -32.85569119165588,
+            -70.67781327144174
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          5312,
-          3101
+          5443,
+          2668
         ],
         "display_size": [
           4096,
-          2391
+          2008
         ],
         "render_mode": "smooth",
         "opacity": 1.0,
         "colormap": "Turbo",
-        "stretch_p0": 9.93,
-        "stretch_p100": 32.71,
+        "stretch_p0": 10.43,
+        "stretch_p100": 32.55,
         "legend_label": "Térmica",
-        "legend_unit": "°C",
-        "cuartel_outlines": "drone/outlines/a_inguerzon_20260618_thermal.geojson"
+        "legend_unit": "°C"
       },
       "analytic_path": "data/drone/A_INGUERZON_2026_06_18_thermal.tif",
       "source_fingerprint": {
@@ -788,7 +784,7 @@
         "size": 42507571,
         "mtime_ns": 1781901913244805800
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"thermal\", \"mode\": \"thermal_visual_flat\", \"preview_geom_sha\": \"0867a0389119a2233967017971dee557\", \"rgb_preview_mask_revision\": 12, \"thermal_preview_revision\": 5, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"thermal\", \"mode\": \"thermal_visual_flat\", \"preview_geom_sha\": \"a219a50c4ef516d60d56046b9865cbd2\", \"rgb_preview_mask_revision\": 12, \"thermal_preview_revision\": 5, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     },
     "b_devoto_20260529_ndvi": {
       "source": "drone",
@@ -801,26 +797,25 @@
         "path": "drone/rasters/B_DEVOTO_2026_05_29_ndvi.webp",
         "bounds": [
           [
-            -32.99627344588348,
-            -71.26096174993432
+            -32.996257536612305,
+            -71.26092383799765
           ],
           [
-            -32.99386674062478,
-            -71.25761833501606
+            -32.99387094956084,
+            -71.25764162610537
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          17573,
-          14907
+          18800,
+          13670
         ],
         "display_size": [
           4096,
-          3475
+          2978
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/b_devoto_20260529_ndvi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/B_DEVOTO_2026_05_29_ndvi.tif",
       "source_fingerprint": {
@@ -828,7 +823,7 @@
         "size": 1339071369,
         "mtime_ns": 1780678833868341600
       },
-      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"d802090f11739135acfbc3c0ab3b3746\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"621a70f97d01fee392e7adf5edb40973\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "b_devoto_20260529_ndwi": {
       "source": "drone",
@@ -841,26 +836,25 @@
         "path": "drone/rasters/B_DEVOTO_2026_05_29_ndwi.webp",
         "bounds": [
           [
-            -32.99627344588348,
-            -71.26096174993432
+            -32.996257536612305,
+            -71.26092383799765
           ],
           [
-            -32.99386674062478,
-            -71.25761833501606
+            -32.99387094956084,
+            -71.25764162610537
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          17573,
-          14907
+          18800,
+          13670
         ],
         "display_size": [
           4096,
-          3475
+          2978
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/b_devoto_20260529_ndwi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/B_DEVOTO_2026_05_29_ndwi.tif",
       "source_fingerprint": {
@@ -868,7 +862,7 @@
         "size": 1343689800,
         "mtime_ns": 1780678868804722300
       },
-      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"d802090f11739135acfbc3c0ab3b3746\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"621a70f97d01fee392e7adf5edb40973\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "b_devoto_20260529_rgb": {
       "source": "drone",
@@ -881,26 +875,25 @@
         "path": "drone/rasters/B_DEVOTO_2026_05_29_rgb.webp",
         "bounds": [
           [
-            -32.99627344588348,
-            -71.26096174993432
+            -32.996257536612305,
+            -71.26092383799765
           ],
           [
-            -32.99386674062478,
-            -71.25761833501606
+            -32.99387094956084,
+            -71.25764162610537
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          17573,
-          14907
+          18800,
+          13670
         ],
         "display_size": [
           4096,
-          3475
+          2978
         ],
         "render_mode": "smooth",
-        "opacity": 1.0,
-        "cuartel_outlines": "drone/outlines/b_devoto_20260529_rgb.geojson"
+        "opacity": 1.0
       },
       "analytic_path": "data/drone/B_DEVOTO_2026_05_29_rgb.tif",
       "source_fingerprint": {
@@ -908,7 +901,7 @@
         "size": 4294275598,
         "mtime_ns": 1780676759947484800
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"d802090f11739135acfbc3c0ab3b3746\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"621a70f97d01fee392e7adf5edb40973\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     },
     "b_devoto_20260529_thermal": {
       "source": "drone",
@@ -921,31 +914,30 @@
         "path": "drone/rasters/B_DEVOTO_2026_05_29_thermal.webp",
         "bounds": [
           [
-            -32.99627350597802,
-            -71.26096244948369
+            -32.9962579036154,
+            -71.26092372892928
           ],
           [
-            -32.99386604841256,
-            -71.25761795795943
+            -32.99387030087613,
+            -71.25764131291116
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          3579,
-          3036
+          3815,
+          2775
         ],
         "display_size": [
-          3579,
-          3036
+          3815,
+          2775
         ],
         "render_mode": "smooth",
         "opacity": 1.0,
         "colormap": "Turbo",
-        "stretch_p0": 10.51,
-        "stretch_p100": 29.28,
+        "stretch_p0": 10.58,
+        "stretch_p100": 29.24,
         "legend_label": "Térmica",
-        "legend_unit": "°C",
-        "cuartel_outlines": "drone/outlines/b_devoto_20260529_thermal.geojson"
+        "legend_unit": "°C"
       },
       "analytic_path": "data/drone/B_DEVOTO_2026_05_29_thermal.tif",
       "source_fingerprint": {
@@ -953,7 +945,7 @@
         "size": 47778320,
         "mtime_ns": 1780679573825764800
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"thermal\", \"mode\": \"thermal_visual_flat\", \"preview_geom_sha\": \"d802090f11739135acfbc3c0ab3b3746\", \"rgb_preview_mask_revision\": 12, \"thermal_preview_revision\": 5, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"thermal\", \"mode\": \"thermal_visual_flat\", \"preview_geom_sha\": \"621a70f97d01fee392e7adf5edb40973\", \"rgb_preview_mask_revision\": 12, \"thermal_preview_revision\": 5, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     },
     "c_alvarado_20260121_ndvi": {
       "source": "drone",
@@ -966,26 +958,25 @@
         "path": "drone/rasters/C_ALVARADO_2026_01_21_ndvi.webp",
         "bounds": [
           [
-            -32.82926442782711,
-            -70.54508040133236
+            -32.82926446419347,
+            -70.5450409831235
           ],
           [
-            -32.82724843755464,
-            -70.54213939279694
+            -32.827330245960674,
+            -70.542133305502
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          14600,
-          11780
+          15568,
+          10356
         ],
         "display_size": [
           4096,
-          3305
+          2725
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/c_alvarado_20260121_ndvi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/C_ALVARADO_2026_01_21_ndvi.tif",
       "source_fingerprint": {
@@ -993,7 +984,7 @@
         "size": 1280376344,
         "mtime_ns": 1776769208000000000
       },
-      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"eec10d1084b0b8e78aaea7599681492e\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"085fac9f36da5749df8dea95c6edd3de\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "c_alvarado_20260121_ndwi": {
       "source": "drone",
@@ -1006,26 +997,25 @@
         "path": "drone/rasters/C_ALVARADO_2026_01_21_ndwi.webp",
         "bounds": [
           [
-            -32.82926442782711,
-            -70.54508040133236
+            -32.82926446419347,
+            -70.5450409831235
           ],
           [
-            -32.82724843755464,
-            -70.54213939279694
+            -32.827330245960674,
+            -70.542133305502
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          14600,
-          11780
+          15568,
+          10356
         ],
         "display_size": [
           4096,
-          3305
+          2725
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/c_alvarado_20260121_ndwi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/C_ALVARADO_2026_01_21_ndwi.tif",
       "source_fingerprint": {
@@ -1033,7 +1023,7 @@
         "size": 1249937246,
         "mtime_ns": 1777548110000000000
       },
-      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"eec10d1084b0b8e78aaea7599681492e\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"085fac9f36da5749df8dea95c6edd3de\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "c_alvarado_20260121_rgb": {
       "source": "drone",
@@ -1046,26 +1036,25 @@
         "path": "drone/rasters/C_ALVARADO_2026_01_21_rgb.webp",
         "bounds": [
           [
-            -32.82926442782711,
-            -70.54508040133236
+            -32.82926446419347,
+            -70.5450409831235
           ],
           [
-            -32.82724843755464,
-            -70.54213939279694
+            -32.827330245960674,
+            -70.542133305502
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          14600,
-          11780
+          15568,
+          10356
         ],
         "display_size": [
           4096,
-          3305
+          2725
         ],
         "render_mode": "smooth",
-        "opacity": 1.0,
-        "cuartel_outlines": "drone/outlines/c_alvarado_20260121_rgb.geojson"
+        "opacity": 1.0
       },
       "analytic_path": "data/drone/C_ALVARADO_2026_01_21_rgb.tif",
       "source_fingerprint": {
@@ -1073,7 +1062,7 @@
         "size": 4481159512,
         "mtime_ns": 1777385000460230000
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"eec10d1084b0b8e78aaea7599681492e\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"085fac9f36da5749df8dea95c6edd3de\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     },
     "c_alvarado_20260618_ndvi": {
       "source": "drone",
@@ -1086,26 +1075,25 @@
         "path": "drone/rasters/C_ALVARADO_2026_06_18_ndvi.webp",
         "bounds": [
           [
-            -32.82938141553816,
-            -70.54508230523892
+            -32.829265774649365,
+            -70.54504107003144
           ],
           [
-            -32.827248449160514,
-            -70.5414087566912
+            -32.82733018684418,
+            -70.541635852183
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          18774,
-          12765
+          18460,
+          10493
         ],
         "display_size": [
           4096,
-          2785
+          2328
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/c_alvarado_20260618_ndvi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/C_ALVARADO_2026_06_18_ndvi.tif",
       "source_fingerprint": {
@@ -1113,7 +1101,7 @@
         "size": 930675325,
         "mtime_ns": 1782132320846051400
       },
-      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"eec10d1084b0b8e78aaea7599681492e\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"085fac9f36da5749df8dea95c6edd3de\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "c_alvarado_20260618_ndwi": {
       "source": "drone",
@@ -1126,26 +1114,25 @@
         "path": "drone/rasters/C_ALVARADO_2026_06_18_ndwi.webp",
         "bounds": [
           [
-            -32.82938141553816,
-            -70.54508230523892
+            -32.829265774649365,
+            -70.54504107003144
           ],
           [
-            -32.827248449160514,
-            -70.5414087566912
+            -32.82733018684418,
+            -70.541635852183
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          18774,
-          12765
+          18460,
+          10493
         ],
         "display_size": [
           4096,
-          2785
+          2328
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/c_alvarado_20260618_ndwi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/C_ALVARADO_2026_06_18_ndwi.tif",
       "source_fingerprint": {
@@ -1153,7 +1140,7 @@
         "size": 974638072,
         "mtime_ns": 1782132346084335000
       },
-      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"eec10d1084b0b8e78aaea7599681492e\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"085fac9f36da5749df8dea95c6edd3de\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "c_alvarado_20260618_rgb": {
       "source": "drone",
@@ -1166,26 +1153,25 @@
         "path": "drone/rasters/C_ALVARADO_2026_06_18_rgb.webp",
         "bounds": [
           [
-            -32.82938141553816,
-            -70.54508230523892
+            -32.829265774649365,
+            -70.54504107003144
           ],
           [
-            -32.827248449160514,
-            -70.5414087566912
+            -32.82733018684418,
+            -70.541635852183
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          18774,
-          12765
+          18460,
+          10493
         ],
         "display_size": [
           4096,
-          2785
+          2328
         ],
         "render_mode": "smooth",
-        "opacity": 1.0,
-        "cuartel_outlines": "drone/outlines/c_alvarado_20260618_rgb.geojson"
+        "opacity": 1.0
       },
       "analytic_path": "data/drone/C_ALVARADO_2026_06_18_rgb.tif",
       "source_fingerprint": {
@@ -1193,7 +1179,7 @@
         "size": 4294442922,
         "mtime_ns": 1781914955097936200
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"eec10d1084b0b8e78aaea7599681492e\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"085fac9f36da5749df8dea95c6edd3de\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     },
     "c_alvarado_20260618_thermal": {
       "source": "drone",
@@ -1206,31 +1192,30 @@
         "path": "drone/rasters/C_ALVARADO_2026_06_18_thermal.webp",
         "bounds": [
           [
-            -32.829382046501394,
-            -70.54508285089989
+            -32.82926614303707,
+            -70.54504110152016
           ],
           [
-            -32.82724837838182,
-            -70.54140817908457
+            -32.82732918966616,
+            -70.5416359070278
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          2962,
-          2014
+          2906,
+          1653
         ],
         "display_size": [
-          2962,
-          2014
+          2906,
+          1653
         ],
         "render_mode": "smooth",
         "opacity": 1.0,
         "colormap": "Turbo",
-        "stretch_p0": 3.45,
-        "stretch_p100": 49.5,
+        "stretch_p0": 3.6,
+        "stretch_p100": 14.25,
         "legend_label": "Térmica",
-        "legend_unit": "°C",
-        "cuartel_outlines": "drone/outlines/c_alvarado_20260618_thermal.geojson"
+        "legend_unit": "°C"
       },
       "analytic_path": "data/drone/C_ALVARADO_2026_06_18_thermal.tif",
       "source_fingerprint": {
@@ -1238,7 +1223,7 @@
         "size": 21361126,
         "mtime_ns": 1781915178902505800
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"thermal\", \"mode\": \"thermal_visual_flat\", \"preview_geom_sha\": \"eec10d1084b0b8e78aaea7599681492e\", \"rgb_preview_mask_revision\": 12, \"thermal_preview_revision\": 5, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"thermal\", \"mode\": \"thermal_visual_flat\", \"preview_geom_sha\": \"085fac9f36da5749df8dea95c6edd3de\", \"rgb_preview_mask_revision\": 12, \"thermal_preview_revision\": 5, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     },
     "d_mondaca_20260121_ndvi": {
       "source": "drone",
@@ -1251,26 +1236,25 @@
         "path": "drone/rasters/D_MONDACA_2026_01_21_ndvi.webp",
         "bounds": [
           [
-            -32.74263511899262,
-            -70.58998400991854
+            -32.7426045627589,
+            -70.58998387465756
           ],
           [
-            -32.741166971328134,
-            -70.58754352810128
+            -32.74118954614811,
+            -70.58755592538137
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          13766,
-          9696
+          14619,
+          8520
         ],
         "display_size": [
           4096,
-          2885
+          2387
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/d_mondaca_20260121_ndvi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/D_MONDACA_2026_01_21_ndvi.tif",
       "source_fingerprint": {
@@ -1278,7 +1262,7 @@
         "size": 1888578264,
         "mtime_ns": 1776437968000000000
       },
-      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"5f5609f7ae43f76a9e449054459212ee\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"c38e059989039e3eeb123c6f3b397603\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "d_mondaca_20260121_ndwi": {
       "source": "drone",
@@ -1291,26 +1275,25 @@
         "path": "drone/rasters/D_MONDACA_2026_01_21_ndwi.webp",
         "bounds": [
           [
-            -32.74263511899262,
-            -70.58998400991854
+            -32.7426045627589,
+            -70.58998387465756
           ],
           [
-            -32.741166971328134,
-            -70.58754352810128
+            -32.74118954614811,
+            -70.58755592538137
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          13766,
-          9696
+          14619,
+          8520
         ],
         "display_size": [
           4096,
-          2885
+          2387
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/d_mondaca_20260121_ndwi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/D_MONDACA_2026_01_21_ndwi.tif",
       "source_fingerprint": {
@@ -1318,7 +1301,7 @@
         "size": 1837696012,
         "mtime_ns": 1777546026000000000
       },
-      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"5f5609f7ae43f76a9e449054459212ee\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"c38e059989039e3eeb123c6f3b397603\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "d_mondaca_20260121_rgb": {
       "source": "drone",
@@ -1331,26 +1314,25 @@
         "path": "drone/rasters/D_MONDACA_2026_01_21_rgb.webp",
         "bounds": [
           [
-            -32.74263511899262,
-            -70.58998400991854
+            -32.7426045627589,
+            -70.58998387465756
           ],
           [
-            -32.741166971328134,
-            -70.58754352810128
+            -32.74118954614811,
+            -70.58755592538137
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          13766,
-          9696
+          14619,
+          8520
         ],
         "display_size": [
           4096,
-          2885
+          2387
         ],
         "render_mode": "smooth",
-        "opacity": 1.0,
-        "cuartel_outlines": "drone/outlines/d_mondaca_20260121_rgb.geojson"
+        "opacity": 1.0
       },
       "analytic_path": "data/drone/D_MONDACA_2026_01_21_rgb.tif",
       "source_fingerprint": {
@@ -1358,7 +1340,7 @@
         "size": 6609796632,
         "mtime_ns": 1777385433791794200
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"5f5609f7ae43f76a9e449054459212ee\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"c38e059989039e3eeb123c6f3b397603\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     },
     "d_mondaca_20260612_ndvi": {
       "source": "drone",
@@ -1371,26 +1353,25 @@
         "path": "drone/rasters/D_MONDACA_2026_06_12_ndvi.webp",
         "bounds": [
           [
-            -32.74263509489546,
-            -70.58998395978094
+            -32.74260464074932,
+            -70.5899839457743
           ],
           [
-            -32.74116709752619,
-            -70.58754361631712
+            -32.74118952768828,
+            -70.58755595514648
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          12689,
-          8937
+          13491,
+          7863
         ],
         "display_size": [
           4096,
-          2885
+          2387
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/d_mondaca_20260612_ndvi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/D_MONDACA_2026_06_12_ndvi.tif",
       "source_fingerprint": {
@@ -1398,7 +1379,7 @@
         "size": 808415846,
         "mtime_ns": 1781526950919792500
       },
-      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"5f5609f7ae43f76a9e449054459212ee\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"c38e059989039e3eeb123c6f3b397603\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "d_mondaca_20260612_ndwi": {
       "source": "drone",
@@ -1411,26 +1392,25 @@
         "path": "drone/rasters/D_MONDACA_2026_06_12_ndwi.webp",
         "bounds": [
           [
-            -32.74263509489546,
-            -70.58998395978094
+            -32.74260464074932,
+            -70.5899839457743
           ],
           [
-            -32.74116709752619,
-            -70.58754361631712
+            -32.74118952768828,
+            -70.58755595514648
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          12689,
-          8937
+          13491,
+          7863
         ],
         "display_size": [
           4096,
-          2885
+          2387
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/d_mondaca_20260612_ndwi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/D_MONDACA_2026_06_12_ndwi.tif",
       "source_fingerprint": {
@@ -1438,7 +1418,7 @@
         "size": 841604185,
         "mtime_ns": 1781526976473087900
       },
-      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"5f5609f7ae43f76a9e449054459212ee\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"c38e059989039e3eeb123c6f3b397603\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "d_mondaca_20260612_rgb": {
       "source": "drone",
@@ -1451,26 +1431,25 @@
         "path": "drone/rasters/D_MONDACA_2026_06_12_rgb.webp",
         "bounds": [
           [
-            -32.74263509489546,
-            -70.58998395978094
+            -32.74260464074932,
+            -70.5899839457743
           ],
           [
-            -32.74116709752619,
-            -70.58754361631712
+            -32.74118952768828,
+            -70.58755595514648
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          12689,
-          8937
+          13491,
+          7863
         ],
         "display_size": [
           4096,
-          2885
+          2387
         ],
         "render_mode": "smooth",
-        "opacity": 1.0,
-        "cuartel_outlines": "drone/outlines/d_mondaca_20260612_rgb.geojson"
+        "opacity": 1.0
       },
       "analytic_path": "data/drone/D_MONDACA_2026_06_12_rgb.tif",
       "source_fingerprint": {
@@ -1478,7 +1457,7 @@
         "size": 4294621486,
         "mtime_ns": 1781484389313665300
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"5f5609f7ae43f76a9e449054459212ee\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"c38e059989039e3eeb123c6f3b397603\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     },
     "d_mondaca_20260612_thermal": {
       "source": "drone",
@@ -1491,31 +1470,30 @@
         "path": "drone/rasters/D_MONDACA_2026_06_12_thermal.webp",
         "bounds": [
           [
-            -32.74263534687824,
-            -70.58998438126103
+            -32.74260486453423,
+            -70.58998461841459
           ],
           [
-            -32.74116709949323,
-            -70.58754342748786
+            -32.74118923492436,
+            -70.58755515211749
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          2563,
-          1805
+          2727,
+          1589
         ],
         "display_size": [
-          2563,
-          1805
+          2727,
+          1589
         ],
         "render_mode": "smooth",
         "opacity": 1.0,
         "colormap": "Turbo",
-        "stretch_p0": -5.62,
-        "stretch_p100": 32.43,
+        "stretch_p0": -5.21,
+        "stretch_p100": 32.25,
         "legend_label": "Térmica",
-        "legend_unit": "°C",
-        "cuartel_outlines": "drone/outlines/d_mondaca_20260612_thermal.geojson"
+        "legend_unit": "°C"
       },
       "analytic_path": "data/drone/D_MONDACA_2026_06_12_thermal.tif",
       "source_fingerprint": {
@@ -1523,7 +1501,7 @@
         "size": 28292715,
         "mtime_ns": 1781413355361872600
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"thermal\", \"mode\": \"thermal_visual_flat\", \"preview_geom_sha\": \"5f5609f7ae43f76a9e449054459212ee\", \"rgb_preview_mask_revision\": 12, \"thermal_preview_revision\": 5, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"thermal\", \"mode\": \"thermal_visual_flat\", \"preview_geom_sha\": \"c38e059989039e3eeb123c6f3b397603\", \"rgb_preview_mask_revision\": 12, \"thermal_preview_revision\": 5, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     },
     "e_sazo_20260121_ndvi": {
       "source": "drone",
@@ -1821,26 +1799,25 @@
         "path": "drone/rasters/J_CONTRERAS_2026_01_21_ndvi.webp",
         "bounds": [
           [
-            -32.7493936917026,
-            -70.61691201609842
+            -32.74940539048423,
+            -70.61689422495931
           ],
           [
-            -32.74693695791208,
-            -70.61503642659929
+            -32.74693969133233,
+            -70.61506684376796
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          10874,
-          17093
+          11769,
+          15880
         ],
         "display_size": [
-          2606,
+          3036,
           4096
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/j_contreras_20260121_ndvi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/J_CONTRERAS_2026_01_21_ndvi.tif",
       "source_fingerprint": {
@@ -1848,7 +1825,7 @@
         "size": 2374353340,
         "mtime_ns": 1777384506689754700
       },
-      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"163afb45c6cd755f44c1090ebca84f3a\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"2cdf7eab37f41dee493edf430ba1047b\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "j_contreras_20260121_ndwi": {
       "source": "drone",
@@ -1861,26 +1838,25 @@
         "path": "drone/rasters/J_CONTRERAS_2026_01_21_ndwi.webp",
         "bounds": [
           [
-            -32.7493936917026,
-            -70.61691201609842
+            -32.74940539048423,
+            -70.61689422495931
           ],
           [
-            -32.74693695791208,
-            -70.61503642659929
+            -32.74693969133233,
+            -70.61506684376796
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          10874,
-          17093
+          11769,
+          15880
         ],
         "display_size": [
-          2606,
+          3036,
           4096
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/j_contreras_20260121_ndwi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/J_CONTRERAS_2026_01_21_ndwi.tif",
       "source_fingerprint": {
@@ -1888,7 +1864,7 @@
         "size": 2323817386,
         "mtime_ns": 1777576305800835000
       },
-      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"163afb45c6cd755f44c1090ebca84f3a\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"2cdf7eab37f41dee493edf430ba1047b\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "j_contreras_20260121_rgb": {
       "source": "drone",
@@ -1901,26 +1877,25 @@
         "path": "drone/rasters/J_CONTRERAS_2026_01_21_rgb.webp",
         "bounds": [
           [
-            -32.7493936917026,
-            -70.61691201609842
+            -32.74940539048423,
+            -70.61689422495931
           ],
           [
-            -32.74693695791208,
-            -70.61503642659929
+            -32.74693969133233,
+            -70.61506684376796
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          10874,
-          17093
+          11769,
+          15880
         ],
         "display_size": [
-          2606,
+          3036,
           4096
         ],
         "render_mode": "smooth",
-        "opacity": 1.0,
-        "cuartel_outlines": "drone/outlines/j_contreras_20260121_rgb.geojson"
+        "opacity": 1.0
       },
       "analytic_path": "data/drone/J_CONTRERAS_2026_01_21_rgb.tif",
       "source_fingerprint": {
@@ -1928,7 +1903,51 @@
         "size": 8309953788,
         "mtime_ns": 1777385651237201100
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"163afb45c6cd755f44c1090ebca84f3a\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"2cdf7eab37f41dee493edf430ba1047b\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+    },
+    "j_contreras_20260121_thermal": {
+      "source": "drone",
+      "predio_id": "j_contreras",
+      "index": "thermal",
+      "year": 2026,
+      "season": "21 Jan 2026",
+      "period_key": "20260121",
+      "visual": {
+        "path": "drone/rasters/J_CONTRERAS_2026_01_21_thermal.webp",
+        "bounds": [
+          [
+            -32.749433301087606,
+            -70.61689506769558
+          ],
+          [
+            -32.74693969485335,
+            -70.61506612573486
+          ]
+        ],
+        "format": "WEBP",
+        "native_size": [
+          1640,
+          2236
+        ],
+        "display_size": [
+          1640,
+          2236
+        ],
+        "render_mode": "smooth",
+        "opacity": 1.0,
+        "colormap": "Turbo",
+        "stretch_p0": 8.47,
+        "stretch_p100": 27.75,
+        "legend_label": "Térmica",
+        "legend_unit": "°C"
+      },
+      "analytic_path": "data/drone/J_CONTRERAS_2026_01_21_thermal.tif",
+      "source_fingerprint": {
+        "path": "data/drone/J_CONTRERAS_2026_01_21_thermal.tif",
+        "size": 22989479,
+        "mtime_ns": 1781910996242364600
+      },
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"thermal\", \"mode\": \"thermal_visual_flat\", \"preview_geom_sha\": \"2cdf7eab37f41dee493edf430ba1047b\", \"rgb_preview_mask_revision\": 12, \"thermal_preview_revision\": 5, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     },
     "l_martinez_20260121_ndvi": {
       "source": "drone",
@@ -2346,26 +2365,25 @@
         "path": "drone/rasters/R_PANI_2026_01_21_ndvi.webp",
         "bounds": [
           [
-            -32.74535746634634,
-            -70.60357048978713
+            -32.745325046274836,
+            -70.60354927732278
           ],
           [
-            -32.74317565114185,
-            -70.60068302327078
+            -32.743200974425065,
+            -70.60071309480477
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          15638,
-          13934
+          16656,
+          12474
         ],
         "display_size": [
           4096,
-          3650
+          3068
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/r_pani_20260121_ndvi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/R_PANI_2026_01_21_ndvi.tif",
       "source_fingerprint": {
@@ -2373,7 +2391,7 @@
         "size": 2551308640,
         "mtime_ns": 1777384562645759800
       },
-      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"a643e000c038dfad494e9ddb51f6bc2f\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"12e2ff879e5eecd8e0c6677278487fa0\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "r_pani_20260121_ndwi": {
       "source": "drone",
@@ -2386,26 +2404,25 @@
         "path": "drone/rasters/R_PANI_2026_01_21_ndwi.webp",
         "bounds": [
           [
-            -32.74535746634634,
-            -70.60357048978713
+            -32.745325046274836,
+            -70.60354927732278
           ],
           [
-            -32.74317565114185,
-            -70.60068302327078
+            -32.743200974425065,
+            -70.60071309480477
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          15638,
-          13934
+          16656,
+          12474
         ],
         "display_size": [
           4096,
-          3650
+          3068
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/r_pani_20260121_ndwi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/R_PANI_2026_01_21_ndwi.tif",
       "source_fingerprint": {
@@ -2413,7 +2430,7 @@
         "size": 2510544390,
         "mtime_ns": 1777560009000462600
       },
-      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"a643e000c038dfad494e9ddb51f6bc2f\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"12e2ff879e5eecd8e0c6677278487fa0\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "r_pani_20260121_rgb": {
       "source": "drone",
@@ -2426,26 +2443,25 @@
         "path": "drone/rasters/R_PANI_2026_01_21_rgb.webp",
         "bounds": [
           [
-            -32.74535746634634,
-            -70.60357048978713
+            -32.745325046274836,
+            -70.60354927732278
           ],
           [
-            -32.74317565114185,
-            -70.60068302327078
+            -32.743200974425065,
+            -70.60071309480477
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          15638,
-          13934
+          16656,
+          12474
         ],
         "display_size": [
           4096,
-          3650
+          3068
         ],
         "render_mode": "smooth",
-        "opacity": 1.0,
-        "cuartel_outlines": "drone/outlines/r_pani_20260121_rgb.geojson"
+        "opacity": 1.0
       },
       "analytic_path": "data/drone/R_PANI_2026_01_21_rgb.tif",
       "source_fingerprint": {
@@ -2453,7 +2469,7 @@
         "size": 8929277088,
         "mtime_ns": 1777385726589739100
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"a643e000c038dfad494e9ddb51f6bc2f\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"12e2ff879e5eecd8e0c6677278487fa0\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     },
     "r_pani_20260612_ndvi": {
       "source": "drone",
@@ -2466,26 +2482,25 @@
         "path": "drone/rasters/R_PANI_2026_06_12_ndvi.webp",
         "bounds": [
           [
-            -32.74535746531125,
-            -70.60357054825785
+            -32.74532519639699,
+            -70.60354925085416
           ],
           [
-            -32.74317574545016,
-            -70.60068301028363
+            -32.7432011023558,
+            -70.60071301449534
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          15950,
-          14211
+          17018,
+          12745
         ],
         "display_size": [
           4096,
-          3649
+          3068
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/r_pani_20260612_ndvi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/R_PANI_2026_06_12_ndvi.tif",
       "source_fingerprint": {
@@ -2493,7 +2508,7 @@
         "size": 1518813551,
         "mtime_ns": 1781527372411922100
       },
-      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"a643e000c038dfad494e9ddb51f6bc2f\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"12e2ff879e5eecd8e0c6677278487fa0\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "r_pani_20260612_ndwi": {
       "source": "drone",
@@ -2506,26 +2521,25 @@
         "path": "drone/rasters/R_PANI_2026_06_12_ndwi.webp",
         "bounds": [
           [
-            -32.74535746531125,
-            -70.60357054825785
+            -32.74532519639699,
+            -70.60354925085416
           ],
           [
-            -32.74317574545016,
-            -70.60068301028363
+            -32.7432011023558,
+            -70.60071301449534
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          15950,
-          14211
+          17018,
+          12745
         ],
         "display_size": [
           4096,
-          3649
+          3068
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/r_pani_20260612_ndwi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/R_PANI_2026_06_12_ndwi.tif",
       "source_fingerprint": {
@@ -2533,7 +2547,7 @@
         "size": 1596862154,
         "mtime_ns": 1781527415018913100
       },
-      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"a643e000c038dfad494e9ddb51f6bc2f\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"12e2ff879e5eecd8e0c6677278487fa0\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "r_pani_20260612_rgb": {
       "source": "drone",
@@ -2546,26 +2560,25 @@
         "path": "drone/rasters/R_PANI_2026_06_12_rgb.webp",
         "bounds": [
           [
-            -32.74535746531125,
-            -70.60357054825785
+            -32.74532519639699,
+            -70.60354925085416
           ],
           [
-            -32.74317574545016,
-            -70.60068301028363
+            -32.7432011023558,
+            -70.60071301449534
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          15950,
-          14211
+          17018,
+          12745
         ],
         "display_size": [
           4096,
-          3649
+          3068
         ],
         "render_mode": "smooth",
-        "opacity": 1.0,
-        "cuartel_outlines": "drone/outlines/r_pani_20260612_rgb.geojson"
+        "opacity": 1.0
       },
       "analytic_path": "data/drone/R_PANI_2026_06_12_rgb.tif",
       "source_fingerprint": {
@@ -2573,7 +2586,7 @@
         "size": 4294749533,
         "mtime_ns": 1781486553275319200
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"a643e000c038dfad494e9ddb51f6bc2f\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"12e2ff879e5eecd8e0c6677278487fa0\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     },
     "r_pani_20260612_thermal": {
       "source": "drone",
@@ -2586,31 +2599,30 @@
         "path": "drone/rasters/R_PANI_2026_06_12_thermal.webp",
         "bounds": [
           [
-            -32.7453581288163,
-            -70.60357067532951
+            -32.74532565738708,
+            -70.60354944413318
           ],
           [
-            -32.74317552236024,
-            -70.60068239504605
+            -32.74320102763308,
+            -70.60071249037867
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          3003,
-          2676
+          3218,
+          2410
         ],
         "display_size": [
-          3003,
-          2676
+          3218,
+          2410
         ],
         "render_mode": "smooth",
         "opacity": 1.0,
         "colormap": "Turbo",
-        "stretch_p0": 14.69,
-        "stretch_p100": 24.29,
+        "stretch_p0": 14.75,
+        "stretch_p100": 24.16,
         "legend_label": "Térmica",
-        "legend_unit": "°C",
-        "cuartel_outlines": "drone/outlines/r_pani_20260612_thermal.geojson"
+        "legend_unit": "°C"
       },
       "analytic_path": "data/drone/R_PANI_2026_06_12_thermal.tif",
       "source_fingerprint": {
@@ -2618,7 +2630,7 @@
         "size": 48487436,
         "mtime_ns": 1781414100768359800
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"thermal\", \"mode\": \"thermal_visual_flat\", \"preview_geom_sha\": \"a643e000c038dfad494e9ddb51f6bc2f\", \"rgb_preview_mask_revision\": 12, \"thermal_preview_revision\": 5, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"thermal\", \"mode\": \"thermal_visual_flat\", \"preview_geom_sha\": \"12e2ff879e5eecd8e0c6677278487fa0\", \"rgb_preview_mask_revision\": 12, \"thermal_preview_revision\": 5, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     },
     "r_porfiri_20260612_ndvi": {
       "source": "drone",
@@ -2796,26 +2808,25 @@
         "path": "drone/rasters/V_FERNANDEZ_2026_06_18_ndvi.webp",
         "bounds": [
           [
-            -32.846596619287,
-            -70.67684646324751
+            -32.846483199596115,
+            -70.67683210245013
           ],
           [
-            -32.84383974159463,
-            -70.6704210423715
+            -32.84391591144385,
+            -70.67060440868379
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          25226,
-          12523
+          25512,
+          10517
         ],
         "display_size": [
           4096,
-          2033
+          1689
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/v_fernandez_20260618_ndvi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/V_FERNANDEZ_2026_06_18_ndvi.tif",
       "source_fingerprint": {
@@ -2823,7 +2834,7 @@
         "size": 1485324027,
         "mtime_ns": 1782132001060223900
       },
-      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"54f8247e1c85d73a3ddb6d07b3112184\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"7a58922d23ded6d1164b07ee0489cc61\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "v_fernandez_20260618_ndwi": {
       "source": "drone",
@@ -2836,26 +2847,25 @@
         "path": "drone/rasters/V_FERNANDEZ_2026_06_18_ndwi.webp",
         "bounds": [
           [
-            -32.846596619287,
-            -70.67684646324751
+            -32.846483199596115,
+            -70.67683210245013
           ],
           [
-            -32.84383974159463,
-            -70.6704210423715
+            -32.84391591144385,
+            -70.67060440868379
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          25226,
-          12523
+          25512,
+          10517
         ],
         "display_size": [
           4096,
-          2033
+          1689
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/v_fernandez_20260618_ndwi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/V_FERNANDEZ_2026_06_18_ndwi.tif",
       "source_fingerprint": {
@@ -2863,7 +2873,7 @@
         "size": 1592918907,
         "mtime_ns": 1782132045158824900
       },
-      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"54f8247e1c85d73a3ddb6d07b3112184\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"7a58922d23ded6d1164b07ee0489cc61\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "v_fernandez_20260618_rgb": {
       "source": "drone",
@@ -2876,26 +2886,25 @@
         "path": "drone/rasters/V_FERNANDEZ_2026_06_18_rgb.webp",
         "bounds": [
           [
-            -32.846596619287,
-            -70.67684646324751
+            -32.846483199596115,
+            -70.67683210245013
           ],
           [
-            -32.84383974159463,
-            -70.6704210423715
+            -32.84391591144385,
+            -70.67060440868379
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          25226,
-          12523
+          25512,
+          10517
         ],
         "display_size": [
           4096,
-          2033
+          1689
         ],
         "render_mode": "smooth",
-        "opacity": 1.0,
-        "cuartel_outlines": "drone/outlines/v_fernandez_20260618_rgb.geojson"
+        "opacity": 1.0
       },
       "analytic_path": "data/drone/V_FERNANDEZ_2026_06_18_rgb.tif",
       "source_fingerprint": {
@@ -2903,7 +2912,7 @@
         "size": 4294885538,
         "mtime_ns": 1781909866247964000
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"54f8247e1c85d73a3ddb6d07b3112184\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"7a58922d23ded6d1164b07ee0489cc61\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     },
     "v_fernandez_20260618_thermal": {
       "source": "drone",
@@ -2916,31 +2925,30 @@
         "path": "drone/rasters/V_FERNANDEZ_2026_06_18_thermal.webp",
         "bounds": [
           [
-            -32.84659743776659,
-            -70.67684734360466
+            -32.84648352994238,
+            -70.67683281122135
           ],
           [
-            -32.84383944615835,
-            -70.6704209529343
+            -32.84391518104078,
+            -70.67060369858275
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          5528,
-          2745
+          5571,
+          2297
         ],
         "display_size": [
           4096,
-          2034
+          1689
         ],
         "render_mode": "smooth",
         "opacity": 1.0,
         "colormap": "Turbo",
-        "stretch_p0": 11.7,
-        "stretch_p100": 32.48,
+        "stretch_p0": 11.96,
+        "stretch_p100": 30.32,
         "legend_label": "Térmica",
-        "legend_unit": "°C",
-        "cuartel_outlines": "drone/outlines/v_fernandez_20260618_thermal.geojson"
+        "legend_unit": "°C"
       },
       "analytic_path": "data/drone/V_FERNANDEZ_2026_06_18_thermal.tif",
       "source_fingerprint": {
@@ -2948,7 +2956,7 @@
         "size": 60988246,
         "mtime_ns": 1781910703751221700
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"thermal\", \"mode\": \"thermal_visual_flat\", \"preview_geom_sha\": \"54f8247e1c85d73a3ddb6d07b3112184\", \"rgb_preview_mask_revision\": 12, \"thermal_preview_revision\": 5, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"thermal\", \"mode\": \"thermal_visual_flat\", \"preview_geom_sha\": \"7a58922d23ded6d1164b07ee0489cc61\", \"rgb_preview_mask_revision\": 12, \"thermal_preview_revision\": 5, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     },
     "v_siebenthal2_20260618_ndvi": {
       "source": "drone",
@@ -2961,26 +2969,25 @@
         "path": "drone/rasters/V_SIEBENTHAL2_2026_06_18_ndvi.webp",
         "bounds": [
           [
-            -32.81076477998393,
-            -70.84731658582353
+            -32.810707015398265,
+            -70.84710761937579
           ],
           [
-            -32.80614229085309,
-            -70.8433134803282
+            -32.806190535308374,
+            -70.84347286243225
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          15481,
-          21409
+          16040,
+          19931
         ],
         "display_size": [
-          2962,
+          3296,
           4096
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/v_siebenthal2_20260618_ndvi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/V_SIEBENTHAL2_2026_06_18_ndvi.tif",
       "source_fingerprint": {
@@ -2988,7 +2995,7 @@
         "size": 1287370250,
         "mtime_ns": 1782130739018301500
       },
-      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"7be3e7e468d2037a5d74f4a8226080e1\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"974c1dda5ac5659024835ad5e398eb2b\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "v_siebenthal2_20260618_ndwi": {
       "source": "drone",
@@ -3001,26 +3008,25 @@
         "path": "drone/rasters/V_SIEBENTHAL2_2026_06_18_ndwi.webp",
         "bounds": [
           [
-            -32.81076477998393,
-            -70.84731658582353
+            -32.810707015398265,
+            -70.84710761937579
           ],
           [
-            -32.80614229085309,
-            -70.8433134803282
+            -32.806190535308374,
+            -70.84347286243225
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          15481,
-          21409
+          16040,
+          19931
         ],
         "display_size": [
-          2962,
+          3296,
           4096
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/v_siebenthal2_20260618_ndwi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/V_SIEBENTHAL2_2026_06_18_ndwi.tif",
       "source_fingerprint": {
@@ -3028,7 +3034,7 @@
         "size": 1378457955,
         "mtime_ns": 1782130772985434000
       },
-      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"7be3e7e468d2037a5d74f4a8226080e1\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"974c1dda5ac5659024835ad5e398eb2b\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "v_siebenthal2_20260618_rgb": {
       "source": "drone",
@@ -3041,26 +3047,25 @@
         "path": "drone/rasters/V_SIEBENTHAL2_2026_06_18_rgb.webp",
         "bounds": [
           [
-            -32.81076477998393,
-            -70.84731658582353
+            -32.810707015398265,
+            -70.84710761937579
           ],
           [
-            -32.80614229085309,
-            -70.8433134803282
+            -32.806190535308374,
+            -70.84347286243225
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          15481,
-          21409
+          16040,
+          19931
         ],
         "display_size": [
-          2962,
+          3296,
           4096
         ],
         "render_mode": "smooth",
-        "opacity": 1.0,
-        "cuartel_outlines": "drone/outlines/v_siebenthal2_20260618_rgb.geojson"
+        "opacity": 1.0
       },
       "analytic_path": "data/drone/V_SIEBENTHAL2_2026_06_18_rgb.tif",
       "source_fingerprint": {
@@ -3068,7 +3073,7 @@
         "size": 4294643816,
         "mtime_ns": 1781896206699550000
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"7be3e7e468d2037a5d74f4a8226080e1\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"974c1dda5ac5659024835ad5e398eb2b\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     },
     "v_siebenthal2_20260618_thermal": {
       "source": "drone",
@@ -3081,31 +3086,30 @@
         "path": "drone/rasters/V_SIEBENTHAL2_2026_06_18_thermal.webp",
         "bounds": [
           [
-            -32.8107653398066,
-            -70.84731746485677
+            -32.81070758249122,
+            -70.84710801925515
           ],
           [
-            -32.80614169972459,
-            -70.84331350807165
+            -32.80619011645497,
+            -70.8434722130863
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          3794,
-          5247
+          3930,
+          4883
         ],
         "display_size": [
-          2962,
+          3297,
           4096
         ],
         "render_mode": "smooth",
         "opacity": 1.0,
         "colormap": "Turbo",
-        "stretch_p0": 8.5,
-        "stretch_p100": 27.22,
+        "stretch_p0": 9.81,
+        "stretch_p100": 26.69,
         "legend_label": "Térmica",
-        "legend_unit": "°C",
-        "cuartel_outlines": "drone/outlines/v_siebenthal2_20260618_thermal.geojson"
+        "legend_unit": "°C"
       },
       "analytic_path": "data/drone/V_SIEBENTHAL2_2026_06_18_thermal.tif",
       "source_fingerprint": {
@@ -3113,7 +3117,7 @@
         "size": 66387345,
         "mtime_ns": 1781900929404499600
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"thermal\", \"mode\": \"thermal_visual_flat\", \"preview_geom_sha\": \"7be3e7e468d2037a5d74f4a8226080e1\", \"rgb_preview_mask_revision\": 12, \"thermal_preview_revision\": 5, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"thermal\", \"mode\": \"thermal_visual_flat\", \"preview_geom_sha\": \"974c1dda5ac5659024835ad5e398eb2b\", \"rgb_preview_mask_revision\": 12, \"thermal_preview_revision\": 5, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     },
     "v_siebenthal3_20260618_ndvi": {
       "source": "drone",
@@ -3126,26 +3130,25 @@
         "path": "drone/rasters/V_SIEBENTHAL3_2026_06_18_ndvi.webp",
         "bounds": [
           [
-            -32.810528168986934,
-            -70.84176583639723
+            -32.81041940043108,
+            -70.84150884290398
           ],
           [
-            -32.807227896700034,
-            -70.83910574295416
+            -32.80735723788965,
+            -70.83931618330641
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          10375,
-          15457
+          9744,
+          13608
         ],
         "display_size": [
-          2749,
+          2933,
           4096
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/v_siebenthal3_20260618_ndvi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/V_SIEBENTHAL3_2026_06_18_ndvi.tif",
       "source_fingerprint": {
@@ -3153,7 +3156,7 @@
         "size": 841002193,
         "mtime_ns": 1782131067515271700
       },
-      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"9e7453c7c6dd73876e5fd646c3764639\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"1d145098d1b95859502146560edba282\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "v_siebenthal3_20260618_ndwi": {
       "source": "drone",
@@ -3166,26 +3169,25 @@
         "path": "drone/rasters/V_SIEBENTHAL3_2026_06_18_ndwi.webp",
         "bounds": [
           [
-            -32.810528168986934,
-            -70.84176583639723
+            -32.81041940043108,
+            -70.84150884290398
           ],
           [
-            -32.807227896700034,
-            -70.83910574295416
+            -32.80735723788965,
+            -70.83931618330641
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          10375,
-          15457
+          9744,
+          13608
         ],
         "display_size": [
-          2749,
+          2933,
           4096
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/v_siebenthal3_20260618_ndwi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/V_SIEBENTHAL3_2026_06_18_ndwi.tif",
       "source_fingerprint": {
@@ -3193,7 +3195,7 @@
         "size": 895992916,
         "mtime_ns": 1782131100459403000
       },
-      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"9e7453c7c6dd73876e5fd646c3764639\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"1d145098d1b95859502146560edba282\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "v_siebenthal3_20260618_rgb": {
       "source": "drone",
@@ -3206,26 +3208,25 @@
         "path": "drone/rasters/V_SIEBENTHAL3_2026_06_18_rgb.webp",
         "bounds": [
           [
-            -32.810528168986934,
-            -70.84176583639723
+            -32.81041940043108,
+            -70.84150884290398
           ],
           [
-            -32.807227896700034,
-            -70.83910574295416
+            -32.80735723788965,
+            -70.83931618330641
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          10375,
-          15457
+          9744,
+          13608
         ],
         "display_size": [
-          2749,
+          2933,
           4096
         ],
         "render_mode": "smooth",
-        "opacity": 1.0,
-        "cuartel_outlines": "drone/outlines/v_siebenthal3_20260618_rgb.geojson"
+        "opacity": 1.0
       },
       "analytic_path": "data/drone/V_SIEBENTHAL3_2026_06_18_rgb.tif",
       "source_fingerprint": {
@@ -3233,7 +3234,7 @@
         "size": 4294853126,
         "mtime_ns": 1781900193459318700
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"9e7453c7c6dd73876e5fd646c3764639\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"1d145098d1b95859502146560edba282\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     },
     "v_siebenthal3_20260618_thermal": {
       "source": "drone",
@@ -3246,31 +3247,30 @@
         "path": "drone/rasters/V_SIEBENTHAL3_2026_06_18_thermal.webp",
         "bounds": [
           [
-            -32.81052813868086,
-            -70.84176576386538
+            -32.81042013284065,
+            -70.84150925345159
           ],
           [
-            -32.8072274034718,
-            -70.8391056791644
+            -32.80735726670426,
+            -70.83931570079214
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          2061,
-          3071
+          1948,
+          2720
         ],
         "display_size": [
-          2061,
-          3071
+          1948,
+          2720
         ],
         "render_mode": "smooth",
         "opacity": 1.0,
         "colormap": "Turbo",
-        "stretch_p0": 7.94,
-        "stretch_p100": 18.01,
+        "stretch_p0": 10.61,
+        "stretch_p100": 17.76,
         "legend_label": "Térmica",
-        "legend_unit": "°C",
-        "cuartel_outlines": "drone/outlines/v_siebenthal3_20260618_thermal.geojson"
+        "legend_unit": "°C"
       },
       "analytic_path": "data/drone/V_SIEBENTHAL3_2026_06_18_thermal.tif",
       "source_fingerprint": {
@@ -3278,7 +3278,7 @@
         "size": 28870102,
         "mtime_ns": 1781901359521062300
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"thermal\", \"mode\": \"thermal_visual_flat\", \"preview_geom_sha\": \"9e7453c7c6dd73876e5fd646c3764639\", \"rgb_preview_mask_revision\": 12, \"thermal_preview_revision\": 5, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"thermal\", \"mode\": \"thermal_visual_flat\", \"preview_geom_sha\": \"1d145098d1b95859502146560edba282\", \"rgb_preview_mask_revision\": 12, \"thermal_preview_revision\": 5, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     },
     "v_siebenthal_20260612_ndvi": {
       "source": "drone",
@@ -3291,26 +3291,25 @@
         "path": "drone/rasters/V_SIEBENTHAL_2026_06_12_ndvi.webp",
         "bounds": [
           [
-            -32.80113110387913,
-            -70.8375956273387
+            -32.80108760350052,
+            -70.83754514110169
           ],
           [
-            -32.797855713469765,
-            -70.83324886663937
+            -32.7978874998207,
+            -70.83328760557733
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          22145,
-          19678
+          23578,
+          17722
         ],
         "display_size": [
           4096,
-          3640
+          3079
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/v_siebenthal_20260612_ndvi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/V_SIEBENTHAL_2026_06_12_ndvi.tif",
       "source_fingerprint": {
@@ -3318,7 +3317,7 @@
         "size": 1655648868,
         "mtime_ns": 1781491728334998200
       },
-      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"b43c0cdd96726490249938b46e375039\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlGn\", \"index\": \"ndvi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"798904532fd738a99fff34eb3fad3d05\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "v_siebenthal_20260612_ndwi": {
       "source": "drone",
@@ -3331,26 +3330,25 @@
         "path": "drone/rasters/V_SIEBENTHAL_2026_06_12_ndwi.webp",
         "bounds": [
           [
-            -32.80113110387913,
-            -70.8375956273387
+            -32.80108760350052,
+            -70.83754514110169
           ],
           [
-            -32.797855713469765,
-            -70.83324886663937
+            -32.7978874998207,
+            -70.83328760557733
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          22145,
-          19678
+          23578,
+          17722
         ],
         "display_size": [
           4096,
-          3640
+          3079
         ],
         "render_mode": "smooth",
-        "opacity": 0.9,
-        "cuartel_outlines": "drone/outlines/v_siebenthal_20260612_ndwi.geojson"
+        "opacity": 0.9
       },
       "analytic_path": "data/drone/V_SIEBENTHAL_2026_06_12_ndwi.tif",
       "source_fingerprint": {
@@ -3358,7 +3356,7 @@
         "size": 1779791371,
         "mtime_ns": 1781491787575475700
       },
-      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"b43c0cdd96726490249938b46e375039\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
+      "export_signature": "{\"colormap\": \"RdYlBu\", \"index\": \"ndwi\", \"mode\": \"analytic_preview_flat\", \"preview_geom_sha\": \"798904532fd738a99fff34eb3fad3d05\", \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}, \"vmax\": 1, \"vmin\": -1}"
     },
     "v_siebenthal_20260612_rgb": {
       "source": "drone",
@@ -3371,26 +3369,25 @@
         "path": "drone/rasters/V_SIEBENTHAL_2026_06_12_rgb.webp",
         "bounds": [
           [
-            -32.80113110387913,
-            -70.8375956273387
+            -32.80108760350052,
+            -70.83754514110169
           ],
           [
-            -32.797855713469765,
-            -70.83324886663937
+            -32.7978874998207,
+            -70.83328760557733
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          22145,
-          19678
+          23578,
+          17722
         ],
         "display_size": [
           4096,
-          3640
+          3079
         ],
         "render_mode": "smooth",
-        "opacity": 1.0,
-        "cuartel_outlines": "drone/outlines/v_siebenthal_20260612_rgb.geojson"
+        "opacity": 1.0
       },
       "analytic_path": "data/drone/V_SIEBENTHAL_2026_06_12_rgb.tif",
       "source_fingerprint": {
@@ -3398,7 +3395,7 @@
         "size": 4294554229,
         "mtime_ns": 1781482578518319800
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"b43c0cdd96726490249938b46e375039\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"rgb\", \"mode\": \"rgb_visual_flat\", \"preview_geom_sha\": \"798904532fd738a99fff34eb3fad3d05\", \"rgb_preview_mask_revision\": 12, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     },
     "v_siebenthal_20260612_thermal": {
       "source": "drone",
@@ -3411,31 +3408,30 @@
         "path": "drone/rasters/V_SIEBENTHAL_2026_06_12_thermal.webp",
         "bounds": [
           [
-            -32.80113192960191,
-            -70.83759603976286
+            -32.80108798402799,
+            -70.8375456742888
           ],
           [
-            -32.79785482991827,
-            -70.83324838560848
+            -32.797887437368246,
+            -70.83328683531394
           ]
         ],
         "format": "WEBP",
         "native_size": [
-          3429,
-          3048
+          3650,
+          2743
         ],
         "display_size": [
-          3429,
-          3048
+          3650,
+          2743
         ],
         "render_mode": "smooth",
         "opacity": 1.0,
         "colormap": "Turbo",
-        "stretch_p0": 5.74,
-        "stretch_p100": 25.31,
+        "stretch_p0": 6.3,
+        "stretch_p100": 25.15,
         "legend_label": "Térmica",
-        "legend_unit": "°C",
-        "cuartel_outlines": "drone/outlines/v_siebenthal_20260612_thermal.geojson"
+        "legend_unit": "°C"
       },
       "analytic_path": "data/drone/V_SIEBENTHAL_2026_06_12_thermal.tif",
       "source_fingerprint": {
@@ -3443,52 +3439,7 @@
         "size": 39930655,
         "mtime_ns": 1781432782982382900
       },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"thermal\", \"mode\": \"thermal_visual_flat\", \"preview_geom_sha\": \"b43c0cdd96726490249938b46e375039\", \"rgb_preview_mask_revision\": 12, \"thermal_preview_revision\": 5, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
-    },
-    "j_contreras_20260121_thermal": {
-      "source": "drone",
-      "predio_id": "j_contreras",
-      "index": "thermal",
-      "year": 2026,
-      "season": "21 Jan 2026",
-      "period_key": "20260121",
-      "visual": {
-        "path": "drone/rasters/J_CONTRERAS_2026_01_21_thermal.webp",
-        "bounds": [
-          [
-            -32.749433301087606,
-            -70.61689506769558
-          ],
-          [
-            -32.74693969485335,
-            -70.61506612573486
-          ]
-        ],
-        "format": "WEBP",
-        "native_size": [
-          1640,
-          2236
-        ],
-        "display_size": [
-          1640,
-          2236
-        ],
-        "render_mode": "smooth",
-        "opacity": 1.0,
-        "colormap": "Turbo",
-        "stretch_p0": 8.47,
-        "stretch_p100": 27.75,
-        "legend_label": "Térmica",
-        "legend_unit": "°C",
-        "cuartel_outlines": "drone/outlines/j_contreras_20260121_thermal.geojson"
-      },
-      "analytic_path": "data/drone/J_CONTRERAS_2026_01_21_thermal.tif",
-      "source_fingerprint": {
-        "path": "data/drone/J_CONTRERAS_2026_01_21_thermal.tif",
-        "size": 22989479,
-        "mtime_ns": 1781910996242364600
-      },
-      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"thermal\", \"mode\": \"thermal_visual_flat\", \"preview_geom_sha\": \"2cdf7eab37f41dee493edf430ba1047b\", \"rgb_preview_mask_revision\": 12, \"thermal_preview_revision\": 5, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
+      "export_signature": "{\"buffer_m\": 0.0, \"index\": \"thermal\", \"mode\": \"thermal_visual_flat\", \"preview_geom_sha\": \"798904532fd738a99fff34eb3fad3d05\", \"rgb_preview_mask_revision\": 12, \"thermal_preview_revision\": 5, \"visualization\": {\"clip_aoi_buffer_m\": 0, \"clip_to_aoi\": true, \"index_preview_max_size\": 4096, \"opacity\": 0.9, \"overwrite_preview_file\": true, \"pause_between_drone_tiffs_sec\": 0, \"preserve_pixels\": true, \"preview_format\": \"WEBP\", \"reuse_exported_webp_if_unchanged\": true, \"rgb_border_black_frac_of_max\": 0.02, \"rgb_border_near_gray_mean_min_uint8\": 226, \"rgb_border_near_gray_spread_uint8\": 42, \"rgb_border_white_frac_of_max\": 0.982, \"rgb_context_buffer_m\": 0, \"rgb_hide_white_black_borders\": true, \"rgb_leaflet_opacity\": 1.0, \"rgb_max_size\": 4096, \"rgb_quantize_colors\": 64, \"rgb_stretch_percentiles\": [2, 98], \"rgb_upscale_factor\": 1, \"rgb_use_source_alpha_band\": false, \"rgb_webp_quality\": 78, \"upscale_factor\": 2, \"webp_quality_analytic\": 86}}"
     }
   },
   "periods": [
@@ -3517,8 +3468,8 @@
     "n_predios": 16,
     "n_periods": 5,
     "data_points": 42,
-    "raster_count": 77,
-    "total_area_ha": 89.4,
+    "raster_count": 78,
+    "total_area_ha": 83.9,
     "latest_period": "Vuelo 18 Jun 2026",
     "available_years": [
       2026

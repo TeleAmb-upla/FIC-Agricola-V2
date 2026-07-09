@@ -31,7 +31,7 @@ export_drone_log.txt
 # Datos crudos locales — no publicar (GitHub Pages usa solo data_static/ + HTML)
 data/sentinel2/
 data/drone/
-data/shapefiles/
+data/vectors/
 
 # Copias / auxiliares de CSV
 data/fic_database_fixed.csv

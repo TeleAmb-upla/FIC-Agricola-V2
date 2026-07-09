@@ -16,18 +16,38 @@ fic_agro/
 ├── assets/
 ├── scripts/
 │   ├── static_site/       # export_data_ortho, pipeline_utils → data_static/
-│   ├── data_prep/         # KMZ → shapefile, escaneo de códigos en data/drone
+│   ├── data_prep/         # KMZ → GeoJSON, cuarteles, sync
 │   └── gee/               # export_s2, Drive sync, previews, estadísticas
 ├── data/
-│   ├── shapefiles/
+│   ├── vectors/           # kml/, vuelos/, cuarteles/
 │   ├── sentinel2/
 │   └── drone/
 ├── data_static/
-│   ├── sources_manifest.json
-│   ├── wetlands_aoi.geojson
+│   ├── vectors/cuarteles/ # copia desplegada de cuarteles.geojson
 │   ├── sentinel2/
 │   └── drone/
 └── documentación/
+```
+
+## Carpeta `data/vectors/`
+
+```text
+data/vectors/
+├── kml/              # KMZ/KML originales (polígonos de vuelo DJI)
+├── vuelos/           # vuelos.geojson (compilado desde kml/)
+└── cuarteles/        # cuarteles.geojson (id_cuartel, fuente de verdad)
+```
+
+Fuente de verdad espacial por predio: ``data_static/predios_aoi.geojson``.  
+``sync_predios_master.py`` propaga esas geometrías a ``cuarteles.geojson`` y sincroniza ``superficie`` al CSV.  
+Copia desplegada de cuarteles: ``data_static/vectors/cuarteles/cuarteles.geojson``.
+
+Scripts útiles:
+
+```bash
+python scripts/data_prep/shp_to_cuarteles_geojson.py --sync   # cuarteles.shp → geojson + CSV
+python scripts/data_prep/build_vuelos_geojson.py   # KMZ → data/vectors/vuelos/
+python scripts/data_prep/sync_predios_master.py    # cuarteles → CSV, índice, data_static
 ```
 
 ## Convención de entrada (dron)
@@ -36,7 +56,7 @@ fic_agro/
 - `data/drone/{lote_id}/ndwi/{año}_{estacion}.tif`
 - `data/drone/{lote_id}/rgb/{año}_{estacion}.tif`
 
-El lote de ejemplo en config es `lote_demo`. Sustituye o agrega entradas bajo `wetlands` en `config.yaml` cuando tengas tus polígonos.
+El lote de ejemplo en config es `lote_demo`. Sustituye o agrega entradas bajo `predios` en `config.yaml` cuando tengas tus polígonos.
 
 ## Exportar datos estáticos
 
@@ -72,4 +92,4 @@ Abre `http://localhost:8090/index.html`.
 
 ## Nota sobre `data/`
 
-El `.gitignore` ignora `data/` como en el proyecto de humedales; los GeoTIFF y shapefiles suelen vivir solo en tu máquina.
+El `.gitignore` ignora `data/` como en el proyecto de humedales; los GeoTIFF y vectores locales suelen vivir solo en tu máquina.

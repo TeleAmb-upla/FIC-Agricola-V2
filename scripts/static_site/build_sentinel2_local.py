@@ -111,10 +111,10 @@ OPERATIVE_INDEX_SET: frozenset[str] = frozenset(OPERATIVE_INDEX_BANDS)
 # Si una banda no está acá, se usa DEFAULT_VIZ.
 BAND_VIZ: dict[str, dict] = {
     "NDVI":              {"vmin": -1.0, "vmax": 1.0,   "colormap": "RdYlGn",   "label": "NDVI"},
-    "NDMI":              {"vmin": -1.0, "vmax": 1.0,   "colormap": "RdYlBu_r", "label": "NDMI"},
+    "NDMI":              {"vmin": -1.0, "vmax": 1.0,   "colormap": "RdYlBu",   "label": "NDMI"},
     "MNDWI":             {"vmin": -1.0, "vmax": 1.0,   "colormap": "Blues",    "label": "MNDWI"},
     "REDEDGE_POSITION":  {"vmin": 700.0,"vmax": 750.0, "colormap": "viridis",  "label": "Posición red edge (nm)"},
-    "MCARI":             {"vmin":  0.0, "vmax": 3.0,   "colormap": "YlGn",     "label": "MCARI"},
+    "MCARI":             {"vmin":  0.0, "vmax": 0.1,   "colormap": "YlGn",     "label": "MCARI"},
     "GNDVI":             {"vmin": -1.0, "vmax": 1.0,   "colormap": "YlGn",     "label": "GNDVI"},
     "MSAVI":             {"vmin": -1.0, "vmax": 1.0,   "colormap": "YlGn",     "label": "MSAVI"},
     "EVI":               {"vmin": -1.0, "vmax": 1.0,   "colormap": "YlGn",     "label": "EVI"},
@@ -128,7 +128,7 @@ DEFAULT_CHART_BAND_ORDER = ["NDVI", "NDMI", "MNDWI", "EVI", "MSAVI", "GNDVI", "M
 
 WEBP_QUALITY = 86
 WEBP_METHOD = 4  # PIL WebP: 0=rápido, 6=más compresión. 4 balance velocidad/tamaño.
-WEBP_UPSCALE_MIN_SIDE = 384  # Cada predio es chico (~13x17 px). Subimos hasta lado mín. ≥ N px.
+WEBP_UPSCALE_MIN_SIDE = 512  # Predios pequeños (~15×25 px); suavizar antes de colorear.
 
 # Divisor por banda (los TIF guardan los índices como int16-en-float64 escalados ×1000;
 # ``clear_pixel_count`` es entero crudo).
@@ -137,6 +137,10 @@ DIVISOR_DEFAULT = 1000.0
 BAND_DIVISOR_OVERRIDE: dict[str, float] = {
     "CLEAR_PIXEL_COUNT": 1.0,
     "REDEDGE_POSITION": 10.0,
+}
+# MCARI puede tener píxeles espurios (denominador ~0); fuera de este rango → nodata.
+BAND_PHYSICAL_CLAMP: dict[str, tuple[float, float]] = {
+    "MCARI": (-0.2, 0.5),
 }
 # Bandas auxiliares / legado: no se publican en mapa ni series.
 SKIP_BANDS: set[str] = {"CLEAR_PIXEL_COUNT"}
@@ -327,6 +331,13 @@ def read_stack(predio_records: list[dict]) -> tuple[np.ndarray, list[str], dict]
         if arr.shape[0] != n_bands:
             arr = arr[:n_bands]
         arr = arr / div_per_band[: arr.shape[0]]
+        for bi, band in enumerate(band_names[: arr.shape[0]]):
+            clamp = BAND_PHYSICAL_CLAMP.get(band)
+            if not clamp:
+                continue
+            lo_c, hi_c = clamp
+            slab = arr[bi]
+            arr[bi] = np.where((slab < lo_c) | (slab > hi_c), np.nan, slab)
         stack[i, : arr.shape[0]] = arr
 
     geo = {
@@ -459,6 +470,11 @@ def _accumulate_map_composite_stats(
             slot = band_stats.setdefault(band, {"min": float("inf"), "max": float("-inf")})
             slot["min"] = min(slot["min"], lo)
             slot["max"] = max(slot["max"], hi)
+            if valid.size >= 8:
+                p2 = float(np.nanpercentile(valid, 2))
+                p98 = float(np.nanpercentile(valid, 98))
+                slot["p2_lo"] = min(slot.get("p2_lo", float("inf")), p2)
+                slot["p98_hi"] = max(slot.get("p98_hi", float("-inf")), p98)
 
 
 def _round_viz_limit(value: float) -> float:
@@ -484,6 +500,18 @@ def _resolve_band_viz_ranges(
             out[band] = {"vmin": float(base["vmin"]), "vmax": float(base["vmax"])}
         else:
             lo_adj, hi_adj = float(lo), float(hi)
+            p2_lo = stats.get("p2_lo")
+            p98_hi = stats.get("p98_hi")
+            base_span = float(base["vmax"]) - float(base["vmin"])
+            if (
+                p2_lo is not None
+                and p98_hi is not None
+                and np.isfinite(p2_lo)
+                and np.isfinite(p98_hi)
+                and p98_hi > p2_lo
+                and (hi_adj - lo_adj) > max(base_span * 1.5, 0.5)
+            ):
+                lo_adj, hi_adj = float(p2_lo), float(p98_hi)
             if band == "REDEDGE_POSITION":
                 # Valores físicos ~700–740 nm; ignorar basura de exportaciones antiguas (sentinelas sin filtrar).
                 if lo_adj < 680.0 or hi_adj > 760.0 or lo_adj >= hi_adj:
@@ -513,6 +541,20 @@ def _band_viz_ranges_changed(
         if abs(float(old["vmin"]) - lim["vmin"]) > 1e-6:
             return True
         if abs(float(old["vmax"]) - lim["vmax"]) > 1e-6:
+            return True
+    return False
+
+
+def _band_colormap_config_changed(existing_meta: dict, band_set: set[str] | None = None) -> bool:
+    """True si algún colormap en ``BAND_VIZ`` difiere del ``metadata.json`` previo."""
+    prev = (existing_meta or {}).get("indices") or {}
+    bands = band_set if band_set is not None else set(BAND_VIZ.keys())
+    for band in bands:
+        if not is_published_band(band):
+            continue
+        viz = BAND_VIZ.get(band, DEFAULT_VIZ)
+        old = prev.get(band) or {}
+        if old.get("colormap") != viz.get("colormap"):
             return True
     return False
 
@@ -856,6 +898,28 @@ class ColormapCache:
 CMAP_CACHE = ColormapCache()
 
 
+def _upscale_scalar_grid(
+    values: np.ndarray,
+    mask: np.ndarray,
+    new_w: int,
+    new_h: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Interpola el campo escalar (bilinear) y la máscara (nearest)."""
+    fill = np.where(mask, 0.0, values).astype(np.float32)
+    val_up = np.array(
+        PILImage.fromarray(fill, mode="F").resize((new_w, new_h), PILImage.BILINEAR),
+        dtype=np.float32,
+    )
+    mask_u8 = np.where(mask, 0, 255).astype(np.uint8)
+    mask_up = (
+        np.array(
+            PILImage.fromarray(mask_u8, mode="L").resize((new_w, new_h), PILImage.NEAREST)
+        )
+        < 128
+    )
+    return val_up, mask_up
+
+
 def render_band_to_webp(
     data: np.ndarray,
     out_path: Path,
@@ -876,13 +940,8 @@ def render_band_to_webp(
     span = max(float(vmax) - float(vmin), 1e-9)
     norm = np.clip((arr - vmin) / span, 0.0, 1.0)
     norm = np.where(mask, 0.0, norm)
-    idx = (norm * 255.0).astype(np.uint8)
 
-    lut = CMAP_CACHE.get(colormap)
-    rgba = lut[idx].copy()  # (H, W, 4)
-    rgba[mask, 3] = 0
-
-    h, w = rgba.shape[:2]
+    h, w = norm.shape
     if min(h, w) < upscale_min_side:
         scale = upscale_min_side / max(1, min(h, w))
         new_w = max(1, int(round(w * scale)))
@@ -890,9 +949,15 @@ def render_band_to_webp(
     else:
         new_w, new_h = w, h
 
-    img = PILImage.fromarray(rgba, mode="RGBA")
     if (new_w, new_h) != (w, h):
-        img = img.resize((new_w, new_h), PILImage.NEAREST)
+        norm, mask = _upscale_scalar_grid(norm, mask, new_w, new_h)
+
+    idx = (norm * 255.0).astype(np.uint8)
+    lut = CMAP_CACHE.get(colormap)
+    rgba = lut[idx].copy()  # (H, W, 4)
+    rgba[mask, 3] = 0
+
+    img = PILImage.fromarray(rgba, mode="RGBA")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     img.save(out_path, format="WEBP", quality=quality, method=method)
     return new_w, new_h
@@ -1186,6 +1251,7 @@ def build(
     existing_ts_doc: dict | None = _load_json(static_dir / "timeseries.json") if incremental else None
     existing_wetlands: dict = (existing_ts_doc or {}).get("wetlands") or {}
     existing_meta: dict = _load_json(static_dir / "metadata.json") or {} if incremental else {}
+    cmap_config_changed = _band_colormap_config_changed(existing_meta)
 
     band_stats: dict[str, dict[str, float]] = {}
     predio_render_jobs: list[dict] = []
@@ -1256,7 +1322,7 @@ def build(
                 for b in timeseries_all[pl]:
                     band_set.add(b)
 
-            if fp_ok and ts_existing and wcsv.is_file() and has_monthly and mcsv.is_file() and wl_meta:
+            if fp_ok and ts_existing and wcsv.is_file() and has_monthly and mcsv.is_file() and wl_meta and not cmap_config_changed:
                 _merge_skipped_predio()
                 skip_render = True
                 print(
@@ -1264,7 +1330,7 @@ def build(
                     f"({wcsv.name}, {mcsv.name})."
                 )
 
-            elif fp_ok and ts_existing and wcsv.is_file() and has_monthly and not mcsv.is_file() and wl_meta:
+            elif fp_ok and ts_existing and wcsv.is_file() and has_monthly and not mcsv.is_file() and wl_meta and not cmap_config_changed:
                 _merge_skipped_predio()
                 write_predio_monthly_csv(csv_dir, predio, timeseries_all[pl], current_year=current_year)
                 skip_render = True
@@ -1310,10 +1376,16 @@ def build(
 
     band_viz_ranges = _resolve_band_viz_ranges(band_stats)
     ranges_changed = _band_viz_ranges_changed(band_viz_ranges, existing_meta)
+    cmap_changed = cmap_config_changed or _band_colormap_config_changed(existing_meta, band_set)
     if ranges_changed and incremental and not force:
         print(
             "\n[aviso] Rangos de leyenda (vmin/vmax) actualizados; "
             "se regeneran WebPs con escala conjunta semanal/mensual."
+        )
+    if cmap_changed and incremental and not force:
+        print(
+            "\n[aviso] Colormap(s) de índice actualizados en BAND_VIZ; "
+            "se regeneran WebPs afectados."
         )
     if band_viz_ranges:
         sample = ", ".join(
@@ -1323,7 +1395,7 @@ def build(
         print(f"\nEscala conjunta mapa (muestra): {sample}{'…' if len(band_viz_ranges) > 6 else ''}")
 
     for job in predio_render_jobs:
-        if job["skip_render"] and not force and not ranges_changed:
+        if job["skip_render"] and not force and not ranges_changed and not cmap_changed:
             continue
         predio = job["predio"]
         aggregates = job["aggregates"]
@@ -1346,7 +1418,16 @@ def build(
                 stem = f"S2_{predio.upper()}_{comp_key}_{band}"
                 webp_path = rasters_dir / f"{stem}.webp"
 
-                if not (webp_path.exists() and not force and not ranges_changed):
+                band_cmap_changed = (
+                    ((existing_meta.get("indices") or {}).get(band) or {}).get("colormap")
+                    != base_viz.get("colormap")
+                )
+                if not (
+                    webp_path.exists()
+                    and not force
+                    and not ranges_changed
+                    and not band_cmap_changed
+                ):
                     try:
                         render_band_to_webp(
                             raster_3d[b_idx],
@@ -1376,11 +1457,16 @@ def build(
 
     # Indices catalog para el frontend (misma escala que los WebPs del mapa).
     indices_out: dict[str, dict] = {}
+    allowed_filter_upper = (
+        {b.strip().upper() for b in bands_filter} if bands_filter else None
+    )
     band_order = [b for b in DEFAULT_CHART_BAND_ORDER if b in band_set and is_published_band(b)]
     band_order.extend(
         sorted(b for b in band_set if b not in band_order and is_published_band(b))
     )
     for band in band_order:
+        if allowed_filter_upper and band not in allowed_filter_upper:
+            continue
         viz = BAND_VIZ.get(band, DEFAULT_VIZ)
         lim = band_viz_ranges.get(
             band,
@@ -1394,6 +1480,22 @@ def build(
             "visual_only": False,
             "scale": float(BAND_DIVISOR_OVERRIDE.get(band, DIVISOR_DEFAULT)),
         }
+    if allowed_filter_upper and existing_meta:
+        for band, prev in (existing_meta.get("indices") or {}).items():
+            if not is_published_band(band) or band in indices_out:
+                continue
+            if band in allowed_filter_upper:
+                continue
+            indices_out[band] = copy.deepcopy(prev)
+
+    if allowed_filter_upper and existing_meta:
+        for rk, rv in (existing_meta.get("rasters") or {}).items():
+            if rk in rasters_meta:
+                continue
+            if _raster_ref_band(rk) in allowed_filter_upper:
+                continue
+            if is_published_band(_raster_ref_band(rk)):
+                rasters_meta[rk] = copy.deepcopy(rv)
 
     # Último completo (a partir de records globales).
     metadata = {

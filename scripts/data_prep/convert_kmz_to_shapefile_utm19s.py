@@ -7,7 +7,7 @@ se usa ``OGR_GEOMETRY_ACCEPT_UNCLOSED_RING=YES`` para que GDAL las cierre al imp
 
 Requiere GDAL en PATH (ogr2ogr). Ejemplo::
 
-    python scripts/data_prep/convert_kmz_to_shapefile_utm19s.py --input-dir data/shapefiles
+    python scripts/data_prep/convert_kmz_to_shapefile_utm19s.py --input-dir data/vectors/kml
 """
 
 from __future__ import annotations
@@ -90,8 +90,8 @@ def main() -> None:
     parser.add_argument(
         "--input-dir",
         type=Path,
-        default=Path("data/shapefiles"),
-        help="Carpeta que contiene los *.kmz (por defecto: data/shapefiles)",
+        default=Path("data/vectors/kml"),
+        help="Carpeta con *.kmz (por defecto: data/vectors/kml)",
     )
     parser.add_argument(
         "--glob",

@@ -1,1 +1,1 @@
-"""Utilidades de preparación de datos (shapefiles, inspección de carpetas de dron)."""
+"""Utilidades de preparación de datos (vectores, inspección de carpetas de dron)."""

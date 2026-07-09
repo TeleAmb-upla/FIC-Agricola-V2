@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Genera ``data_static/shapefiles/cuarteles_display.geojson``: contornos de cuarteles
+Genera ``data_static/vectors/cuarteles/cuarteles_display.geojson``: contornos de cuarteles
 alineados al píxel visible del WebP dron (intersección geometría maestra × alpha).
 
 Solo para **visualización** en el mapa; el clip de exportación sigue siendo el AOI del predio.
@@ -36,7 +36,9 @@ from pipeline_utils import (  # noqa: E402
 
 bootstrap_proj_environment()
 
-OUTPUT = REPO_ROOT / "data_static" / "shapefiles" / "cuarteles_display.geojson"
+from scripts.data_prep.vectors_paths import STATIC_CUARTELES_DISPLAY, STATIC_CUARTELES_GEOJSON  # noqa: E402
+
+OUTPUT = STATIC_CUARTELES_DISPLAY
 STATIC_DRONE = REPO_ROOT / "data_static" / "drone"
 
 
@@ -45,7 +47,7 @@ def _latest_ndvi_raster(rasters: dict, wetland_id: str) -> dict | None:
     best = None
     best_key = ""
     for rk, meta in rasters.items():
-        if str(meta.get("wetland_id") or "").lower() != want:
+        if str(meta.get("predio_id") or meta.get("wetland_id") or "").lower() != want:
             continue
         if str(meta.get("index") or "").lower() != "ndvi":
             continue
@@ -104,7 +106,7 @@ def _alpha_footprint_geom(alpha: np.ndarray, transform) -> dict | None:
     return mapping(merged)
 
 
-def _feature_props(cu: dict, wetland_id: str) -> dict:
+def _feature_props(cu: dict, predio_id: str) -> dict:
     return {
         "id_cuartel": cu["id_cuartel"],
         "nom_cuartel": cu.get("nom_cuartel"),
@@ -112,18 +114,18 @@ def _feature_props(cu: dict, wetland_id: str) -> dict:
         "nom_predio": cu.get("nom_predio"),
         "propietario": cu.get("propietario"),
         "superficie": cu.get("superficie"),
-        "wetland_id": wetland_id,
+        "predio_id": predio_id,
         "fuente": "cuarteles_display",
     }
 
 
-def sync_predios_geojson(config: dict) -> Path | None:
-    src = Path(config.get("shapefile_path") or "data/shapefiles/predios.geojson")
+def sync_cuarteles_geojson(config: dict) -> Path | None:
+    src = Path(config.get("cuarteles_path") or config.get("shapefile_path") or "data/vectors/cuarteles/cuarteles.geojson")
     if not src.is_file():
         src = REPO_ROOT / src
     if not src.is_file():
         return None
-    dst = REPO_ROOT / "data_static" / "shapefiles" / "predios.geojson"
+    dst = STATIC_CUARTELES_GEOJSON
     dst.parent.mkdir(parents=True, exist_ok=True)
     fc = json.loads(src.read_text(encoding="utf-8"))
     try:
@@ -138,11 +140,16 @@ def sync_predios_geojson(config: dict) -> Path | None:
             props = feat.setdefault("properties", {})
             cid = str(props.get("id_cuartel") or "").strip()
             if cid and cid in cid_to_wid:
-                props["wetland_id"] = cid_to_wid[cid]
+                props["predio_id"] = cid_to_wid[cid]
     except Exception as exc:
-        print(f"  [warn] wetland_id en predios.geojson: {exc}")
+        print(f"  [warn] wetland_id en cuarteles.geojson: {exc}")
     dst.write_text(json.dumps(fc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return dst
+
+
+def sync_predios_geojson(config: dict) -> Path | None:
+    """Alias legacy."""
+    return sync_cuarteles_geojson(config)
 
 
 def sync_fic_database_csv() -> Path | None:
@@ -222,9 +229,9 @@ def build_features(config: dict) -> list[dict]:
 
 def main() -> None:
     config = load_config()
-    predios_dst = sync_predios_geojson(config)
-    if predios_dst:
-        print(f"predios.geojson -> {predios_dst.relative_to(REPO_ROOT)}")
+    cuarteles_dst = sync_cuarteles_geojson(config)
+    if cuarteles_dst:
+        print(f"cuarteles.geojson -> {cuarteles_dst.relative_to(REPO_ROOT)}")
     db_dst = sync_fic_database_csv()
     if db_dst:
         print(f"fic_database.csv -> {db_dst.relative_to(REPO_ROOT)}")

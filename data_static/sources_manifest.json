@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-07-07T15:10:39.031096+00:00",
-  "aoi_path": "wetlands_aoi.geojson",
+  "generated_at": "2026-07-09T17:03:19.129951+00:00",
+  "aoi_path": "predios_aoi.geojson",
   "year_range": {
     "start": 2017,
     "end": 2026
@@ -20,8 +20,8 @@
         "n_predios": 16,
         "n_periods": 5,
         "data_points": 42,
-        "raster_count": 77,
-        "total_area_ha": 89.4,
+        "raster_count": 78,
+        "total_area_ha": 83.9,
         "latest_period": "Vuelo 18 Jun 2026",
         "available_years": [
           2026
