@@ -1,7 +1,7 @@
 # Rellena GeoTIFF semanales S2 faltantes por predio y reconstruye data_static/sentinel2.
 # Requisito: earthengine authenticate (una vez por maquina).
 #
-# Re-exportacion completa (vaciar la coleccion y re-generar desde 2017): ver scripts/gee/README.md.
+# Re-exportacion completa (vaciar la coleccion y re-generar desde 2018): ver scripts/gee/README.md.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $Repo = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent

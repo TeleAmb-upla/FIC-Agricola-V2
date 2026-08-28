@@ -10,7 +10,7 @@
         "cultivo": "Palto",
         "nom_predio": "El resguardo",
         "propietario": "Alejandra Brito",
-        "superficie": "1.40778",
+        "superficie": "1.40815",
         "predio_id": "a_brito_rpa",
         "raster_key": "a_brito_rpa_20260528_ndvi",
         "fuente": "drone_webp_alpha"
@@ -25077,7 +25077,7 @@
         "cultivo": "Palto",
         "nom_predio": "El resguardo",
         "propietario": "Alejandra Brito",
-        "superficie": "0.77359",
+        "superficie": "0.77379",
         "predio_id": "a_brito_rpa",
         "raster_key": "a_brito_rpa_20260528_ndvi",
         "fuente": "drone_webp_alpha"

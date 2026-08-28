@@ -10,7 +10,7 @@
         "cultivo": "Durazno conservero",
         "nom_predio": "Parcela 24",
         "propietario": "Emilio Sazo",
-        "superficie": "1.52263",
+        "superficie": "1.52224",
         "predio_id": "e_sazo",
         "raster_key": "e_sazo_20260121_ndwi",
         "fuente": "drone_webp_alpha"
@@ -20277,7 +20277,7 @@
         "cultivo": "Uva Red Globe",
         "nom_predio": "Parcela 24",
         "propietario": "Emilio Sazo",
-        "superficie": "1.13928",
+        "superficie": "1.139",
         "predio_id": "e_sazo",
         "raster_key": "e_sazo_20260121_ndwi",
         "fuente": "drone_webp_alpha"
@@ -34502,7 +34502,7 @@
         "cultivo": "Uva Red Globe",
         "nom_predio": "Parcela 24",
         "propietario": "Emilio Sazo",
-        "superficie": "0.78926",
+        "superficie": "0.78906",
         "predio_id": "e_sazo",
         "raster_key": "e_sazo_20260121_ndwi",
         "fuente": "drone_webp_alpha"

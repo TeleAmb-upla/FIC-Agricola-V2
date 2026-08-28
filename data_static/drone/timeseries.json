@@ -1711,6 +1711,125 @@
           }
         }
       }
+    },
+    "r_salazar": {
+      "name": "Palto — Rodrigo Salazar",
+      "indices": {
+        "ndvi": {
+          "points": [
+            {
+              "date": "2026-06-26",
+              "label": "26 Jun 2026",
+              "year": 2026,
+              "season_key": "vuelo",
+              "season_label": "26 Jun 2026",
+              "period_key": "20260626",
+              "value": 0.4709
+            }
+          ],
+          "metrics": {
+            "latest": {
+              "date": "2026-06-26",
+              "label": "26 Jun 2026",
+              "year": 2026,
+              "season_key": "vuelo",
+              "season_label": "26 Jun 2026",
+              "value": 0.4709,
+              "historical_mean": 0.4709,
+              "historical_anomaly_abs": 0.0,
+              "historical_anomaly_pct": 0.0,
+              "seasonal_mean": 0.4709,
+              "seasonal_anomaly_abs": 0.0,
+              "seasonal_anomaly_pct": 0.0
+            },
+            "historical_mean": 0.4709,
+            "seasonal_means": {
+              "vuelo": {
+                "label": "26 Jun 2026",
+                "mean": 0.4709
+              }
+            },
+            "annual_summary": [],
+            "trend": null
+          }
+        },
+        "ndwi": {
+          "points": [
+            {
+              "date": "2026-06-26",
+              "label": "26 Jun 2026",
+              "year": 2026,
+              "season_key": "vuelo",
+              "season_label": "26 Jun 2026",
+              "period_key": "20260626",
+              "value": -0.2184
+            }
+          ],
+          "metrics": {
+            "latest": {
+              "date": "2026-06-26",
+              "label": "26 Jun 2026",
+              "year": 2026,
+              "season_key": "vuelo",
+              "season_label": "26 Jun 2026",
+              "value": -0.2184,
+              "historical_mean": -0.2184,
+              "historical_anomaly_abs": 0.0,
+              "historical_anomaly_pct": 0.0,
+              "seasonal_mean": -0.2184,
+              "seasonal_anomaly_abs": 0.0,
+              "seasonal_anomaly_pct": 0.0
+            },
+            "historical_mean": -0.2184,
+            "seasonal_means": {
+              "vuelo": {
+                "label": "26 Jun 2026",
+                "mean": -0.2184
+              }
+            },
+            "annual_summary": [],
+            "trend": null
+          }
+        },
+        "ndci": {
+          "points": [
+            {
+              "date": "2026-06-26",
+              "label": "26 Jun 2026",
+              "year": 2026,
+              "season_key": "vuelo",
+              "season_label": "26 Jun 2026",
+              "period_key": "20260626",
+              "value": 0.4734
+            }
+          ],
+          "metrics": {
+            "latest": {
+              "date": "2026-06-26",
+              "label": "26 Jun 2026",
+              "year": 2026,
+              "season_key": "vuelo",
+              "season_label": "26 Jun 2026",
+              "value": 0.4734,
+              "historical_mean": 0.4734,
+              "historical_anomaly_abs": 0.0,
+              "historical_anomaly_pct": 0.0,
+              "seasonal_mean": 0.4734,
+              "seasonal_anomaly_abs": 0.0,
+              "seasonal_anomaly_pct": 0.0
+            },
+            "historical_mean": 0.4734,
+            "seasonal_means": {
+              "vuelo": {
+                "label": "26 Jun 2026",
+                "mean": 0.4734
+              }
+            },
+            "annual_summary": [],
+            "trend": null
+          }
+        }
+      }
     }
   }
 }

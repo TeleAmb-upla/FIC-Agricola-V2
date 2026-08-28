@@ -7,10 +7,10 @@
       "properties": {
         "id_cuartel": "c00011",
         "nom_cuartel": "1",
-        "cultivo": "Nectarin",
+        "cultivo": "Durazno Nectarin",
         "nom_predio": "NN",
         "propietario": "Oscar Herrera",
-        "superficie": "4.31247",
+        "superficie": "4.33348",
         "predio_id": "o_herrera",
         "raster_key": "o_herrera_20260121_ndvi",
         "fuente": "drone_webp_alpha"

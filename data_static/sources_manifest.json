@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-09T17:03:19.129951+00:00",
+  "generated_at": "2026-08-27T20:54:07.648927+00:00",
   "aoi_path": "predios_aoi.geojson",
   "year_range": {
     "start": 2017,
@@ -39,8 +39,8 @@
       "csv_dir": "sentinel2/csv",
       "status": "ready",
       "summary": {
-        "n_wetlands": 16,
-        "raster_count": 13536,
+        "n_wetlands": 17,
+        "raster_count": 16218,
         "available_years": [
           2024,
           2025,

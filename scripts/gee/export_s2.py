@@ -87,7 +87,7 @@ DEFAULT_EXPORT_PREFIX = "projects/teleambagr/assets/S2_weekly_valpo"
 # Proyecto Google Cloud para ``ee.Initialize(project=...)`` (API / facturación EE).
 DEFAULT_CLOUD_PROJECT = "teleambagr"
 
-DEFAULT_START_YEAR = 2017
+DEFAULT_START_YEAR = 2018
 DEFAULT_END_YEAR = None  # None ⇒ año civil actual (ver resolve_year_range)
 
 # Raíz del repositorio (…/fic_agro): scripts/gee/export_s2.py → parents[2]
@@ -210,7 +210,7 @@ def processed_scene_date_bounds_from_week_specs(
     ventanas [lunes, lunes+7d) de ``specs``. Sin acotar así, el grafo supera con facilidad
     el límite de memoria de usuario de Earth Engine.
     """
-    floor_ms = int(datetime(2017, 1, 1, tzinfo=timezone.utc).timestamp() * 1000)
+    floor_ms = int(datetime(DEFAULT_START_YEAR, 1, 1, tzinfo=timezone.utc).timestamp() * 1000)
     ms_week = 7 * 24 * 60 * 60 * 1000
     if not specs:
         return floor_ms, end_exclusive_ms
@@ -314,6 +314,64 @@ def empty_collection(export_prefix: str, *, dry_run: bool = False) -> int:
     return deleted
 
 
+def delete_year_from_collection(
+    export_prefix: str,
+    calendar_year: int,
+    *,
+    dry_run: bool = False,
+) -> int:
+    """
+    Borra imágenes de la IC cuyo asset coincide con las semanas ISO del año civil
+    ``calendar_year`` (mismo criterio de nombres ``Y{iso}_W{ww}`` que ``export_year``).
+    """
+    export_prefix = export_prefix.strip().rstrip("/")
+    end_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    # Año pasado completo: incluir todas las semanas del año civil.
+    year_end_ms = int(
+        datetime(calendar_year + 1, 1, 7, tzinfo=timezone.utc).timestamp() * 1000
+    )
+    specs = iso_week_specs_thursday_in_calendar_year(
+        calendar_year, max(end_ms, year_end_ms)
+    )
+    targets: list[str] = []
+    for spec in specs:
+        base = export_asset_basename(int(spec["iso_year"]), int(spec["iso_week"]))
+        aid = f"{export_prefix}/{base}"
+        if _asset_exists(aid):
+            targets.append(aid)
+    # También limpia huérfanos con basename Y{calendar_year}_* (por si el año ISO = civil).
+    for aid in sorted(list_child_asset_ids(export_prefix)):
+        base = aid.rstrip("/").split("/")[-1]
+        if base.startswith(f"Y{calendar_year}_W") and aid not in targets:
+            if _asset_exists(aid) and str(
+                ee.data.getAsset(aid).get("type", "")
+            ).upper() == "IMAGE":
+                targets.append(aid)
+    targets = sorted(set(targets))
+    print(
+        f"Colección {export_prefix}: {len(targets)} imagen(es) del año civil "
+        f"{calendar_year} a eliminar."
+    )
+    if dry_run:
+        for aid in targets:
+            print(f"  [dry-run] deleteAsset {aid}")
+        return 0
+    deleted = 0
+    for aid in targets:
+        try:
+            ee.data.deleteAsset(aid)
+            deleted += 1
+            if deleted % 25 == 0:
+                print(f"  ...{deleted}/{len(targets)} eliminadas")
+        except ee.EEException as exc:
+            print(f"  [WARN] no se pudo eliminar {aid}: {exc}")
+    print(
+        f"Eliminadas {deleted}/{len(targets)} imágenes del año {calendar_year} "
+        f"en {export_prefix}."
+    )
+    return deleted
+
+
 def ensure_export_destination(export_prefix: str, *, dry_run: bool) -> None:
     """
     Crea bajo ``projects/<cloud>/assets/`` las carpetas (FOLDER) que falten y, al final del
@@ -389,17 +447,14 @@ def mask_and_scale(image: ee.Image) -> ee.Image:
 
 def reduce_radiometric_resolution(img: ee.Image) -> ee.Image:
     """
-    Cuantiza cada índice a Int16 con su escala (``index_int16_scale``) para reducir tamaño.
+    Cuantiza cada índice a Int8/Int16 según ``BAND_STORAGE_DTYPE`` y ``index_scale``.
 
     Se aplica **solo al mosaico semanal** listo para exportar (índices ya en reflectancia
     0–1 o rango físico del índice), no por escena: así ``median()`` y el clip no
-    reintroducen float sobre enteros ya cuantizados. ``clear_pixel_count`` no se altera.
+    reintroducen float sobre enteros ya cuantizados.
     """
-    clear = img.select("clear_pixel_count")
-    scaled = [
-        img.select(band).multiply(index_int16_scale(band)).round().toInt16()
-        for band in COMPOSED_INDEX_BANDS
-    ]
+    clear = quantize_clear_pixel_count(img)
+    scaled = [quantize_index_band(img, band) for band in COMPOSED_INDEX_BANDS]
     idx = ee.Image.cat(scaled)
     return idx.addBands(clear).copyProperties(img, ["system:time_start", "system:index"])
 
@@ -464,16 +519,53 @@ COMPOSED_INDEX_BANDS = [
     "PSRI",
 ]
 
-# Escala entera al exportar índices (Int16): valor_físico ≈ pixel / escala.
-# La mayoría usa ×1000; REDEDGE_POSITION (~700–740 nm) usa ×10 para no desbordar Int16.
+# Cuantización al exportar mosaicos semanales: valor_físico ≈ pixel_dn / escala.
+# Int8 (×100): resolución 0.01 en índices normalizados [-1, 1].
+# PSRI usa ×10 (rango físico más amplio, ~±11).
+# REDEDGE_POSITION (~700–750 nm) permanece Int16 ×10 (única banda que no cabe en Int8).
+# clear_pixel_count: Int8 (conteo semanal de escenas válidas; típicamente < 30).
+INDEX_SCALE_DEFAULT = 100
+INDEX_SCALE_BY_BAND: dict[str, int] = {
+    "REDEDGE_POSITION": 10,
+    "PSRI": 10,
+}
+BAND_STORAGE_DTYPE: dict[str, str] = {
+    "REDEDGE_POSITION": "int16",
+}
+CLEAR_PIXEL_COUNT_DTYPE = "int8"
+
+# Compatibilidad con scripts que aún importan el nombre antiguo (stats, Drive legacy).
 INDEX_INT16_SCALE = 1000
 INDEX_INT16_SCALE_BY_BAND = {
     "REDEDGE_POSITION": 10,
 }
 
 
+def index_scale(band: str) -> int:
+    """Factor de escala entera: valor_físico ≈ pixel_dn / escala."""
+    return int(INDEX_SCALE_BY_BAND.get(band, INDEX_SCALE_DEFAULT))
+
+
+def band_storage_dtype(band: str) -> str:
+    """``int8`` o ``int16`` para una banda de índice compuesto."""
+    return BAND_STORAGE_DTYPE.get(band, "int8")
+
+
+def quantize_index_band(img: ee.Image, band: str) -> ee.Image:
+    """Cuantiza un índice a Int8 o Int16 según ``band_storage_dtype``."""
+    scaled = img.select(band).multiply(index_scale(band)).round()
+    if band_storage_dtype(band) == "int16":
+        return scaled.toInt16().rename(band)
+    return scaled.toInt8().rename(band)
+
+
+def quantize_clear_pixel_count(img: ee.Image) -> ee.Image:
+    """Cuenta de escenas despejadas por píxel (Int8; antes Int64 en assets antiguos)."""
+    return img.select("clear_pixel_count").round().toInt8().rename("clear_pixel_count")
+
+
 def index_int16_scale(band: str) -> int:
-    """Factor de escala Int16 para una banda de índice (default ``INDEX_INT16_SCALE``)."""
+    """Legacy: escala Int16 antigua (×1000). Preferir ``index_scale``."""
     return int(INDEX_INT16_SCALE_BY_BAND.get(band, INDEX_INT16_SCALE))
 
 
@@ -1599,12 +1691,12 @@ def run_image_collection_exports(
     print(f"Omitir dup.   : {'sí' if skip_existing else 'no ( --force )'}")
     if build_years:
         print(
-            f"Rango solicitado: {start_y} → {end_y} ({n_years_requested} año(s)); "
-            f"exportación con grafo por año civil ({build_start} → {build_end}, {n_years_build} año(s))."
+            f"Rango solicitado: {start_y} -> {end_y} ({n_years_requested} año(s)); "
+            f"exportación con grafo por año civil ({build_start} -> {build_end}, {n_years_build} año(s))."
         )
     else:
         print(
-            f"Rango solicitado: {start_y} → {end_y} ({n_years_requested} año(s)); "
+            f"Rango solicitado: {start_y} -> {end_y} ({n_years_requested} año(s)); "
             "sin años con grafo de assets en esta corrida."
         )
     if n_years_requested > 1 and build_years and n_years_build < n_years_requested:
@@ -1741,6 +1833,16 @@ def main() -> None:
         help=(
             "DESTRUCTIVO: elimina todas las imágenes de la ImageCollection destino antes de "
             "exportar (la colección se conserva). Combinar con --start-year para re-exportar."
+        ),
+    )
+    parser.add_argument(
+        "--delete-year",
+        type=int,
+        default=None,
+        metavar="AAAA",
+        help=(
+            "DESTRUCTIVO: elimina solo las imágenes semanales del año civil indicado "
+            "(p. ej. 2017) de la ImageCollection destino. No vacía el resto de años."
         ),
     )
     parser.add_argument(
@@ -2040,11 +2142,42 @@ def main() -> None:
     weekly_enqueued_stems: set[str] = set()
     composite_enqueued_stems: set[str] = set()
 
+    if args.empty_collection and args.delete_year is not None:
+        print(
+            "Error: usa --empty-collection o --delete-year, no ambos.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     if args.empty_collection:
         print(f"== Vaciando ImageCollection destino: {export_prefix} ==")
         empty_collection(export_prefix, dry_run=args.dry_run)
+    elif args.delete_year is not None:
+        print(
+            f"== Eliminando año civil {args.delete_year} de {export_prefix} =="
+        )
+        delete_year_from_collection(
+            export_prefix, int(args.delete_year), dry_run=args.dry_run
+        )
 
     ran_assets = not args.predios_drive_only and not args.no_export_assets
+    # Si el usuario solo pasó --delete-year, no encolar assets ni Drive.
+    delete_only = (
+        args.delete_year is not None
+        and args.year is None
+        and args.start_year is None
+        and not args.force
+        and not args.export_predios_composites
+        and not args.predios_drive_only
+    )
+    if delete_only:
+        args.no_export_assets = True
+        args.no_drive_weekly_ic = True
+        ran_assets = False
+        print("(Solo eliminación de año: no se encolan mosaicos ni Drive en esta corrida.)")
+        print("Listo.")
+        return
+
     if ran_assets:
         run_image_collection_exports(args, init_project, export_prefix, aoi_asset)
     elif not args.predios_drive_only:

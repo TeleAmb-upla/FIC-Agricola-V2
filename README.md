@@ -3,7 +3,10 @@
 Proyecto con convención similar a `wetland_ortho_monitoring`: `config.yaml`, utilidades en `scripts/`, exportación a `data_static/` y frontend (`index.html` + `explorador.html`).
 
 - **Dron multiespectral**: fuente principal (`data/drone/...`).
-- **Sentinel-2**: desactivada por defecto (`enabled: false` en `config.yaml`); activa la fuente cuando quieras series de referencia.
+- **Sentinel-2**: series semanales de referencia desde Earth Engine (`enabled: true` en `config.yaml`).
+
+> **Documentación completa de arquitectura:** [`documentación/ARQUITECTURA.md`](documentación/ARQUITECTURA.md)
+> explica qué hace cada script, cómo se conectan y los flujos de actualización.
 
 ## Estructura
 
@@ -56,7 +59,9 @@ python scripts/data_prep/sync_predios_master.py    # cuarteles → CSV, índice,
 - `data/drone/{lote_id}/ndwi/{año}_{estacion}.tif`
 - `data/drone/{lote_id}/rgb/{año}_{estacion}.tif`
 
-El lote de ejemplo en config es `lote_demo`. Sustituye o agrega entradas bajo `predios` en `config.yaml` cuando tengas tus polígonos.
+Cada predio se declara bajo `predios:` en `config.yaml` con su `drone_code` y
+`s2_code`. Para añadir uno nuevo, sigue el checklist de la sección 9 de
+[`documentación/ARQUITECTURA.md`](documentación/ARQUITECTURA.md).
 
 ## Exportar datos estáticos
 

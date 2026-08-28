@@ -1,5 +1,5 @@
 """
-Rutas del proyecto y carpeta única en Google Drive para exportaciones S2.
+Rutas del proyecto y carpetas en Google Drive para exportaciones S2 y S1.
 
 El nombre ``DRIVE_S2_EXPORT_FOLDER`` debe coincidir **exactamente** con la carpeta en Drive
 (la que usa ``Export.image.toDrive(..., folder=...)`` en ``export_s2.py``, tras
@@ -32,6 +32,24 @@ DEFAULT_EE_CLOUD_PROJECT = "teleambagr"
 # ImageCollection semanal con assets ``Y{year}_W{week}`` (índices compuestos por semana ISO).
 # Sobrescribir: ``GEE_STATS_COLLECTION``.
 DEFAULT_S2_WEEKLY_COLLECTION = "projects/teleambagr/assets/S2_weekly_valpo"
+DEFAULT_S1_WEEKLY_COLLECTION = "projects/teleambagr/assets/S1_weekly_valpo"
+DEFAULT_SCALE_M = 10.0
+CONFIG_PATH = PROJECT_ROOT / "config.yaml"
+
+REPO_S1_DIR = PROJECT_ROOT / "data" / "sentinel1"
+DRIVE_S1_EXPORT_FOLDER = (
+    os.environ.get("FIC_DRIVE_S1_EXPORT_FOLDER", "").strip()
+    or "FIC_RASTER_S1_semanales"
+)
+
+GEE_COLLECTION = (
+    os.environ.get("GEE_STATS_COLLECTION", "").strip()
+    or DEFAULT_S2_WEEKLY_COLLECTION
+)
+GEE_S1_COLLECTION = (
+    os.environ.get("GEE_S1_COLLECTION", "").strip()
+    or DEFAULT_S1_WEEKLY_COLLECTION
+)
 
 
 def resolve_ee_cloud_project(cli: str | None = None) -> str:
@@ -43,3 +61,6 @@ def resolve_ee_cloud_project(cli: str | None = None) -> str:
         if v:
             return v
     return DEFAULT_EE_CLOUD_PROJECT
+
+
+GEE_CLOUD_PROJECT = resolve_ee_cloud_project()

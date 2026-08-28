@@ -202,7 +202,11 @@ def main() -> None:
     except ValueError:
         preview_rel = preview_path
     print(f"OK {raster_key} -> {preview_rel}")
-    print(f"metadata -> {metadata_path.relative_to(REPO_ROOT)}")
+    try:
+        meta_rel = metadata_path.relative_to(REPO_ROOT)
+    except ValueError:
+        meta_rel = metadata_path
+    print(f"metadata -> {meta_rel}")
 
 
 if __name__ == "__main__":

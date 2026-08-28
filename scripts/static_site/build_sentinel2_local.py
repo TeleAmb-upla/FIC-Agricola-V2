@@ -105,6 +105,8 @@ OPERATIVE_INDEX_BANDS: tuple[str, ...] = (
     "EVI",
     "PSRI",
 )
+# 9 índices + clear_pixel_count en cada TIF local descargado desde GEE.
+EXPECTED_S2_TIF_BANDS = len(OPERATIVE_INDEX_BANDS) + 1
 OPERATIVE_INDEX_SET: frozenset[str] = frozenset(OPERATIVE_INDEX_BANDS)
 
 # Visualización por banda (vmin, vmax, colormap matplotlib).
@@ -130,13 +132,15 @@ WEBP_QUALITY = 86
 WEBP_METHOD = 4  # PIL WebP: 0=rápido, 6=más compresión. 4 balance velocidad/tamaño.
 WEBP_UPSCALE_MIN_SIDE = 512  # Predios pequeños (~15×25 px); suavizar antes de colorear.
 
-# Divisor por banda (los TIF guardan los índices como int16-en-float64 escalados ×1000;
-# ``clear_pixel_count`` es entero crudo).
-DIVISOR_DEFAULT = 1000.0
-# Escala Int16 por banda (coherente con export_s2.index_int16_scale): REDEDGE ×10, el resto ×1000.
+# Divisor por banda al leer TIF: valor_físico ≈ pixel_dn / divisor.
+# Formato nuevo (Int8 en GEE): índices normalizados ×100, PSRI ×10, REDEDGE ×10.
+# Formato legacy (Int16): índices ×1000, REDEDGE ×10.
+DIVISOR_DEFAULT = 100.0
+DIVISOR_LEGACY_DEFAULT = 1000.0
 BAND_DIVISOR_OVERRIDE: dict[str, float] = {
     "CLEAR_PIXEL_COUNT": 1.0,
     "REDEDGE_POSITION": 10.0,
+    "PSRI": 10.0,
 }
 # MCARI puede tener píxeles espurios (denominador ~0); fuera de este rango → nodata.
 BAND_PHYSICAL_CLAMP: dict[str, tuple[float, float]] = {
@@ -148,8 +152,24 @@ SKIP_BANDS: set[str] = {"CLEAR_PIXEL_COUNT"}
 
 def is_published_band(name: str) -> bool:
     return str(name or "").strip().upper() in OPERATIVE_INDEX_SET
-# Valores sentinel adicionales (vienen como int16): ±32767 / ±32768.
-SENTINEL_VALUES = (32767.0, -32767.0, 32768.0, -32768.0)
+
+
+def infer_band_divisor(band: str, dn_sample: np.ndarray) -> float:
+    """Detecta escala legacy (×1000) vs nueva (×100) a partir de magnitud del DN."""
+    b = str(band or "").strip().upper()
+    if b in BAND_DIVISOR_OVERRIDE:
+        return float(BAND_DIVISOR_OVERRIDE[b])
+    valid = dn_sample[np.isfinite(dn_sample)]
+    if valid.size == 0:
+        return DIVISOR_DEFAULT
+    mx = float(np.nanmax(np.abs(valid)))
+    if mx > 250.0:
+        return DIVISOR_LEGACY_DEFAULT
+    return DIVISOR_DEFAULT
+
+
+# Valores sentinel (nodata en assets Int16/Int8): ±127/±128 y legacy ±32767.
+SENTINEL_VALUES = (32767.0, -32767.0, 32768.0, -32768.0, 127.0, -127.0, 128.0, -128.0)
 
 
 # ---------------------------------------------------------------------------
@@ -237,9 +257,18 @@ def discover_tifs(tif_dir: Path, s2_to_wetland: dict[str, str] | None = None) ->
     Los archivos ``S2_G5_…`` se renombran lógicamente a ``l_martinez`` si ``s2_to_wetland`` lo indica.
     """
     grouped: dict[str, list[dict]] = defaultdict(list)
+    skipped_legacy = 0
     for path in sorted(tif_dir.glob("S2_*.tif")):
         m = _STEM_RE.match(path.stem)
         if not m:
+            continue
+        try:
+            with rasterio.open(path) as ds:
+                if int(ds.count) != EXPECTED_S2_TIF_BANDS:
+                    skipped_legacy += 1
+                    continue
+        except Exception:
+            skipped_legacy += 1
             continue
         file_predio = m.group("predio").upper()
         wetland_key = file_predio.lower()
@@ -252,6 +281,12 @@ def discover_tifs(tif_dir: Path, s2_to_wetland: dict[str, str] | None = None) ->
         except ValueError:
             continue
         grouped[wetland_key].append({"path": path, "year": y, "week": w, "thursday": th})
+    if skipped_legacy:
+        print(
+            f"  [aviso] Omitidos {skipped_legacy} TIF con ≠{EXPECTED_S2_TIF_BANDS} bandas "
+            f"(formato legacy). Ejecuta export_s2_predio_local.py para re-descargar.",
+            file=sys.stderr,
+        )
     for predio in grouped:
         grouped[predio].sort(key=lambda r: r["thursday"])
     return dict(grouped)
@@ -286,9 +321,14 @@ def read_stack(predio_records: list[dict]) -> tuple[np.ndarray, list[str], dict]
     n_dates = len(predio_records)
     stack = np.full((n_dates, n_bands, ref_h, ref_w), np.nan, dtype=np.float32)
 
-    # Divisor por banda (resuelto desde band_names para no recalcular en cada iteración).
+    # Divisor por banda (auto-detecta legacy ×1000 vs nuevo ×100 en el primer TIF).
+    with rasterio.open(predio_records[0]["path"]) as ds0b:
+        sample0 = ds0b.read().astype(np.float32, copy=False)
     div_per_band = np.array(
-        [BAND_DIVISOR_OVERRIDE.get(b, DIVISOR_DEFAULT) for b in band_names],
+        [
+            infer_band_divisor(b, sample0[bi] if bi < sample0.shape[0] else sample0[0])
+            for bi, b in enumerate(band_names)
+        ],
         dtype=np.float32,
     ).reshape(-1, 1, 1)
 

@@ -1,0 +1,94 @@
+Hola,
+
+Gracias por el detalle de lo que ya lograste automatizar. Te confirmo cómo está armado nuestro código hoy, porque en varios puntos la intuición que tienes es correcta.
+
+---
+
+## TIFF por cuartel
+
+**No exportamos TIFF semanales ni históricos por cuartel.** Todo el raster intermedio y final va a nivel **predio**.
+
+Flujo real:
+
+1. Mosaico regional semanal en GEE (`Y2026_W05`, etc.) — ImageCollection `S2_weekly_valpo`.
+2. Recorte por predio a local: `scripts/gee/export_s2_predio_local.py`  
+   → `data/sentinel2/S2_{PREDIO}_Y{AAAA}_W{SS}.tif`  
+   La geometría de recorte sale de la **unión de cuarteles** del predio (`cuarteles.geojson` + `config.yaml`), pero el archivo es uno por predio, no uno por cuartel.
+3. Build del sitio: `scripts/static_site/build_sentinel2_local.py`  
+   → WebP + JSON + CSV en `data_static/sentinel2/`, también por predio.
+
+En el mapa, el WebP es del predio completo y el explorador hace **clip en el navegador** al polígono del cuartel seleccionado (`explorador.html` + `cuarteles.geojson`). No hay capa raster separada por cuartel.
+
+### Estadísticas por cuartel
+
+Tu sospecha va bien encaminada:
+
+- `build_sentinel2_local.py` calcula series y CSV **solo a nivel predio** (media espacial sobre el stack de TIFs del predio).
+- Los datos **por cuartel** no salen solos. Hay que correr aparte:
+
+  `python scripts/static_site/augment_cuartel_timeseries.py`
+
+  Ese script **no exporta TIFF**. Lee los mismos TIF locales del predio, enmascara por geometría de cada `id_cuartel`, y recalcula las series en local. Escribe el bloque `cuarteles` dentro de `data_static/sentinel2/timeseries.json` (y lo mismo para dron si corres `--source all`).
+
+- Si **no** se ha corrido `augment_cuartel_timeseries.py`, el front al elegir un cuartel **cae al dato del predio** (hay fallback en `explorador.html`). No es que copie literalmente un campo, pero el gráfico muestra lo mismo que el predio porque no existe bloque `cuarteles` en el JSON.
+
+Para dron pasa parecido: `export_data_ortho.py` deja series por predio; el desglose por cuartel lo hace `augment_cuartel_timeseries.py` leyendo los TIF de `data/drone/`.
+
+Scripts relacionados con cuarteles pero **no** generan TIFF:
+- `scripts/data_prep/sync_predios_master.py` — sincroniza geojson/CSV
+- `scripts/static_site/build_drone_raster_cuartel_outlines.py` — contornos geojson opcionales (el mapa hoy no los pide directo)
+- `scripts/static_site/build_cuarteles_display_geojson.py` — contornos alineados al píxel del WebP
+
+---
+
+## Conversión TIFF → WebP
+
+**Sentinel-2:**  
+`scripts/static_site/build_sentinel2_local.py`  
+Lee `data/sentinel2/S2_*.tif`, arma compositos (anual / mensual / semanal) y escribe  
+`data_static/sentinel2/rasters/S2_{PREDIO}_{COMPOSITE}_{BANDA}.webp`
+
+Utilidad aparte si solo cambia el colormap sin rehacer todo:  
+`scripts/static_site/remap_s2_webp_colormap.py`
+
+**Dron:**  
+`scripts/static_site/export_data_ortho.py`  
+Lee `data/drone/{CODIGO}_YYYYMMDD_{indice}.tif` →  
+`data_static/drone/rasters/{CODIGO}_YYYY_MM_DD_{indice}.webp`
+
+---
+
+## Extracción de estadísticas por predio — ¿GEE o local?
+
+Para lo que publica el **sitio web**, el cómputo es **local en Python**, no en GEE en el momento del build.
+
+Cadena:
+
+1. GEE genera el mosaico regional (`export_s2.py` → ImageCollection).
+2. Se bajan recortes por predio a disco (`export_s2_predio_local.py` desde la IC; en nuestro flujo actual **no** pasamos por Drive — bajada directa con `getDownloadURL` de Earth Engine).
+3. `build_sentinel2_local.py` abre esos TIF locales, aplica máscara del predio, y con NumPy calcula medias espaciales y las series (`compute_weekly_timeseries`, etc.). De ahí salen `timeseries.json`, los CSV en `data_static/sentinel2/csv/` y los WebP.
+
+**No** usamos las imágenes de Drive ni de Cloud Storage para ese paso en el código actual; usamos los TIF en `data/sentinel2/`. Si ustedes exportan a Storage, habría que bajarlos a esa carpeta (o adaptar el script) para que `build_sentinel2_local.py` los encuentre.
+
+Hay otro script, `scripts/gee/stats_s2_shapes.py`, que **sí** hace estadística zonal en GEE (`reduceRegions`) sobre la ImageCollection. Es análisis paralelo / export CSV fuera del sitio; **no** alimenta el explorador hoy.
+
+---
+
+## Resumen de scripts por paso (S2 → sitio)
+
+| Paso | Script |
+|------|--------|
+| Mosaicos semanales en GEE | `scripts/gee/export_s2.py` |
+| TIF por predio (local) | `scripts/gee/export_s2_predio_local.py` |
+| WebP + metadata + series predio | `scripts/static_site/build_sentinel2_local.py` |
+| Series por cuartel (opcional) | `scripts/static_site/augment_cuartel_timeseries.py` |
+| Orquestador habitual | `scripts/gee/run_s2_fill_and_build.ps1` (predio local + build; **no** incluye augment) |
+
+---
+
+Si en su automatización ya tienen TIF semanales/mensuales por predio en Cloud Storage, el encaje con nuestro código sería: sincronizar esos archivos a `data/sentinel2/` con el naming `S2_{PREDIO}_Y{AAAA}_W{SS}.tif` y correr `build_sentinel2_local.py` (+ `augment_cuartel_timeseries.py` si quieren gráficos por cuartel).
+
+Cualquier cosa lo vemos en una llamada corta.
+
+Saludos,
+Javier

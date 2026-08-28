@@ -10,7 +10,7 @@
         "cultivo": "Uva de mesa",
         "nom_predio": "Parcela 14",
         "propietario": "Juan Contreras",
-        "superficie": "3.64453",
+        "superficie": "3.64452",
         "predio_id": "j_contreras",
         "raster_key": "j_contreras_20260121_thermal",
         "fuente": "drone_webp_alpha"
@@ -7585,11 +7585,11 @@
             ],
             [
               -70.61521556367555,
-              -32.748029253570195
+              -32.74803036877871
             ],
             [
               -70.61521667888407,
-              -32.748029253570195
+              -32.74803036877871
             ],
             [
               -70.61521667888407,

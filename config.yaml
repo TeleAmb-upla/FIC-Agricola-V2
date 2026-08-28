@@ -12,7 +12,7 @@ cuarteles_geojson_authoritative: true
 shapefile_id_col: "id_cuartel"
 shapefile_name_col: "nom_predio"
 
-year_start: 2017
+year_start: 2018
 year_end: auto
 
 predios:
@@ -114,6 +114,12 @@ predios:
     aoi_filter_val: "FIC-V-FERNANDEZ-X"
     drone_code: "V_FERNANDEZ"
     s2_code: "V_FERNANDEZ"
+  r_salazar:
+    name: "Palto — Rodrigo Salazar"
+    aoi_filter_col: "poligono_vuelo"
+    aoi_filter_val: "FIC-R-SALAZAR-X"
+    drone_code: "R_SALAZAR"
+    s2_code: "R_SALAZAR"
 
 sources:
   sentinel2:
@@ -126,6 +132,15 @@ sources:
     color: "#38bdf8"
     # 9 índices operativos GEE (ver scripts/gee/README.md).
     indices: ["ndvi", "ndmi", "mndwi", "rededge_position", "mcari", "gndvi", "msavi", "evi", "psri"]
+  sentinel1:
+    label: "Sentinel-1"
+    description: "Radar C-band semanal (RVI, γ0 dB, humedad relativa VV)."
+    input_root: "data/sentinel1"
+    static_root: "data_static/sentinel1"
+    enabled: true
+    download_enabled: true
+    color: "#0f766e"
+    indices: ["rvi", "vv_db", "vh_db", "ssm"]
   drone:
     label: "Dron multiespectral"
     description: "Ortofotos e índices de campañas de vuelo."
@@ -135,7 +150,7 @@ sources:
     enabled: true
     download_enabled: false
     color: "#22c55e"
-    indices: ["ndvi", "ndwi", "rgb", "thermal"]
+    indices: ["ndvi", "ndwi", "ndci", "rgb", "thermal"]
     # Archivos planos: L_MARTINEZ_YYYYMMDD_ndvi.tif → data_static/drone/rasters/…webp
     flat_date_filenames: true
 
@@ -184,6 +199,12 @@ indices:
     description: "Índice de humedad"
     bands: ["B3", "B8"]
     colormap: "RdYlBu"
+    vmin: -1
+    vmax: 1
+  ndci:
+    label: "NDCI"
+    description: "Índice de clorofila (borde rojo)"
+    colormap: "RdYlGn"
     vmin: -1
     vmax: 1
   rgb:

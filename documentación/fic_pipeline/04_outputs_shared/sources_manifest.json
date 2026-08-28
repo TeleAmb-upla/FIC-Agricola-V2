@@ -1,0 +1,52 @@
+{
+  "generated_at": "2026-07-09T17:03:19.129951+00:00",
+  "aoi_path": "predios_aoi.geojson",
+  "year_range": {
+    "start": 2017,
+    "end": 2026
+  },
+  "sources": {
+    "drone": {
+      "id": "drone",
+      "label": "Dron multiespectral",
+      "description": "Ortofotos e índices de campañas de vuelo.",
+      "color": "#22c55e",
+      "has_data": true,
+      "timeseries_path": "drone/timeseries.json",
+      "metadata_path": "drone/metadata.json",
+      "csv_dir": "drone/csv",
+      "status": "ready",
+      "summary": {
+        "n_predios": 16,
+        "n_periods": 5,
+        "data_points": 42,
+        "raster_count": 78,
+        "total_area_ha": 83.9,
+        "latest_period": "Vuelo 18 Jun 2026",
+        "available_years": [
+          2026
+        ]
+      }
+    },
+    "sentinel2": {
+      "id": "sentinel2",
+      "label": "Satélite Sentinel-2",
+      "description": "Mosaicos semanales Sentinel-2 por predio (agregados locales).",
+      "color": "#1d6b4a",
+      "has_data": true,
+      "timeseries_path": "sentinel2/timeseries.json",
+      "metadata_path": "sentinel2/metadata.json",
+      "csv_dir": "sentinel2/csv",
+      "status": "ready",
+      "summary": {
+        "n_wetlands": 16,
+        "raster_count": 13536,
+        "available_years": [
+          2024,
+          2025,
+          2026
+        ]
+      }
+    }
+  }
+}

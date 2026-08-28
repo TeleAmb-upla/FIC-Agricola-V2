@@ -1,0 +1,3 @@
+source,predio_id,predio_name,index,date,year,season,period_key,mean
+drone,a_brito_rpa,El resguardo RPA — Alejandra Brito,NDVI,2026-05-28,2026,28 May 2026,20260528,0.5373
+drone,a_brito_rpa,El resguardo RPA — Alejandra Brito,NDWI,2026-05-28,2026,28 May 2026,20260528,-0.2111

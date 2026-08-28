@@ -1,1 +1,1 @@
-"""Exportación a ``data_static/`` y utilidades compartidas (orto, dron, Sentinel-2 en el sitio)."""
+"""Exportación a ``data_static/`` (dron, Sentinel-2 y Sentinel-1)."""

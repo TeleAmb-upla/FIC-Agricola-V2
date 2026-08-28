@@ -1,1 +1,1 @@
-{"aoi_mtime_ns":1783447940011474600,"current_year":2026,"geom_mask_v":1,"last_complete_month":[2026,6],"last_complete_week":[2026,24],"max_tif_mtime_ns":1782390873809987000,"n_tifs":128,"thursday_first":"2024-01-04","thursday_last":"2026-06-11"}
+{"aoi_mtime_ns":1787862196325727200,"current_year":2026,"geom_mask_v":1,"last_complete_month":[2026,7],"last_complete_week":[2026,34],"max_tif_mtime_ns":1787862569742578200,"n_tifs":138,"thursday_first":"2024-01-04","thursday_last":"2026-08-20"}

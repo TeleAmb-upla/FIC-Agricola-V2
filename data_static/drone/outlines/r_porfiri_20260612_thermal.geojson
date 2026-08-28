@@ -5,12 +5,12 @@
     {
       "type": "Feature",
       "properties": {
-        "id_cuartel": "c00019",
+        "id_cuartel": "c00020",
         "nom_cuartel": "2",
         "cultivo": "Uva de mesa",
         "nom_predio": "Hacienda Rinconada",
         "propietario": "Ricardo Porfiri",
-        "superficie": "4.18653",
+        "superficie": "4.18585",
         "predio_id": "r_porfiri",
         "raster_key": "r_porfiri_20260612_thermal",
         "fuente": "drone_webp_alpha"
@@ -12174,12 +12174,12 @@
     {
       "type": "Feature",
       "properties": {
-        "id_cuartel": "c00020",
+        "id_cuartel": "c00021",
         "nom_cuartel": "3",
         "cultivo": "Uva de mesa",
         "nom_predio": "Hacienda Rinconada",
         "propietario": "Ricardo Porfiri",
-        "superficie": "2.94562",
+        "superficie": "2.94514",
         "predio_id": "r_porfiri",
         "raster_key": "r_porfiri_20260612_thermal",
         "fuente": "drone_webp_alpha"
@@ -22913,12 +22913,12 @@
     {
       "type": "Feature",
       "properties": {
-        "id_cuartel": "c00021",
+        "id_cuartel": "c00022",
         "nom_cuartel": "4",
         "cultivo": "Uva de mesa",
         "nom_predio": "Hacienda Rinconada",
         "propietario": "Ricardo Porfiri",
-        "superficie": "3.02729",
+        "superficie": "3.02679",
         "predio_id": "r_porfiri",
         "raster_key": "r_porfiri_20260612_thermal",
         "fuente": "drone_webp_alpha"
@@ -32746,12 +32746,12 @@
     {
       "type": "Feature",
       "properties": {
-        "id_cuartel": "c00022",
+        "id_cuartel": "c00023",
         "nom_cuartel": "5",
         "cultivo": "Uva de mesa",
         "nom_predio": "Hacienda Rinconada",
         "propietario": "Ricardo Porfiri",
-        "superficie": "1.19807",
+        "superficie": "1.19787",
         "predio_id": "r_porfiri",
         "raster_key": "r_porfiri_20260612_thermal",
         "fuente": "drone_webp_alpha"

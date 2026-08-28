@@ -1,0 +1,32 @@
+Hola,
+
+Perdón la demora. Te adjunto un zip con ejemplos y un LEEME adentro que explica el pipeline con más calma.
+
+Resumo por acá lo que me preguntaste:
+
+1) Inputs que no están en GEE
+
+Lo principal en local es:
+- config.yaml (raíz) — ahí están definidos los predios y los códigos S2/dron
+- data/vectors/cuarteles/cuarteles.geojson — polígonos por cuartel, de acá salen los recortes
+- data/fic_database.csv — atributos y lo del login
+- data_static/predios_aoi.geojson — un polígono por predio para exportar
+- data/vectors/kml/FIC-*.kmz — polígonos de vuelo DJI originales
+
+En GEE solo uso el AOI regional (Area_Agricola_Reg_Valpo_2025) para generar los mosaicos grandes, y la colección S2_weekly_valpo donde quedan las semanas. Los recortes por predio no los subo a Assets; los bajo a data/sentinel2/ con un script de Python.
+
+2) Patrones de nombres
+
+- Mosaico grande en GEE: Y2026_W05, Y2026_W06, etc. (año + semana ISO)
+- TIF local por predio: S2_E_SAZO_Y2026_W12.tif (el código del predio va en mayúsculas)
+- WebP del sitio S2: S2_E_SAZO_annual_2025_NDVI.webp (o monthly_current_06, weekly_current_12, etc.)
+- CSV: e_sazo_timeseries.csv (acá el predio va en minúsculas, como en config.yaml)
+- Dron webp: E_SAZO_2026_06_12_ndvi.webp
+
+El mapa solo lee data_static/, no data/ ni GEE directo.
+
+En el zip van muestras de cada tipo de salida (3 por grupo más o menos), con la ruta indicada en el LEEME. Los TIF intermedios de sentinel2 no los pude incluir porque en este momento la carpeta estaba vacía (estamos regenerando la colección en GEE); cuando terminen las tareas se vuelven a bajar solos.
+
+Si algo no te cuadra con lo que ves en el código avísame y lo vemos juntos.
+
+Saludos,

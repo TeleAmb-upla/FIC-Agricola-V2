@@ -1516,6 +1516,14 @@
                     </div>
                 </div>
 
+                <div class="fic-sidebar-block" id="ficSatProductBlock" hidden>
+                    <label class="selector-label" for="ficSatProductSelect">Sensor</label>
+                    <select id="ficSatProductSelect" title="Sentinel-2 (óptico) o Sentinel-1 (radar)">
+                        <option value="sentinel2">Sentinel-2 (óptico)</option>
+                        <option value="sentinel1">Sentinel-1 (radar)</option>
+                    </select>
+                </div>
+
                 <div>
                     <div class="fic-sidebar-block">
                         <label class="selector-label" for="mapIndex">Capa</label>
@@ -1839,16 +1847,54 @@ const HIERARCHY_LEVELS = {
 };
 const NIVEL_LEGACY = { agricultor_satelital: 'agricultor', sensor: 'agricultor' };
 
-/** Clave de fuente no-dron del manifiesto (p. ej. ``sentinel2``). */
-function getSatelliteSourceKey() {
+/** Fuentes satélite publicadas en el manifiesto (S2 y/o S1). */
+function satelliteSourceKeys() {
     var srcs = state.manifest && state.manifest.sources;
-    if (!srcs) return null;
-    if (srcs.sentinel2) return 'sentinel2';
-    var keys = Object.keys(srcs);
-    for (var i = 0; i < keys.length; i++) {
-        if (keys[i] !== 'drone') return keys[i];
+    if (!srcs) return [];
+    var keys = [];
+    if (srcs.sentinel2 && srcs.sentinel2.has_data) keys.push('sentinel2');
+    if (srcs.sentinel1 && srcs.sentinel1.has_data) keys.push('sentinel1');
+    if (!keys.length) {
+        if (srcs.sentinel2) keys.push('sentinel2');
+        else if (srcs.sentinel1) keys.push('sentinel1');
     }
-    return null;
+    return keys;
+}
+
+function isSatelliteSourceKey(key) {
+    return key === 'sentinel2' || key === 'sentinel1';
+}
+
+/** Clave de fuente satélite activa (S2 por defecto). */
+function getSatelliteSourceKey() {
+    var keys = satelliteSourceKeys();
+    if (!keys.length) {
+        var srcs = state.manifest && state.manifest.sources;
+        if (!srcs) return null;
+        var all = Object.keys(srcs);
+        for (var i = 0; i < all.length; i++) {
+            if (all[i] !== 'drone') return all[i];
+        }
+        return null;
+    }
+    if (keys.indexOf(state.satProduct) >= 0) return state.satProduct;
+    state.satProduct = keys[0];
+    return keys[0];
+}
+
+function syncSatProductSelect() {
+    var block = document.getElementById('ficSatProductBlock');
+    var sel = document.getElementById('ficSatProductSelect');
+    if (!block || !sel) return;
+    var keys = satelliteSourceKeys();
+    var show = isSatelliteSourceKey(state.selectedSource) && keys.length > 1;
+    block.hidden = !show;
+    if (!show) return;
+    Array.prototype.forEach.call(sel.options, function (opt) {
+        opt.hidden = keys.indexOf(opt.value) < 0;
+        opt.disabled = opt.hidden;
+    });
+    sel.value = getSatelliteSourceKey() || 'sentinel2';
 }
 
 const CBAR = {
@@ -2446,6 +2492,8 @@ const state = {
     datasets: {},
     metadata: {},
     selectedSource: null,
+    /** ``sentinel2`` | ``sentinel1`` cuando el origen es satélite. */
+    satProduct: 'sentinel2',
     selectedPredio: null,
     hierarchyLevel: null,
     authSession: null,
@@ -2806,6 +2854,7 @@ function syncSourcePillsDom() {
         }
         if (bSat && bDrone) applyPressed(onSat, bSat, bDrone);
     }
+    syncSatProductSelect();
     ficSyncLidarAttrPanelVisibility();
 }
 
@@ -2822,6 +2871,16 @@ function ficBindSourcePills() {
     bDrone.addEventListener('click', function () {
         if (contextShowsDronePill()) void setSource('drone');
     });
+    var prod = document.getElementById('ficSatProductSelect');
+    if (prod && !prod.dataset.ficBound) {
+        prod.dataset.ficBound = '1';
+        prod.addEventListener('change', function () {
+            var v = prod.value;
+            if (!isSatelliteSourceKey(v)) return;
+            state.satProduct = v;
+            void setSource(v);
+        });
+    }
 }
 
 /** Promedio espacial del último vuelo en series dron para un índice numérico (NDVI, NDWI…). */
@@ -3142,6 +3201,10 @@ function satBand() {
     var keys = Object.keys(indices);
     var sel = String(state.mapLayerKind || '').toUpperCase();
     if (sel && keys.indexOf(sel) >= 0) return sel;
+    if (state.selectedSource === 'sentinel1') {
+        if (keys.indexOf('RVI') >= 0) return 'RVI';
+        return keys[0] || 'RVI';
+    }
     if (keys.indexOf('NDVI') >= 0) return 'NDVI';
     if (keys.indexOf('ndvi') >= 0) return 'ndvi';
     return keys[0] || 'NDVI';
@@ -4057,7 +4120,7 @@ function predioHasDroneRasterForPeriod(wid, periodKey, indexKey) {
 function predioHasDroneFlightForPeriod(wid, periodKey) {
     if (!wid || !periodKey) return false;
     if (predioHasLidarData(wid, periodKey)) return true;
-    var indices = ['ndvi', 'ndwi', 'rgb', 'thermal'];
+    var indices = ['ndvi', 'ndwi', 'ndci', 'rgb', 'thermal'];
     for (var fi = 0; fi < indices.length; fi++) {
         if (predioHasDroneRasterForPeriod(wid, periodKey, indices[fi])) return true;
     }
@@ -4957,12 +5020,20 @@ function ficTimeseriesForPredio(predio, sourceKey) {
 var FIC_SAT_OPERATIVE_BANDS = [
     'NDVI', 'NDMI', 'MNDWI', 'EVI', 'MSAVI', 'GNDVI', 'MCARI', 'PSRI', 'REDEDGE_POSITION'
 ];
+var FIC_S1_OPERATIVE_BANDS = ['RVI', 'VV_DB', 'VH_DB', 'SSM'];
+
+function ficSatOperativeBandList() {
+    if (state.selectedSource === 'sentinel1') return FIC_S1_OPERATIVE_BANDS;
+    return FIC_SAT_OPERATIVE_BANDS;
+}
 
 /** ¿Valor en rango físico razonable para publicar en UI? */
 function ficSatBandValueInRange(bandKey, value) {
     if (value == null || !isFinite(Number(value))) return false;
     var v = Number(value);
     var b = String(bandKey || '').toUpperCase();
+    if (b === 'VV_DB' || b === 'VH_DB') return v >= -40 && v <= 15;
+    if (b === 'RVI' || b === 'SSM') return v >= -0.05 && v <= 5;
     if (b === 'REDEDGE_POSITION') return v >= 680 && v <= 760;
     if (b === 'CLEAR_PIXEL_COUNT') return v >= 0;
     return v >= -2.5 && v <= 2.5;
@@ -5009,7 +5080,7 @@ function ficSatBandHasUsableData(bandKey, predio) {
 function ficSatOperativeIndices(indices) {
     var src = indices || {};
     var out = {};
-    FIC_SAT_OPERATIVE_BANDS.forEach(function (band) {
+    ficSatOperativeBandList().forEach(function (band) {
         var meta = src[band] || src[band.toLowerCase()];
         if (!meta || !ficSatBandHasUsableData(band)) return;
         out[band] = meta;
@@ -6139,7 +6210,15 @@ async function loadManifest() {
 async function setSource(sourceKey) {
     var prevSource = state.selectedSource;
     state.selectedSource = sourceKey;
+    if (isSatelliteSourceKey(sourceKey)) state.satProduct = sourceKey;
     if (prevSource !== sourceKey) {
+        if (sourceKey === 'sentinel1') {
+            var s1ok = String(state.mapLayerKind || '').toUpperCase();
+            if (FIC_S1_OPERATIVE_BANDS.indexOf(s1ok) < 0) state.mapLayerKind = 'RVI';
+        } else if (sourceKey === 'sentinel2') {
+            var s2ok = String(state.mapLayerKind || '').toUpperCase();
+            if (FIC_SAT_OPERATIVE_BANDS.indexOf(s2ok) < 0) state.mapLayerKind = 'NDVI';
+        }
         state.mapPeriodKey = null;
         state._lastMapFitContextKey = null;
         state._satMapFitSig = null;
@@ -6462,6 +6541,11 @@ var FIC_INDEX_DESCRIPTIONS = {
         map: 'Muestra dónde hay valores relativamente mayores o menores dentro de este predio y fecha.',
         chart: 'El gráfico ayuda a seguir cambios de humedad superficial entre períodos.'
     },
+    ndci: {
+        what: 'Contenido de clorofila en el cultivo (índice de borde rojo).',
+        map: 'Compara zonas con valores relativamente más altos o más bajos dentro del cuartel.',
+        chart: 'Sigue la evolución temporal de la clorofila entre vuelos.'
+    },
     ndmi: {
         what: 'Humedad en el follaje de las plantas.',
         map: 'Indica diferencias relativas entre zonas; revísalo junto al riego, suelo y clima.',
@@ -6509,6 +6593,26 @@ var FIC_INDEX_DESCRIPTIONS = {
     lidar: {
         what: 'Modelo 3D del terreno y del dosel.',
         map: 'Permite ver relieve y altura del cultivo por zona.'
+    },
+    rvi: {
+        what: 'Índice de vegetación radar (RVI) a partir de VV y VH de Sentinel-1.',
+        map: 'Valores más altos suelen asociarse a más biomasa o dosel más denso, siempre relativo a este predio.',
+        chart: 'Compara la evolución semanal o mensual del RVI entre el histórico y el año actual.'
+    },
+    vv_db: {
+        what: 'Retrodispersión γ0 en polarización VV, en decibeles.',
+        map: 'Zonas más claras u oscuras indican diferencias de rugosidad y humedad superficial.',
+        chart: 'Sigue cambios de retrodispersión en el tiempo (lluvia, labranza, cobertura).'
+    },
+    vh_db: {
+        what: 'Retrodispersión γ0 en polarización VH, en decibeles.',
+        map: 'Sensible a volumen de vegetación; compara zonas del cuartel dentro de la escala.',
+        chart: 'Útil junto a RVI para ver cambios de estructura del cultivo.'
+    },
+    ssm: {
+        what: 'Humedad relativa del suelo estimada por cambio de VV (modelo tipo TU Wien).',
+        map: '0–1 relativo a la serie del píxel; se enmascaran agua permanente y zonas muy brillantes (urbano).',
+        chart: 'Compara humedad relativa entre semanas; no es un % volumétrico de laboratorio.'
     }
 };
 
@@ -6634,7 +6738,7 @@ function predioHasLidarData(wid, periodKey) {
 
 function droneIndicesForSelect() {
     var raw = (currentMeta().indices || {});
-    var indices = state.selectedSource === 'sentinel2'
+    var indices = isSatelliteSourceKey(state.selectedSource)
         ? ficSatOperativeIndices(raw)
         : Object.assign({}, raw);
     if (state.selectedSource === 'drone' && state.selectedPredio && predioHasAnyLidarData(state.selectedPredio)) {
@@ -6758,7 +6862,7 @@ function refreshMapLayerState() {
         return;
     }
     if (idxKeys.indexOf(state.mapLayerKind) < 0) {
-        if (state.selectedSource === 'sentinel2') {
+        if (isSatelliteSourceKey(state.selectedSource)) {
             var upperKind = String(state.mapLayerKind || '').toUpperCase();
             if (idxKeys.indexOf(upperKind) >= 0) state.mapLayerKind = upperKind;
         }

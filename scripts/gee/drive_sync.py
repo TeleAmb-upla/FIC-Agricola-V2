@@ -318,6 +318,11 @@ SYNC_REGISTRY: dict[str, DriveSyncSpec] = {
         paths.REPO_S2_DIR,
         (".tif", ".tiff", ".geotiff", ".csv", ".json", ".geojson"),
     ),
+    "s1": DriveSyncSpec(
+        paths.DRIVE_S1_EXPORT_FOLDER,
+        paths.REPO_S1_DIR,
+        (".tif", ".tiff", ".geotiff"),
+    ),
 }
 
 
@@ -411,7 +416,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--only",
         default="all",
-        help="Claves: s2 (única) o all.",
+        help="Claves: s2, s1 o all.",
     )
     parser.add_argument(
         "--only-files",

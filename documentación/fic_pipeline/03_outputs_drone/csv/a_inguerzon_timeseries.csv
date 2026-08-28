@@ -1,0 +1,3 @@
+source,predio_id,predio_name,index,date,year,season,period_key,mean
+drone,a_inguerzon,Alfalfa — Anita Inguerzon,NDVI,2026-06-18,2026,18 Jun 2026,20260618,0.2763
+drone,a_inguerzon,Alfalfa — Anita Inguerzon,NDWI,2026-06-18,2026,18 Jun 2026,20260618,-0.053

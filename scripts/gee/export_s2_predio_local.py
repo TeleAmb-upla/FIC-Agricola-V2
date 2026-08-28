@@ -39,8 +39,9 @@ from paths import DEFAULT_S2_WEEKLY_COLLECTION, resolve_ee_cloud_project
 DEFAULT_COLLECTION = DEFAULT_S2_WEEKLY_COLLECTION
 LOCAL_STEM_RE = re.compile(r"^S2_([A-Za-z0-9_]+)_Y(\d{4})_W(\d{2})$", re.I)
 EE_WEEK_BASENAME_RE = re.compile(r"^Y(\d{4})_W(\d{2})$", re.I)
-# Mismas bandas que el asset (int16 con escala por banda + clear_pixel_count crudo).
+# Mismas bandas que el asset (int8/int16 + clear_pixel_count).
 COMPOSED_BANDS = COMPOSED_INDEX_BANDS + ["clear_pixel_count"]
+EXPECTED_BAND_COUNT = len(COMPOSED_BANDS)
 SKIP_PREDIO_CODES = {"LOTE_DEMO"}
 
 
@@ -135,6 +136,33 @@ def asset_basename(year: int, week: int) -> str:
     return f"Y{year}_W{week:02d}"
 
 
+def purge_legacy_local_tifs(dest: Path, *, dry_run: bool = False) -> int:
+    """
+    Elimina TIF locales con formato antiguo (p. ej. 29 bandas GEE legacy).
+
+    Solo conserva archivos con exactamente ``EXPECTED_BAND_COUNT`` bandas operativas.
+    """
+    import rasterio
+
+    removed = 0
+    for path in sorted(dest.glob("S2_*.tif")):
+        try:
+            with rasterio.open(path) as ds:
+                n_bands = int(ds.count)
+        except Exception as exc:
+            print(f"  [WARN] no se pudo leer {path.name}: {exc}", file=sys.stderr)
+            continue
+        if n_bands == EXPECTED_BAND_COUNT:
+            continue
+        if dry_run:
+            print(f"  [dry-run] eliminaría {path.name} ({n_bands} bandas)")
+        else:
+            path.unlink(missing_ok=True)
+            print(f"  eliminado {path.name} ({n_bands} bandas ≠ {EXPECTED_BAND_COUNT})")
+        removed += 1
+    return removed
+
+
 def stamp_band_descriptions(tif_path: Path, band_names: list[str]) -> None:
     """GEE getDownloadURL no conserva nombres de banda; los escribimos como en G1."""
     import rasterio
@@ -213,7 +241,27 @@ def main() -> None:
         action="store_true",
         help="Exportar semanas faltantes para todos los predios del AOI (incluido el de referencia).",
     )
+    ap.add_argument(
+        "--year",
+        type=int,
+        default=None,
+        metavar="AAAA",
+        help="Limitar el calendario a un año ISO (p. ej. 2026).",
+    )
+    ap.add_argument(
+        "--no-purge-legacy",
+        action="store_true",
+        help="No borrar TIF locales con formato antiguo (≠10 bandas) antes de exportar.",
+    )
     args = ap.parse_args()
+
+    if not args.no_purge_legacy and args.dest.is_dir():
+        n_legacy = purge_legacy_local_tifs(args.dest, dry_run=args.dry_run)
+        if n_legacy:
+            print(
+                f"TIF legacy eliminados: {n_legacy} "
+                f"(se conservan solo {EXPECTED_BAND_COUNT} bandas: {', '.join(COMPOSED_BANDS)})"
+            )
 
     config = load_config(REPO_ROOT / "config.yaml")
     project = resolve_ee_cloud_project(args.project)
@@ -225,6 +273,9 @@ def main() -> None:
     weeks = merge_calendar_weeks(
         args.dest, args.reference, args.collection, sync_ee=args.sync_ee_weeks
     )
+    if args.year is not None:
+        weeks = [(y, w) for y, w in weeks if y == int(args.year)]
+        print(f"Filtro --year {args.year}: {len(weeks)} semana(s).")
     if not weeks:
         print(f"No hay semanas locales para S2_{args.reference.upper()}_*", file=sys.stderr)
         sys.exit(1)
@@ -246,6 +297,7 @@ def main() -> None:
     ref_n = len(weeks)
     print(f"Semanas en calendario ({args.reference.upper()}): {ref_n} | rango: {weeks[0]} … {weeks[-1]}")
     print(f"Destino: {args.dest}")
+    print(f"Bandas por TIF: {EXPECTED_BAND_COUNT} ({', '.join(COMPOSED_BANDS)})")
     print(f"Predios a exportar ({len(targets)}): {', '.join(targets)}")
 
     total_jobs = sum(

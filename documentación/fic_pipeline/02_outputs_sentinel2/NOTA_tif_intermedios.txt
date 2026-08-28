@@ -1,0 +1,4 @@
+data/sentinel2/ estaba vacío al empaquetar.
+Los TIF se generan con:
+  python scripts/gee/export_s2_predio_local.py --reference E_SAZO --sync-ee-weeks --fill-missing-weeks
+Patrón: data/sentinel2/S2_{S2_CODE}_Y{AAAA}_W{SS}.tif (10 bandas)
