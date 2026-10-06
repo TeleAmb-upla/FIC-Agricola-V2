@@ -908,9 +908,13 @@ def normalize_drone_index_band_values(
     data: np.ndarray,
     src,
     band_idx: int = 1,
+    invalid: np.ndarray | None = None,
 ) -> np.ndarray:
     """
     Convierte la banda cruda de un GeoTIFF de índice (NDVI, NDWI, etc.) a magnitud física ~[-1, 1].
+
+    ``invalid`` (opcional) excluye píxeles nodata al inferir la escala: un nodata finito
+    como -9999 no debe confundirse con un índice guardado ×10 000.
 
     Muchos flujos de fotogrametría multiespectral guardan el índice como entero 16 bits
     (valor × 10 000, p. ej. -2534 ↔ -0,2534). Sin reescalar, la media zonal y el colormap
@@ -935,6 +939,8 @@ def normalize_drone_index_band_values(
         out = out * sc + off
 
     finite = np.isfinite(out)
+    if invalid is not None and invalid.shape == out.shape:
+        finite &= ~invalid
     if finite.any():
         mx = float(np.nanmax(np.abs(out[finite])))
         mn = float(np.nanmin(out[finite]))
@@ -1038,7 +1044,7 @@ def _extract_zonal_mean_gdalwarp(tiff_path: Path, zone_geom_wgs84: dict) -> floa
                     raw.astype(np.float64), float(dst.nodata), rtol=1e-5, atol=1e-6
                 )
             invalid |= ~np.isfinite(raw.astype(np.float64))
-            physical = normalize_drone_index_band_values(raw, dst, band_idx=1)
+            physical = normalize_drone_index_band_values(raw, dst, band_idx=1, invalid=invalid)
         return _trimmed_physical_mean(physical, invalid)
     except Exception as exc:
         print(f"    [zonal gdalwarp fallback] {exc}")
@@ -1068,7 +1074,7 @@ def _full_raster_trimmed_mean(tiff_path: Path, max_dim: int = 1024) -> float | N
             invalid = ~np.isfinite(raw)
             if src.nodata is not None and np.isfinite(float(src.nodata)):
                 invalid |= np.isclose(raw, float(src.nodata), rtol=1e-5, atol=1e-6)
-            physical = normalize_drone_index_band_values(raw, src, band_idx=1)
+            physical = normalize_drone_index_band_values(raw, src, band_idx=1, invalid=invalid)
             return _trimmed_physical_mean(physical, invalid)
     except Exception as exc:
         print(f"    [zonal full-raster fallback] {exc}")
@@ -1111,7 +1117,7 @@ def extract_zonal_mean(
                 )
             invalid |= ~np.isfinite(raw.astype(np.float64))
 
-            physical = normalize_drone_index_band_values(raw, src, band_idx=1)
+            physical = normalize_drone_index_band_values(raw, src, band_idx=1, invalid=invalid)
             value = _trimmed_physical_mean(physical, invalid)
             if value is None and allow_full_raster_fallback:
                 fv = _full_raster_trimmed_mean(tiff_path)
@@ -1150,7 +1156,7 @@ def _full_raster_trimmed_median(tiff_path: Path, max_dim: int = 1024) -> float |
             invalid = ~np.isfinite(raw)
             if src.nodata is not None and np.isfinite(float(src.nodata)):
                 invalid |= np.isclose(raw, float(src.nodata), rtol=1e-5, atol=1e-6)
-            physical = normalize_drone_index_band_values(raw, src, band_idx=1)
+            physical = normalize_drone_index_band_values(raw, src, band_idx=1, invalid=invalid)
             return _trimmed_physical_median(physical, invalid)
     except Exception as exc:
         print(f"    [zonal full-raster median fallback] {exc}")
@@ -1187,7 +1193,7 @@ def extract_zonal_median(
                 )
             invalid |= ~np.isfinite(raw.astype(np.float64))
 
-            physical = normalize_drone_index_band_values(raw, src, band_idx=1)
+            physical = normalize_drone_index_band_values(raw, src, band_idx=1, invalid=invalid)
             value = _trimmed_physical_median(physical, invalid)
             if value is None and allow_full_raster_fallback:
                 fv = _full_raster_trimmed_median(tiff_path)

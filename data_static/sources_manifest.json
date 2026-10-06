@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-27T20:54:07.648927+00:00",
+  "generated_at": "2026-10-05T20:06:03.042469+00:00",
   "aoi_path": "predios_aoi.geojson",
   "year_range": {
     "start": 2017,
@@ -18,11 +18,11 @@
       "status": "ready",
       "summary": {
         "n_predios": 16,
-        "n_periods": 5,
-        "data_points": 42,
-        "raster_count": 78,
+        "n_periods": 6,
+        "data_points": 56,
+        "raster_count": 93,
         "total_area_ha": 83.9,
-        "latest_period": "Vuelo 18 Jun 2026",
+        "latest_period": "Vuelo 26 Jun 2026",
         "available_years": [
           2026
         ]
@@ -40,7 +40,7 @@
       "status": "ready",
       "summary": {
         "n_wetlands": 17,
-        "raster_count": 16218,
+        "raster_count": 17136,
         "available_years": [
           2024,
           2025,

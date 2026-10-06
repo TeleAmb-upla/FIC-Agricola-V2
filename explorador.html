@@ -424,6 +424,7 @@
 
         .helper { font-size: 0.9rem; color: var(--fic-ag-muted); line-height: 1.45; margin-bottom: 0.65rem; }
         .fic-sidebar-block { display: flex; flex-direction: column; gap: 0.28rem; margin-top: 0; }
+        .fic-sidebar-block[hidden] { display: none !important; }
         #ficLidarAttrFields[hidden] { display: none !important; }
         #ficLidarAttrFields {
             margin-top: 0.9rem;
@@ -805,6 +806,14 @@
             color: var(--fic-ag-dark);
             line-height: 1.15;
         }
+        .fic-sat-compare-yrs__note {
+            font-size: 0.68rem;
+            font-weight: 700;
+            color: #9a3412;
+            text-align: center;
+            line-height: 1.2;
+        }
+        .fic-sat-compare-yrs__note[hidden] { display: none; }
         .fic-sat-panel__map {
             position: absolute;
             inset: 0;
@@ -2876,7 +2885,10 @@ function ficBindSourcePills() {
         prod.dataset.ficBound = '1';
         prod.addEventListener('change', function () {
             var v = prod.value;
-            if (!isSatelliteSourceKey(v)) return;
+            if (!isSatelliteSourceKey(v) || satelliteSourceKeys().indexOf(v) < 0) {
+                syncSatProductSelect();
+                return;
+            }
             state.satProduct = v;
             void setSource(v);
         });
@@ -3059,7 +3071,7 @@ async function loadFicDatabaseCsv() {
     var u = 0;
     for (; u < urls.length; u++) {
         try {
-            var r = await fetch(urls[u]);
+            var r = await fetch(urls[u], { cache: 'no-cache' });
             if (!r.ok) continue;
             parseAndStoreFicDatabaseCsv(await r.text());
             return;
@@ -3406,6 +3418,7 @@ function ensureSatMapPeriodHasRaster() {
     clampSatPillToViewModeItems(viewMode);
     var band = satBand();
     var wid = state.selectedPredio;
+    ficSatApplyAutoPillForPredio(viewMode, wid, band);
     var pill = satCurrentPillValue(viewMode);
     if (predioHasSatRasterForPill(wid, viewMode, pill, band)) return;
     var items = satTemporalItemsWithRaster(viewMode, band, wid);
@@ -3441,9 +3454,11 @@ function ensureSatLeftDefaults() {
     var sm = getSatMeta();
     var vmW = (sm.view_modes && sm.view_modes.weekly) || {};
     if (!state.satViewMode) state.satViewMode = 'monthly';
+    if (!state._satAutoPill) state._satAutoPill = {};
     if (state.satLeftMonth == null) {
         var lcm = sm.last_complete_month && sm.last_complete_month.month;
         state.satLeftMonth = lcm || ((new Date()).getMonth() || 12);
+        state._satAutoPill.monthly = { value: state.satLeftMonth, predio: null };
     }
     if (state.satLeftWeek == null) {
         var lcw = (sm.last_complete_week && sm.last_complete_week.week) || vmW.default_week;
@@ -3453,7 +3468,34 @@ function ensureSatLeftDefaults() {
             lcw = Math.max(1, Math.min(52, Math.ceil(doy / 7)));
         }
         state.satLeftWeek = lcw;
+        state._satAutoPill.weekly = { value: state.satLeftWeek, predio: null };
     }
+}
+
+/** Último mes/semana (hasta el último período completo) con imagen actual válida para el predio. */
+function ficSatLatestPillWithCurrentData(wid, viewMode, band) {
+    var vm = satViewModeMeta(viewMode);
+    var items = viewMode === 'weekly' ? (vm.weeks || []) : (vm.months || []);
+    for (var i = items.length - 1; i >= 0; i--) {
+        if (ficSatHasCurrentDataForPill(wid, viewMode, items[i], band)) return items[i];
+    }
+    return null;
+}
+
+/** Mientras el usuario no mueva el selector, el período por defecto sigue al último con dato actual del predio
+ *  (p. ej. si la última semana completa quedó cubierta de nubes). */
+function ficSatApplyAutoPillForPredio(viewMode, wid, band) {
+    var auto = state._satAutoPill && state._satAutoPill[viewMode];
+    if (!auto || !wid) return;
+    var pill = satCurrentPillValue(viewMode);
+    if (auto.value !== pill || auto.predio === wid) return;
+    var latest = ficSatLatestPillWithCurrentData(wid, viewMode, band);
+    if (latest != null) {
+        if (viewMode === 'monthly') state.satLeftMonth = latest;
+        else state.satLeftWeek = latest;
+    }
+    auto.value = satCurrentPillValue(viewMode);
+    auto.predio = wid;
 }
 
 function mapFitContextKey() {
@@ -3499,6 +3541,7 @@ function ficUpdateSatCompareOverlays(opts) {
     var rightCK = satCompositeKeyForPill('right', viewMode, pill);
     var rightRaster = ficSatResolveRightRaster(predio, viewMode, pill, band);
     _setSatOverlay('right', rightRaster, rightCK);
+    ficSyncSatRightNoDataNote();
     applySatSwipeClip();
 }
 
@@ -4633,6 +4676,7 @@ function buildSatPeriodPills() {
                 previewIdx = i;
                 if (viewMode === 'monthly') state.satLeftMonth = items[i];
                 else state.satLeftWeek = items[i];
+                if (state._satAutoPill) state._satAutoPill[viewMode] = null;
                 syncUiFromState();
                 ficUpdateSatCompareOverlays({ force: true });
             }
@@ -4682,6 +4726,7 @@ function buildSatPeriodPills() {
                 if (i < 0 || i >= items.length) return;
                 if (viewMode === 'monthly') state.satLeftMonth = items[i];
                 else state.satLeftWeek = items[i];
+                if (state._satAutoPill) state._satAutoPill[viewMode] = null;
                 updateSatSplitOverlays();
             }
             btnMinus.addEventListener('click', function () { step(-1); });
@@ -4743,7 +4788,33 @@ function syncSatCompareYearSubtitles() {
     vR.textContent = rightYear;
     rightEl.appendChild(kR);
     rightEl.appendChild(vR);
+    ficSyncSatRightNoDataNote();
     ficSyncSatCompareYearLabelVisibility();
+}
+
+/** Aviso bajo «Estado actual» cuando el período elegido no tiene imagen válida en el año en curso. */
+function ficSyncSatRightNoDataNote() {
+    var rightEl = document.getElementById('ficSatSideYearRight');
+    if (!rightEl) return;
+    var note = rightEl.querySelector('.fic-sat-compare-yrs__note');
+    if (!note) {
+        note = document.createElement('span');
+        note.className = 'fic-sat-compare-yrs__note';
+        rightEl.appendChild(note);
+    }
+    var predio = state.selectedPredio;
+    var viewMode = state.satViewMode || 'monthly';
+    var pill = satCurrentPillValue(viewMode);
+    if (!isSatSplitMode() || !predio || pill == null
+        || ficSatResolveRightRaster(predio, viewMode, pill, satBand())) {
+        note.hidden = true;
+        note.textContent = '';
+        return;
+    }
+    note.textContent = ficSatPillBeyondLastComplete(viewMode, pill)
+        ? 'Período aún sin datos'
+        : 'Sin imagen válida (nubosidad)';
+    note.hidden = false;
 }
 
 /** Oculta el bloque completo del lado que queda tapado al mover el divisor. */
@@ -4786,6 +4857,7 @@ function updateSatSplitOverlays() {
     var rightCK = satCompositeKeyForSide('right', viewMode);
     var rightRaster = ficSatResolveRightRaster(predio, viewMode, pill, band);
     _setSatOverlay('right', rightRaster, rightCK);
+    ficSyncSatRightNoDataNote();
     _ficSatOverlaySig = ficSatOverlayUpdateSig(viewMode, predio, band, pill);
     state._satOverlaySig = overlaySig;
 
@@ -6155,7 +6227,7 @@ async function loadPrediosAoiGeojson() {
 }
 
 async function fetchJson(url) {
-    const response = await fetch(url);
+    const response = await fetch(url, { cache: 'no-cache' });
     if (!response.ok) throw new Error('No se pudo cargar ' + url);
     return response.json();
 }
@@ -6208,6 +6280,12 @@ async function loadManifest() {
 }
 
 async function setSource(sourceKey) {
+    var srcs = (state.manifest && state.manifest.sources) || {};
+    if (!srcs[sourceKey]) {
+        var fallbackKey = getSatelliteSourceKey();
+        if (!fallbackKey || !srcs[fallbackKey]) return;
+        sourceKey = fallbackKey;
+    }
     var prevSource = state.selectedSource;
     state.selectedSource = sourceKey;
     if (isSatelliteSourceKey(sourceKey)) state.satProduct = sourceKey;

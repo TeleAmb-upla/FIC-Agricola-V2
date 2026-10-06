@@ -1,0 +1,1 @@
+{"aoi_mtime_ns":1791229811078159000,"current_year":2026,"geom_mask_v":1,"last_complete_month":[2026,9],"last_complete_week":[2026,39],"max_tif_mtime_ns":1791225707343458500,"n_tifs":143,"thursday_first":"2024-01-04","thursday_last":"2026-09-24"}

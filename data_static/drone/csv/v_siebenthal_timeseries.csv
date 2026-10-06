@@ -1,3 +1,4 @@
 source,predio_id,predio_name,index,date,year,season,period_key,mean
 drone,v_siebenthal,Von Siebenthal — Viña Von Siebenthal,NDVI,2026-06-12,2026,12 Jun 2026,20260612,0.2274
 drone,v_siebenthal,Von Siebenthal — Viña Von Siebenthal,NDWI,2026-06-12,2026,12 Jun 2026,20260612,-0.0342
+drone,v_siebenthal,Von Siebenthal — Viña Von Siebenthal,NDCI,2026-06-12,2026,12 Jun 2026,20260612,0.2623
